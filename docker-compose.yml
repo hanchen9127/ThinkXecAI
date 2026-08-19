@@ -1,0 +1,17 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg18
+    container_name: thinkxecai-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: thinkxecai
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${THINKXECAI_DB_PASSWORD}
+    ports:
+      - "5433:5432"
+    volumes:
+      - thinkxecai-postgres-data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d
+
+volumes:
+  thinkxecai-postgres-data:
