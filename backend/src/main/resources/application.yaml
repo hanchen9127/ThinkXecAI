@@ -1,0 +1,47 @@
+# Secret placeholders below default to empty (${VAR:}) rather than failing here directly -
+# Spring's relaxed property binding silently accepts an unresolved bare ${VAR}, so the real
+# fail-fast check lives in RequiredSecretsValidator (com.thinkxecai.config), not in this file.
+spring:
+  application:
+    name: thinkxecai-backend
+
+  datasource:
+    url: jdbc:postgresql://localhost:5433/thinkxecai
+    username: postgres
+    password: ${THINKXECAI_DB_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+
+  mail:
+    host: smtp.qq.com
+    port: 587
+    username: ${THINKXECAI_MAIL_USERNAME:}
+    password: ${THINKXECAI_MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+  ai:
+    deepseek:
+      api-key: ${THINKXECAI_DEEPSEEK_API_KEY:}
+      chat:
+        options:
+          model: deepseek-chat
+    openai:
+      api-key: ${THINKXECAI_OPENAI_API_KEY:}
+      chat:
+        options:
+          model: gpt-5.4-mini
+
+mybatis:
+  mapper-locations: classpath:mapper/**/*.xml
+  type-aliases-package: com.thinkxecai.model
+  type-handlers-package: com.thinkxecai.typehandler
+  configuration:
+    map-underscore-to-camel-case: true
+
+thinkxecai:
+  document:
+    storage-path: ./data/documents

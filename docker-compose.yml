@@ -10,7 +10,7 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - thinkxecai-postgres-data:/var/lib/postgresql/data
+      - thinkxecai-postgres-data:/var/lib/postgresql
       - ./db/init:/docker-entrypoint-initdb.d
 
 volumes:
