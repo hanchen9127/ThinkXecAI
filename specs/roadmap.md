@@ -55,11 +55,11 @@ Acceptance criteria:
 
 ## Phase 4: Frontend Setup
 
-1. [ ] Create a React 19 and TypeScript Vite app.
-2. [ ] Add the exact frontend dependencies from `tech-stack.md`.
-3. [ ] Configure Tailwind CSS and ESLint.
-4. [ ] Implement the shared API wrapper with `BASE_URL = "http://localhost:8080/api"`.
-5. [ ] Implement typed API functions for all backend endpoints.
+1. [x] Create a React 19 and TypeScript Vite app.
+2. [x] Add the exact frontend dependencies from `tech-stack.md`.
+3. [x] Configure Tailwind CSS and ESLint.
+4. [x] Implement the shared API wrapper with `BASE_URL = "http://localhost:8080/api"`.
+5. [x] Implement typed API functions for all backend endpoints.
 
 Acceptance criteria:
 
