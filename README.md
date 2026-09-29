@@ -7,9 +7,6 @@ models, give them tools and knowledge bases, chat with them, and watch generated
 stream in live. It's built with Spring Boot + Spring AI on the backend, React + Ant Design
 on the frontend, and PostgreSQL + pgvector for storage and retrieval.
 
-This repository is being rebuilt from an empty project against the specs in [`specs/`](specs/),
-which are the source of truth for scope and behavior — see [Specs](#specs) below.
-
 ## Features
 
 - **Configurable agents** — name, description, system prompt, chat model, allowed tools,
@@ -29,8 +26,8 @@ which are the source of truth for scope and behavior — see [Specs](#specs) bel
 - **React frontend** — sidebar layout with tabs for agents, chats, and knowledge bases;
   modals for creating agents/knowledge bases; a chat view with live streaming updates.
 
-See [`specs/mission.md`](specs/mission.md) for the full product scope, including explicit
-non-goals (no auth, no WebSockets, no alternate databases, etc.).
+Out of scope by design: authentication/authorization, multi-tenancy, WebSocket transport,
+token-by-token streaming, and document formats other than Markdown.
 
 ## Tech Stack
 
@@ -42,20 +39,15 @@ non-goals (no auth, no WebSockets, no alternate databases, etc.).
 | Embeddings| Local Ollama, model `bge-m3`, 1024-dim vectors                              |
 | Frontend  | React 19, TypeScript, Vite (`rolldown-vite`), Tailwind CSS, Ant Design + `@ant-design/x` |
 | Realtime  | Server-Sent Events (SSE), one connection per chat session                   |
-
-Exact dependency versions and architectural rules are pinned in
-[`specs/tech-stack.md`](specs/tech-stack.md).
-
 ## Project Status
 
-This project is being rebuilt phase by phase per [`specs/roadmap.md`](specs/roadmap.md).
-Current status:
+This project is being built phase by phase. Current status:
 
-- [x] Phase 1 — Repository baseline (`specs/`, `docker-compose.yml`, `backend/`, `ui/`)
+- [x] Phase 1 — Repository baseline (`docker-compose.yml`, `backend/`, `ui/`)
 - [x] Phase 2 — Database schema (`db/init/*.sql`, core tables + sample e-commerce data)
 - [x] Phase 3 — Backend project setup (Spring Boot app, config, secrets validation)
 - [x] Phase 4 — Frontend setup (React/Vite app, typed API client)
-- [ ] Phase 5 — Common backend foundation (`ApiResponse`, DTOs, entities, converters)
+- [x] Phase 5 — Common backend foundation (`ApiResponse`, DTOs, entities, converters)
 - [ ] Phase 6 — MyBatis persistence layer
 - [ ] Phase 7 — Facade services and REST APIs
 - [ ] Phase 8 — Markdown ingestion and RAG
@@ -89,7 +81,7 @@ Copy the example env file and fill in real values (never commit `.env`):
 cp .env.example .env
 ```
 
-Required variables (see [`specs/tech-stack.md#secrets`](specs/tech-stack.md)):
+Required variables:
 
 | Variable                      | Purpose                          |
 |--------------------------------|-----------------------------------|
@@ -140,7 +132,6 @@ backend/      Spring Boot application (controllers, services, mappers, agent run
 ui/           React + TypeScript + Vite frontend
 db/init/      PostgreSQL initialization SQL (schema, indexes, sample data)
 docker-compose.yml   PostgreSQL with pgvector
-specs/        Project constitution: mission, tech stack, and rebuild roadmap
 ```
 
 ## API
@@ -151,20 +142,20 @@ All JSON REST endpoints live under `/api` and return a consistent envelope:
 { "code": 200, "message": "success", "data": { } }
 ```
 
-Errors use `code: 500` (or a specific error code) with `data: null`. The full endpoint
-list and SSE contract are defined in
-[`specs/tech-stack.md#backend-rest-and-sse-contracts`](specs/tech-stack.md).
+Errors use `code: 500` (or a specific error code) with `data: null`.
 
-## Specs
+| Resource        | Endpoints                                                                 |
+|-----------------|---------------------------------------------------------------------------|
+| Agents          | `GET/POST /agents`, `PATCH/DELETE /agents/{agentId}` |
+| Chat sessions   | `GET/POST /chat-sessions`, `GET/PATCH/DELETE /chat-sessions/{chatSessionId}`, `GET /chat-sessions/agent/{agentId}` |
+| Chat messages   | `GET /chat-messages/session/{sessionId}`, `POST /chat-messages`, `PATCH/DELETE /chat-messages/{chatMessageId}` |
+| Knowledge bases | `GET/POST /knowledge-bases`, `PATCH/DELETE /knowledge-bases/{knowledgeBaseId}` |
+| Documents       | `GET/POST /documents`, `GET /documents/kb/{kbId}`, `POST /documents/upload`, `PATCH/DELETE /documents/{documentId}` |
+| Tools           | `GET /tools` (optional tools only) |
 
-The [`specs/`](specs/) directory is the project's constitution and source of truth:
-
-- [`specs/mission.md`](specs/mission.md) — purpose, product goals, feature scope, non-goals.
-- [`specs/tech-stack.md`](specs/tech-stack.md) — exact technologies, versions, contracts,
-  and runtime behavior.
-- [`specs/roadmap.md`](specs/roadmap.md) — the phased rebuild plan and acceptance criteria.
-
-Changes to product direction or architecture should update these specs first.
+Live agent output streams from `GET /sse/connect/{chatSessionId}` (`text/event-stream`):
+an `init` event on connect, then `message` events carrying JSON of the form
+`{ "type": ..., "payload": { "message", "statusText", "done" }, "metadata": { "chatMessageId" } }`.
 
 ## License
 
