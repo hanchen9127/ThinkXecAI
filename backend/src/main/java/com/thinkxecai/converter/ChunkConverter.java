@@ -2,12 +2,8 @@ package com.thinkxecai.converter;
 
 import com.thinkxecai.model.dto.ChunkDTO;
 import com.thinkxecai.model.entity.ChunkEntity;
-import com.thinkxecai.model.request.CreateChunkRequest;
 import com.thinkxecai.model.vo.ChunkVO;
 import org.springframework.stereotype.Component;
-
-import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Component
 public class ChunkConverter {
@@ -53,17 +49,6 @@ public class ChunkConverter {
                 .title(dto.getTitle())
                 .content(dto.getContent())
                 .createdAt(dto.getCreatedAt())
-                .build();
-    }
-
-    /** Embedding is left unset here; the ingestion service fills it in after calling Ollama. */
-    public ChunkDTO fromCreateRequest(CreateChunkRequest request) {
-        return ChunkDTO.builder()
-                .kbId(UUID.fromString(request.getKbId()))
-                .docId(UUID.fromString(request.getDocId()))
-                .title(request.getTitle())
-                .content(request.getContent())
-                .createdAt(LocalDateTime.now())
                 .build();
     }
 
