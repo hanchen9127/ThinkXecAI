@@ -1,0 +1,52 @@
+name: backend-tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Throwaway values: CI uses a disposable database and never calls external services.
+      THINKXECAI_DB_PASSWORD: ci-postgres
+      THINKXECAI_MAIL_USERNAME: ci@example.com
+      THINKXECAI_MAIL_PASSWORD: ci-dummy
+      THINKXECAI_OPENAI_API_KEY: ci-dummy
+      THINKXECAI_DEEPSEEK_API_KEY: ci-dummy
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Start PostgreSQL and run db/init
+        run: docker compose up -d --wait --wait-timeout 120
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+
+      - name: Test
+        working-directory: backend
+        run: mvn -B -ntp test
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: surefire-reports
+          path: backend/target/surefire-reports/
+
+      - name: PostgreSQL logs
+        if: failure()
+        run: docker compose logs postgres

@@ -1,5 +1,9 @@
 # ThinkXecAI
 
+[![backend-tests](https://github.com/hanchen9127/ThinkXecAI/actions/workflows/backend-tests.yml/badge.svg)](https://github.com/hanchen9127/ThinkXecAI/actions/workflows/backend-tests.yml)
+[![frontend-tests](https://github.com/hanchen9127/ThinkXecAI/actions/workflows/frontend-tests.yml/badge.svg)](https://github.com/hanchen9127/ThinkXecAI/actions/workflows/frontend-tests.yml)
+[![build](https://github.com/hanchen9127/ThinkXecAI/actions/workflows/build.yml/badge.svg)](https://github.com/hanchen9127/ThinkXecAI/actions/workflows/build.yml)
+
 A Java AI agent platform for reasoning, tool execution, RAG, and real-time SSE feedback.
 
 ThinkXecAI is a configurable AI agent assistant: create agents backed by different chat

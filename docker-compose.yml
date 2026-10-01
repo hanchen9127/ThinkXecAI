@@ -12,6 +12,13 @@ services:
     volumes:
       - thinkxecai-postgres-data:/var/lib/postgresql
       - ./db/init:/docker-entrypoint-initdb.d
+    # TCP check on purpose: the temporary server that runs db/init only listens on the Unix socket,
+    # so this turns healthy only after all init scripts have finished (lets `up --wait` be trusted).
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d thinkxecai"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
 
 volumes:
   thinkxecai-postgres-data:
