@@ -23,6 +23,9 @@
         <mybatis-spring-boot.version>3.0.3</mybatis-spring-boot.version>
         <flexmark.version>0.64.8</flexmark.version>
         <lombok.version>1.18.32</lombok.version>
+        <!-- Surefire skips tests tagged @Tag("external") (live Ollama / LLM calls) by default, so CI never
+             reaches external services. Run them locally with: mvn test -DexcludedGroups= -Dgroups=external -->
+        <excludedGroups>external</excludedGroups>
     </properties>
 
     <dependencyManagement>
