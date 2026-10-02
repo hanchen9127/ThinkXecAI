@@ -1,9 +1,9 @@
 package com.thinkxecai.converter;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.thinkxecai.exception.BizException;
+import com.thinkxecai.model.ChatMessageMetadata;
 import com.thinkxecai.model.ChatMessageRole;
 import com.thinkxecai.model.dto.ChatMessageDTO;
 import com.thinkxecai.model.entity.ChatMessageEntity;
@@ -14,14 +14,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
-import java.util.Map;
 import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
 public class ChatMessageConverter {
-
-    private static final TypeReference<Map<String, Object>> METADATA_MAP = new TypeReference<>() {};
 
     private final ObjectMapper objectMapper;
 
@@ -90,18 +87,18 @@ public class ChatMessageConverter {
         return existing;
     }
 
-    private Map<String, Object> readMetadata(String json) {
+    private ChatMessageMetadata readMetadata(String json) {
         if (json == null || json.isBlank()) {
             return null;
         }
         try {
-            return objectMapper.readValue(json, METADATA_MAP);
+            return objectMapper.readValue(json, ChatMessageMetadata.class);
         } catch (JsonProcessingException e) {
             throw new BizException("Failed to parse chat message metadata: " + e.getOriginalMessage());
         }
     }
 
-    private String writeMetadata(Map<String, Object> metadata) {
+    private String writeMetadata(ChatMessageMetadata metadata) {
         if (metadata == null) {
             return null;
         }
