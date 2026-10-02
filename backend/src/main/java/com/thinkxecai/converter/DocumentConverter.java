@@ -12,7 +12,6 @@ import com.thinkxecai.model.vo.DocumentVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.UUID;
 
@@ -67,13 +66,10 @@ public class DocumentConverter {
     }
 
     public DocumentDTO fromCreateRequest(CreateDocumentRequest request) {
-        LocalDateTime now = LocalDateTime.now();
         return DocumentDTO.builder()
                 .kbId(UUID.fromString(request.getKbId()))
                 .name(request.getName())
                 .metadata(request.getMetadata())
-                .createdAt(now)
-                .updatedAt(now)
                 .build();
     }
 
@@ -81,7 +77,6 @@ public class DocumentConverter {
     public DocumentDTO applyUpdateRequest(DocumentDTO existing, UpdateDocumentRequest request) {
         if (request.getName() != null) existing.setName(request.getName());
         if (request.getMetadata() != null) existing.setMetadata(request.getMetadata());
-        existing.setUpdatedAt(LocalDateTime.now());
         return existing;
     }
 

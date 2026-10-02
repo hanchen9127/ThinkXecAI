@@ -7,7 +7,6 @@ import com.thinkxecai.model.request.UpdateKnowledgeBaseRequest;
 import com.thinkxecai.model.vo.KnowledgeBaseVO;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
 
 @Component
 public class KnowledgeBaseConverter {
@@ -52,12 +51,9 @@ public class KnowledgeBaseConverter {
     }
 
     public KnowledgeBaseDTO fromCreateRequest(CreateKnowledgeBaseRequest request) {
-        LocalDateTime now = LocalDateTime.now();
         return KnowledgeBaseDTO.builder()
                 .name(request.getName())
                 .description(request.getDescription())
-                .createdAt(now)
-                .updatedAt(now)
                 .build();
     }
 
@@ -65,7 +61,6 @@ public class KnowledgeBaseConverter {
     public KnowledgeBaseDTO applyUpdateRequest(KnowledgeBaseDTO existing, UpdateKnowledgeBaseRequest request) {
         if (request.getName() != null) existing.setName(request.getName());
         if (request.getDescription() != null) existing.setDescription(request.getDescription());
-        existing.setUpdatedAt(LocalDateTime.now());
         return existing;
     }
 

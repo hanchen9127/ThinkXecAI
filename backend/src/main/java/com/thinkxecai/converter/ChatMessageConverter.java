@@ -13,7 +13,6 @@ import com.thinkxecai.model.vo.ChatMessageVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Component
@@ -68,14 +67,11 @@ public class ChatMessageConverter {
     }
 
     public ChatMessageDTO fromCreateRequest(CreateChatMessageRequest request) {
-        LocalDateTime now = LocalDateTime.now();
         return ChatMessageDTO.builder()
                 .sessionId(UUID.fromString(request.getSessionId()))
                 .role(request.getRole())
                 .content(request.getContent())
                 .metadata(request.getMetadata())
-                .createdAt(now)
-                .updatedAt(now)
                 .build();
     }
 
@@ -83,7 +79,6 @@ public class ChatMessageConverter {
     public ChatMessageDTO applyUpdateRequest(ChatMessageDTO existing, UpdateChatMessageRequest request) {
         if (request.getContent() != null) existing.setContent(request.getContent());
         if (request.getMetadata() != null) existing.setMetadata(request.getMetadata());
-        existing.setUpdatedAt(LocalDateTime.now());
         return existing;
     }
 

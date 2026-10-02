@@ -13,7 +13,6 @@ import com.thinkxecai.model.vo.AgentVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -83,7 +82,6 @@ public class AgentConverter {
     }
 
     public AgentDTO fromCreateRequest(CreateAgentRequest request) {
-        LocalDateTime now = LocalDateTime.now();
         return AgentDTO.builder()
                 .name(request.getName())
                 .description(request.getDescription())
@@ -92,8 +90,6 @@ public class AgentConverter {
                 .allowedTools(request.getAllowedTools() != null ? request.getAllowedTools() : List.of())
                 .allowedKbs(request.getAllowedKbs() != null ? request.getAllowedKbs() : List.of())
                 .chatOptions(request.getChatOptions() != null ? request.getChatOptions() : new ChatOptions())
-                .createdAt(now)
-                .updatedAt(now)
                 .build();
     }
 
@@ -106,7 +102,6 @@ public class AgentConverter {
         if (request.getAllowedTools() != null) existing.setAllowedTools(request.getAllowedTools());
         if (request.getAllowedKbs() != null) existing.setAllowedKbs(request.getAllowedKbs());
         if (request.getChatOptions() != null) existing.setChatOptions(request.getChatOptions());
-        existing.setUpdatedAt(LocalDateTime.now());
         return existing;
     }
 
