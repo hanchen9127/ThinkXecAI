@@ -33,7 +33,7 @@ CREATE TABLE chat_message (
     role        TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system', 'tool')),
     content     TEXT,
     metadata    JSONB,                                                            -- extra structured data, e.g. tool_call_id/tool name for role='tool' messages
-    created_at  TIMESTAMP NOT NULL DEFAULT now(),
+    created_at  TIMESTAMP NOT NULL DEFAULT clock_timestamp(),                     -- clock_timestamp(), not now(): now() is frozen per transaction, so messages saved together would tie and ORDER BY created_at would lose their order
     updated_at  TIMESTAMP NOT NULL DEFAULT now()
 );
 
