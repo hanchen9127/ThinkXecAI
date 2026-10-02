@@ -68,8 +68,11 @@ CREATE TABLE chunk_bge_m3 (
 );
 
 -- Approximate nearest-neighbor index so `ORDER BY embedding <-> :query LIMIT 3` stays fast as chunks grow.
+-- HNSW, not ivfflat: ivfflat trains its list centroids on the rows present at build time, and this
+-- script runs on an empty table, so small knowledge bases could get fewer than 3 (or zero) results.
+-- HNSW builds incrementally and needs no training data. vector_l2_ops matches the <-> operator.
 CREATE INDEX chunk_bge_m3_embedding_idx ON chunk_bge_m3
-    USING ivfflat (embedding vector_l2_ops) WITH (lists = 100);
+    USING hnsw (embedding vector_l2_ops);
 
 -- Supporting indexes for the foreign keys above, since Postgres does not create them automatically.
 CREATE INDEX chat_session_agent_id_idx ON chat_session(agent_id);
