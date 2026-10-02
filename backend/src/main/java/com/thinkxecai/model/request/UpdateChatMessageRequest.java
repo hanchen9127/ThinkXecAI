@@ -1,13 +1,13 @@
 package com.thinkxecai.model.request;
 
+import com.thinkxecai.model.ChatMessageMetadata;
 import lombok.Data;
 
-import java.util.Map;
 
 @Data
 public class UpdateChatMessageRequest {
 
     private String content;
-    private Map<String, Object> metadata;
+    private ChatMessageMetadata metadata;
 
 }

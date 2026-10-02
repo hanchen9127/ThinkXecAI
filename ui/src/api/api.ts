@@ -114,12 +114,33 @@ export function deleteChatSession(chatSessionId: string) {
 // Chat message
 // ---------------------------------------------------------------------------
 
+export interface ToolCallMetadata {
+  id: string
+  type: string
+  name: string
+  /** Raw JSON argument string, as produced by the model. */
+  arguments: string
+}
+
+export interface ToolResponseMetadata {
+  /** Matches the id of the ToolCallMetadata this response answers. */
+  id: string
+  name: string
+  responseData: string
+}
+
+/** Assistant messages that request tools carry toolCalls; tool messages carry toolResponse. */
+export interface ChatMessageMetadata {
+  toolCalls?: ToolCallMetadata[]
+  toolResponse?: ToolResponseMetadata
+}
+
 export interface ChatMessage {
   id: string
   sessionId: string
   role: ChatMessageRole
   content: string | null
-  metadata: Record<string, unknown> | null
+  metadata: ChatMessageMetadata | null
   createdAt: string
   updatedAt: string
 }
@@ -128,12 +149,12 @@ export interface CreateChatMessageRequest {
   sessionId: string
   role: ChatMessageRole
   content?: string | null
-  metadata?: Record<string, unknown> | null
+  metadata?: ChatMessageMetadata | null
 }
 
 export interface UpdateChatMessageRequest {
   content?: string | null
-  metadata?: Record<string, unknown> | null
+  metadata?: ChatMessageMetadata | null
 }
 
 export function listChatMessagesBySession(sessionId: string) {

@@ -1,5 +1,6 @@
 package com.thinkxecai.model.vo;
 
+import com.thinkxecai.model.ChatMessageMetadata;
 import com.thinkxecai.model.ChatMessageRole;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -7,7 +8,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
-import java.util.Map;
 
 @Data
 @NoArgsConstructor
@@ -19,7 +19,7 @@ public class ChatMessageVO {
     private String sessionId;
     private ChatMessageRole role;
     private String content;
-    private Map<String, Object> metadata;
+    private ChatMessageMetadata metadata;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
