@@ -37,7 +37,7 @@ token-by-token streaming, and document formats other than Markdown.
 
 | Layer     | Technology                                                                 |
 |-----------|-----------------------------------------------------------------------------|
-| Backend   | Java 17, Spring Boot 3.5.8, Spring AI 1.1.0, MyBatis, PostgreSQL JDBC       |
+| Backend   | Java 21, Spring Boot 3.5.16, Spring AI 1.1.0, MyBatis, PostgreSQL JDBC      |
 | AI models | Spring AI `ChatClient` over DeepSeek (`deepseek-chat`) and OpenAI (`gpt-5.4-mini`) |
 | Database  | PostgreSQL (`pgvector/pgvector:pg18`) with the `vector` extension           |
 | Embeddings| Local Ollama, model `bge-m3`, 1024-dim vectors                              |
@@ -69,7 +69,7 @@ currently only exposes health/diagnostic endpoints and the frontend runs as an e
 
 ### Prerequisites
 
-- Java 17 and Maven
+- Java 21 (e.g. Eclipse Temurin) and Maven
 - Node.js 20+ and npm
 - Docker (for PostgreSQL)
 - [Ollama](https://ollama.com/) running locally with the `bge-m3` model pulled:
