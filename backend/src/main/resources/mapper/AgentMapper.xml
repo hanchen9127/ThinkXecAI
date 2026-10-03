@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.thinkxecai.mapper.AgentMapper">
+
+    <sql id="columns">
+        id, name, description, system_prompt, model, allowed_tools, allowed_kbs, chat_options, created_at, updated_at
+    </sql>
+
+    <!--
+        JSONB parameters arrive as text, so they are cast with ::jsonb. A null JSONB field is left out
+        of the column list so the NOT NULL column keeps its default instead of failing on NULL.
+        Timestamps are left to the column defaults and read back with the generated id.
+    -->
+    <insert id="insert" useGeneratedKeys="true"
+            keyProperty="id,createdAt,updatedAt" keyColumn="id,created_at,updated_at">
+        INSERT INTO agent
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            name, description, system_prompt, model,
+            <if test="allowedTools != null">allowed_tools,</if>
+            <if test="allowedKbs != null">allowed_kbs,</if>
+            <if test="chatOptions != null">chat_options,</if>
+        </trim>
+        <trim prefix="VALUES (" suffix=")" suffixOverrides=",">
+            #{name}, #{description}, #{systemPrompt}, #{model},
+            <if test="allowedTools != null">#{allowedTools}::jsonb,</if>
+            <if test="allowedKbs != null">#{allowedKbs}::jsonb,</if>
+            <if test="chatOptions != null">#{chatOptions}::jsonb,</if>
+        </trim>
+    </insert>
+
+    <select id="selectById" resultType="com.thinkxecai.model.entity.AgentEntity">
+        SELECT <include refid="columns"/>
+        FROM agent
+        WHERE id = #{id}
+    </select>
+
+    <select id="listAll" resultType="com.thinkxecai.model.entity.AgentEntity">
+        SELECT <include refid="columns"/>
+        FROM agent
+        ORDER BY created_at DESC
+    </select>
+
+    <update id="update">
+        UPDATE agent
+        <set>
+            <if test="name != null">name = #{name},</if>
+            <if test="description != null">description = #{description},</if>
+            <if test="systemPrompt != null">system_prompt = #{systemPrompt},</if>
+            <if test="model != null">model = #{model},</if>
+            <if test="allowedTools != null">allowed_tools = #{allowedTools}::jsonb,</if>
+            <if test="allowedKbs != null">allowed_kbs = #{allowedKbs}::jsonb,</if>
+            <if test="chatOptions != null">chat_options = #{chatOptions}::jsonb,</if>
+            updated_at = now()
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM agent
+        WHERE id = #{id}
+    </delete>
+
+</mapper>
