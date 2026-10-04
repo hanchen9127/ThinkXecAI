@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.thinkxecai.mapper.ChatMessageMapper">
+
+    <sql id="columns">id, session_id, role, content, metadata, created_at, updated_at</sql>
+
+    <!--
+        metadata is a nullable JSONB column: the text parameter is cast with ::jsonb, and a null
+        value is simply stored as NULL. Timestamps are left to the column defaults.
+    -->
+    <insert id="insert" useGeneratedKeys="true"
+            keyProperty="id,createdAt,updatedAt" keyColumn="id,created_at,updated_at">
+        INSERT INTO chat_message (session_id, role, content, metadata)
+        VALUES (#{sessionId}, #{role}, #{content}, #{metadata}::jsonb)
+    </insert>
+
+    <select id="selectById" resultType="com.thinkxecai.model.entity.ChatMessageEntity">
+        SELECT <include refid="columns"/>
+        FROM chat_message
+        WHERE id = #{id}
+    </select>
+
+    <select id="listBySessionId" resultType="com.thinkxecai.model.entity.ChatMessageEntity">
+        SELECT <include refid="columns"/>
+        FROM chat_message
+        WHERE session_id = #{sessionId}
+        ORDER BY created_at ASC
+    </select>
+
+    <!-- Latest N: the inner query picks the newest rows, the outer query puts them back in chronological order. -->
+    <select id="selectRecentBySessionId" resultType="com.thinkxecai.model.entity.ChatMessageEntity">
+        SELECT <include refid="columns"/>
+        FROM (
+            SELECT <include refid="columns"/>
+            FROM chat_message
+            WHERE session_id = #{sessionId}
+            ORDER BY created_at DESC
+            LIMIT #{limit}
+        ) recent
+        ORDER BY created_at ASC
+    </select>
+
+    <update id="update">
+        UPDATE chat_message
+        <set>
+            <if test="content != null">content = #{content},</if>
+            <if test="metadata != null">metadata = #{metadata}::jsonb,</if>
+            updated_at = now()
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM chat_message
+        WHERE id = #{id}
+    </delete>
+
+</mapper>
