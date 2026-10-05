@@ -37,8 +37,8 @@ token-by-token streaming, and document formats other than Markdown.
 
 | Layer     | Technology                                                                 |
 |-----------|-----------------------------------------------------------------------------|
-| Backend   | Java 21, Spring Boot 3.5.16, Spring AI 1.1.0, MyBatis, PostgreSQL JDBC      |
-| AI models | Spring AI `ChatClient` over DeepSeek (`deepseek-chat`) and OpenAI (`gpt-5.4-mini`) |
+| Backend   | Java 21, Spring Boot 3.5.16, Spring AI 1.1.8, MyBatis, PostgreSQL JDBC      |
+| AI models | Spring AI `ChatClient` over DeepSeek (`deepseek-chat`) and Google Gemini (`gemini-3.8-flash`) |
 | Database  | PostgreSQL (`pgvector/pgvector:pg18`) with the `vector` extension           |
 | Embeddings| Local Ollama, model `bge-m3`, 1024-dim vectors                              |
 | Frontend  | React 19, TypeScript, Vite (`rolldown-vite`), Tailwind CSS, Ant Design + `@ant-design/x` |
@@ -92,7 +92,7 @@ Required variables:
 | `THINKXECAI_DB_PASSWORD`       | PostgreSQL password               |
 | `THINKXECAI_MAIL_USERNAME`     | QQ mail account for the email tool|
 | `THINKXECAI_MAIL_PASSWORD`     | QQ mail authorization code        |
-| `THINKXECAI_OPENAI_API_KEY`    | OpenAI API key (`gpt-5.4-mini`)   |
+| `THINKXECAI_GEMINI_API_KEY`    | Gemini API key (`gemini-3.8-flash`) |
 | `THINKXECAI_DEEPSEEK_API_KEY`  | DeepSeek API key (`deepseek-chat`)|
 
 The backend fails fast at startup if any of these are missing.

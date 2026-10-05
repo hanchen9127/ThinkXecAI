@@ -29,11 +29,14 @@ spring:
       chat:
         options:
           model: deepseek-chat
-    openai:
-      api-key: ${THINKXECAI_OPENAI_API_KEY:}
-      chat:
-        options:
-          model: gpt-5.4-mini
+    google:
+      genai:
+        # Gemini Developer API with an API key (not Vertex AI). The model must be set explicitly:
+        # the Spring AI default, gemini-2.0-flash, has been shut down by Google.
+        api-key: ${THINKXECAI_GEMINI_API_KEY:}
+        chat:
+          options:
+            model: gemini-3.8-flash
 
 mybatis:
   mapper-locations: classpath:mapper/**/*.xml

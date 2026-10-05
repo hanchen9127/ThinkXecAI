@@ -46,7 +46,7 @@ class AgentConverterTest {
     void createRequestAppliesSpecDefaultsWhenOmitted() {
         CreateAgentRequest request = new CreateAgentRequest();
         request.setName("Bare Agent");
-        request.setModel("gpt-5.4-mini");
+        request.setModel("gemini-3.8-flash");
 
         AgentDTO dto = converter.fromCreateRequest(request);
 
