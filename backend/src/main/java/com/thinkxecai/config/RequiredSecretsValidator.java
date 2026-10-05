@@ -17,8 +17,8 @@ public class RequiredSecretsValidator {
     @Value("${THINKXECAI_MAIL_PASSWORD:}")
     private String mailPassword;
 
-    @Value("${THINKXECAI_OPENAI_API_KEY:}")
-    private String openAiApiKey;
+    @Value("${THINKXECAI_GEMINI_API_KEY:}")
+    private String geminiApiKey;
 
     @Value("${THINKXECAI_DEEPSEEK_API_KEY:}")
     private String deepSeekApiKey;
@@ -28,7 +28,7 @@ public class RequiredSecretsValidator {
         require("THINKXECAI_DB_PASSWORD", dbPassword);
         require("THINKXECAI_MAIL_USERNAME", mailUsername);
         require("THINKXECAI_MAIL_PASSWORD", mailPassword);
-        require("THINKXECAI_OPENAI_API_KEY", openAiApiKey);
+        require("THINKXECAI_GEMINI_API_KEY", geminiApiKey);
         require("THINKXECAI_DEEPSEEK_API_KEY", deepSeekApiKey);
     }
 
