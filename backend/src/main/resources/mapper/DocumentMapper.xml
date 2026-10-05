@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.thinkxecai.mapper.DocumentMapper">
+
+    <sql id="columns">id, kb_id, name, metadata, created_at, updated_at</sql>
+
+    <!--
+        metadata is a nullable JSONB column (it holds the stored file path): the text parameter is
+        cast with ::jsonb, and a null value is simply stored as NULL. Timestamps are left to the
+        column defaults.
+    -->
+    <insert id="insert" useGeneratedKeys="true"
+            keyProperty="id,createdAt,updatedAt" keyColumn="id,created_at,updated_at">
+        INSERT INTO document (kb_id, name, metadata)
+        VALUES (#{kbId}, #{name}, #{metadata}::jsonb)
+    </insert>
+
+    <select id="selectById" resultType="com.thinkxecai.model.entity.DocumentEntity">
+        SELECT <include refid="columns"/>
+        FROM document
+        WHERE id = #{id}
+    </select>
+
+    <select id="listAll" resultType="com.thinkxecai.model.entity.DocumentEntity">
+        SELECT <include refid="columns"/>
+        FROM document
+        ORDER BY updated_at DESC
+    </select>
+
+    <select id="listByKbId" resultType="com.thinkxecai.model.entity.DocumentEntity">
+        SELECT <include refid="columns"/>
+        FROM document
+        WHERE kb_id = #{kbId}
+        ORDER BY updated_at DESC
+    </select>
+
+    <update id="update">
+        UPDATE document
+        <set>
+            <if test="name != null">name = #{name},</if>
+            <if test="metadata != null">metadata = #{metadata}::jsonb,</if>
+            updated_at = now()
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM document
+        WHERE id = #{id}
+    </delete>
+
+</mapper>

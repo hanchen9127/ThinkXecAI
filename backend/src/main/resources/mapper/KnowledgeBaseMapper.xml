@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.thinkxecai.mapper.KnowledgeBaseMapper">
+
+    <sql id="columns">id, name, description, created_at, updated_at</sql>
+
+    <!-- Timestamps are left to the column defaults and read back with the generated id. -->
+    <insert id="insert" useGeneratedKeys="true"
+            keyProperty="id,createdAt,updatedAt" keyColumn="id,created_at,updated_at">
+        INSERT INTO knowledge_base (name, description)
+        VALUES (#{name}, #{description})
+    </insert>
+
+    <select id="selectById" resultType="com.thinkxecai.model.entity.KnowledgeBaseEntity">
+        SELECT <include refid="columns"/>
+        FROM knowledge_base
+        WHERE id = #{id}
+    </select>
+
+    <select id="listAll" resultType="com.thinkxecai.model.entity.KnowledgeBaseEntity">
+        SELECT <include refid="columns"/>
+        FROM knowledge_base
+        ORDER BY updated_at DESC
+    </select>
+
+    <!-- "IN ()" is invalid SQL, so an empty collection matches nothing instead. -->
+    <select id="selectByIds" resultType="com.thinkxecai.model.entity.KnowledgeBaseEntity">
+        SELECT <include refid="columns"/>
+        FROM knowledge_base
+        <choose>
+            <when test="ids != null and !ids.isEmpty()">
+                WHERE id IN
+                <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+            </when>
+            <otherwise>
+                WHERE FALSE
+            </otherwise>
+        </choose>
+    </select>
+
+    <update id="update">
+        UPDATE knowledge_base
+        <set>
+            <if test="name != null">name = #{name},</if>
+            <if test="description != null">description = #{description},</if>
+            updated_at = now()
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM knowledge_base
+        WHERE id = #{id}
+    </delete>
+
+</mapper>

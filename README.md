@@ -52,7 +52,7 @@ This project is being built phase by phase. Current status:
 - [x] Phase 3 — Backend project setup (Spring Boot app, config, secrets validation)
 - [x] Phase 4 — Frontend setup (React/Vite app, typed API client)
 - [x] Phase 5 — Common backend foundation (`ApiResponse`, DTOs, entities, converters)
-- [ ] Phase 6 — MyBatis persistence layer
+- [x] Phase 6 — MyBatis persistence layer (six mappers, tested against PostgreSQL + pgvector)
 - [ ] Phase 7 — Facade services and REST APIs
 - [ ] Phase 8 — Markdown ingestion and RAG
 - [ ] Phase 9 — Tool system
@@ -62,8 +62,8 @@ This project is being built phase by phase. Current status:
 - [ ] Phase 13 — Frontend features (full UI)
 - [ ] Phase 14 — End-to-end verification
 
-Because most REST endpoints and the agent runtime aren't implemented yet, the backend
-currently only exposes health/diagnostic endpoints and the frontend runs as an empty shell.
+The backend's data layer is in place, but there are no REST endpoints yet (Phase 7), so the
+backend starts without serving any API and the frontend runs as an empty shell.
 
 ## Getting Started
 
