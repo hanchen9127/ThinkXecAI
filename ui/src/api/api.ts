@@ -4,7 +4,7 @@ import { BASE_URL, http } from './http'
 // Shared types
 // ---------------------------------------------------------------------------
 
-export type AgentModel = 'deepseek-chat' | 'gpt-5.4-mini'
+export type AgentModel = 'deepseek-chat' | 'gemini-3.8-flash'
 
 export interface ChatOptions {
   temperature: number
