@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.thinkxecai.mapper.ChunkMapper">
+
+    <!-- The embedding (1024 floats) is only selected where a caller needs it. -->
+    <sql id="columnsWithoutEmbedding">id, kb_id, doc_id, title, content, created_at</sql>
+
+    <!--
+        PgVectorTypeHandler binds float[] as the text literal "[0.1,0.2,...]", so it is cast with
+        ::vector. chunk_bge_m3 has no updated_at; created_at is left to the column default.
+    -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id,createdAt" keyColumn="id,created_at">
+        INSERT INTO chunk_bge_m3 (kb_id, doc_id, title, content, embedding)
+        VALUES (#{kbId}, #{docId}, #{title}, #{content}, #{embedding}::vector)
+    </insert>
+
+    <select id="selectById" resultType="com.thinkxecai.model.entity.ChunkEntity">
+        SELECT <include refid="columnsWithoutEmbedding"/>, embedding
+        FROM chunk_bge_m3
+        WHERE id = #{id}
+    </select>
+
+    <select id="listByDocId" resultType="com.thinkxecai.model.entity.ChunkEntity">
+        SELECT <include refid="columnsWithoutEmbedding"/>
+        FROM chunk_bge_m3
+        WHERE doc_id = #{docId}
+        ORDER BY created_at
+    </select>
+
+    <delete id="deleteByDocId">
+        DELETE FROM chunk_bge_m3
+        WHERE doc_id = #{docId}
+    </delete>
+
+    <!-- <-> is pgvector's L2 distance; it matches the vector_l2_ops HNSW index. -->
+    <select id="searchSimilar" resultType="com.thinkxecai.model.entity.ChunkEntity">
+        SELECT <include refid="columnsWithoutEmbedding"/>
+        FROM chunk_bge_m3
+        WHERE kb_id = #{kbId}
+        ORDER BY embedding &lt;-&gt; #{queryEmbedding}::vector
+        LIMIT #{limit}
+    </select>
+
+</mapper>
