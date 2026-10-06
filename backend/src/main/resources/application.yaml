@@ -5,6 +5,12 @@ spring:
   application:
     name: thinkxecai-backend
 
+  # API messages are always English: a fixed locale makes validation messages ignore the
+  # browser's Accept-Language header (otherwise a zh-CN browser gets Chinese messages).
+  web:
+    locale: en
+    locale-resolver: fixed
+
   datasource:
     url: jdbc:postgresql://localhost:5433/thinkxecai
     username: postgres
