@@ -60,4 +60,13 @@
         WHERE id = #{id}
     </delete>
 
+    <!-- allowed_kbs stores ids as JSON strings: "-" drops every matching element, "@>" finds the
+         agents that contain it (the "?" operator would clash with JDBC parameter markers). -->
+    <update id="removeAllowedKb">
+        UPDATE agent
+        SET allowed_kbs = allowed_kbs - #{kbId}::text,
+            updated_at  = now()
+        WHERE allowed_kbs @> jsonb_build_array(#{kbId}::text)
+    </update>
+
 </mapper>

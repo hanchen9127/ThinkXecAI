@@ -29,4 +29,11 @@ public interface AgentMapper {
     /** Sessions of the deleted agent are kept with agent_id set to NULL (ON DELETE SET NULL). */
     int deleteById(@Param("id") UUID id);
 
+    /**
+     * Removes {@code kbId} from every agent's allowed_kbs and refreshes their updated_at. allowed_kbs
+     * is a JSONB array without a foreign key, so deleting a knowledge base calls this in the same
+     * transaction. Returns the number of agents changed.
+     */
+    int removeAllowedKb(@Param("kbId") UUID kbId);
+
 }
