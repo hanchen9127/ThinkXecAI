@@ -2,10 +2,14 @@ package com.thinkxecai.model.request;
 
 import lombok.Data;
 
+import java.util.UUID;
+
 @Data
 public class CreateChatSessionRequest {
 
-    private String agentId;
+    /** Optional; when given it must refer to an existing agent (checked by the service). Fixed after creation. */
+    private UUID agentId;
+    @NullOrNotBlank
     private String title;
 
 }

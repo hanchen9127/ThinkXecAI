@@ -84,7 +84,10 @@ export interface CreateChatSessionRequest {
   title?: string | null
 }
 
-export type UpdateChatSessionRequest = Partial<CreateChatSessionRequest>
+// Only the title can change; the agent is fixed when the session is created.
+export interface UpdateChatSessionRequest {
+  title?: string | null
+}
 
 export function listChatSessions() {
   return http.get<ChatSession[]>('/chat-sessions')

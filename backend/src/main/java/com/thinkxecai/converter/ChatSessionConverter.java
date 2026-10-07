@@ -7,8 +7,6 @@ import com.thinkxecai.model.request.UpdateChatSessionRequest;
 import com.thinkxecai.model.vo.ChatSessionVO;
 import org.springframework.stereotype.Component;
 
-import java.util.UUID;
-
 @Component
 public class ChatSessionConverter {
 
@@ -53,14 +51,13 @@ public class ChatSessionConverter {
 
     public ChatSessionDTO fromCreateRequest(CreateChatSessionRequest request) {
         return ChatSessionDTO.builder()
-                .agentId(request.getAgentId() != null ? UUID.fromString(request.getAgentId()) : null)
+                .agentId(request.getAgentId())
                 .title(request.getTitle())
                 .build();
     }
 
-    /** Merges non-null fields from an UpdateChatSessionRequest onto the existing DTO (PATCH semantics). */
+    /** Merges non-null fields from an UpdateChatSessionRequest onto the existing DTO (PATCH semantics); the agent never changes. */
     public ChatSessionDTO applyUpdateRequest(ChatSessionDTO existing, UpdateChatSessionRequest request) {
-        if (request.getAgentId() != null) existing.setAgentId(UUID.fromString(request.getAgentId()));
         if (request.getTitle() != null) existing.setTitle(request.getTitle());
         return existing;
     }
