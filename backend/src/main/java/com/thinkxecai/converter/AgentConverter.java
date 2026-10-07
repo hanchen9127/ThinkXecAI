@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Converts the agent domain between its persisted JSONB-as-text shape (AgentEntity) and its
@@ -88,8 +89,8 @@ public class AgentConverter {
                 .systemPrompt(request.getSystemPrompt())
                 .model(request.getModel())
                 .allowedTools(request.getAllowedTools() != null ? request.getAllowedTools() : List.of())
-                .allowedKbs(request.getAllowedKbs() != null ? request.getAllowedKbs() : List.of())
-                .chatOptions(request.getChatOptions() != null ? request.getChatOptions() : new ChatOptions())
+                .allowedKbs(request.getAllowedKbs() != null ? kbIds(request.getAllowedKbs()) : List.of())
+                .chatOptions(ChatOptions.defaults().overriddenBy(request.getChatOptions()))
                 .build();
     }
 
@@ -100,9 +101,14 @@ public class AgentConverter {
         if (request.getSystemPrompt() != null) existing.setSystemPrompt(request.getSystemPrompt());
         if (request.getModel() != null) existing.setModel(request.getModel());
         if (request.getAllowedTools() != null) existing.setAllowedTools(request.getAllowedTools());
-        if (request.getAllowedKbs() != null) existing.setAllowedKbs(request.getAllowedKbs());
-        if (request.getChatOptions() != null) existing.setChatOptions(request.getChatOptions());
+        if (request.getAllowedKbs() != null) existing.setAllowedKbs(kbIds(request.getAllowedKbs()));
+        if (request.getChatOptions() != null) existing.setChatOptions(existing.getChatOptions().overriddenBy(request.getChatOptions()));
         return existing;
+    }
+
+    /** Knowledge base ids as stored in allowed_kbs: canonical lowercase text, duplicates dropped, order kept. */
+    private static List<String> kbIds(List<UUID> ids) {
+        return ids.stream().distinct().map(UUID::toString).toList();
     }
 
     private List<String> readList(String json) {
@@ -118,10 +124,10 @@ public class AgentConverter {
 
     private ChatOptions readChatOptions(String json) {
         if (json == null || json.isBlank()) {
-            return new ChatOptions();
+            return ChatOptions.defaults();
         }
         try {
-            return objectMapper.readValue(json, ChatOptions.class);
+            return ChatOptions.defaults().overriddenBy(objectMapper.readValue(json, ChatOptions.class));
         } catch (JsonProcessingException e) {
             throw new BizException("Failed to parse agent chatOptions: " + e.getOriginalMessage());
         }
