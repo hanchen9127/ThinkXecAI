@@ -1,6 +1,6 @@
 package com.thinkxecai.model.request;
 
-import com.thinkxecai.model.ChatOptions;
+import com.thinkxecai.model.ChatOptionsInput;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -24,6 +24,6 @@ public class UpdateAgentRequest {
     /** Each id must refer to an existing knowledge base (checked by the service). */
     private List<@NotNull UUID> allowedKbs;
     @Valid
-    private ChatOptions chatOptions;
+    private ChatOptionsInput chatOptions;
 
 }

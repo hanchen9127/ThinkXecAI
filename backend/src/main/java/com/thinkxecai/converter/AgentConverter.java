@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.thinkxecai.exception.BizException;
 import com.thinkxecai.model.ChatOptions;
+import com.thinkxecai.model.ChatOptionsInput;
 import com.thinkxecai.model.dto.AgentDTO;
 import com.thinkxecai.model.entity.AgentEntity;
 import com.thinkxecai.model.request.CreateAgentRequest;
@@ -127,7 +128,8 @@ public class AgentConverter {
             return ChatOptions.defaults();
         }
         try {
-            return ChatOptions.defaults().overriddenBy(objectMapper.readValue(json, ChatOptions.class));
+            // Read as the partial shape, so a stored value missing a key still comes back complete.
+            return ChatOptions.defaults().overriddenBy(objectMapper.readValue(json, ChatOptionsInput.class));
         } catch (JsonProcessingException e) {
             throw new BizException("Failed to parse agent chatOptions: " + e.getOriginalMessage());
         }

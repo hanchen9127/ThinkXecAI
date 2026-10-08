@@ -2,6 +2,7 @@ package com.thinkxecai.service;
 
 import com.thinkxecai.exception.BizException;
 import com.thinkxecai.model.ChatOptions;
+import com.thinkxecai.model.ChatOptionsInput;
 import com.thinkxecai.model.request.CreateAgentRequest;
 import com.thinkxecai.model.request.UpdateAgentRequest;
 import com.thinkxecai.model.vo.AgentVO;
@@ -48,7 +49,7 @@ class AgentFacadeServiceTest extends ServiceTestSupport {
     @Test
     void createWithPartialChatOptionsFillsTheRestWithDefaults() {
         CreateAgentRequest request = createRequest("Research");
-        request.setChatOptions(ChatOptions.builder().temperature(0.3).build());
+        request.setChatOptions(ChatOptionsInput.builder().temperature(0.3).build());
 
         AgentVO created = service.createAgent(request);
 
@@ -85,11 +86,11 @@ class AgentFacadeServiceTest extends ServiceTestSupport {
     void updateMergesChatOptionsAndKeepsOtherFields() {
         CreateAgentRequest create = createRequest("Research");
         create.setSystemPrompt("Be brief.");
-        create.setChatOptions(new ChatOptions(0.7, 0.9, 30));
+        create.setChatOptions(new ChatOptionsInput(0.7, 0.9, 30));
         UUID id = UUID.fromString(service.createAgent(create).getId());
         UpdateAgentRequest update = new UpdateAgentRequest();
         update.setModel("gemini-3.8-flash");
-        update.setChatOptions(ChatOptions.builder().temperature(0.2).build());
+        update.setChatOptions(ChatOptionsInput.builder().temperature(0.2).build());
 
         AgentVO updated = service.updateAgent(id, update);
 

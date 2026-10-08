@@ -1,6 +1,7 @@
 package com.thinkxecai.model.vo;
 
 import com.thinkxecai.model.ChatOptions;
+import jakarta.annotation.Nullable;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -17,7 +18,9 @@ public class AgentVO {
 
     private String id;
     private String name;
+    @Nullable
     private String description;
+    @Nullable
     private String systemPrompt;
     private String model;
     private List<String> allowedTools;

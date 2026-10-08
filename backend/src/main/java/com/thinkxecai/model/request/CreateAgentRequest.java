@@ -1,6 +1,6 @@
 package com.thinkxecai.model.request;
 
-import com.thinkxecai.model.ChatOptions;
+import com.thinkxecai.model.ChatOptionsInput;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -10,7 +10,7 @@ import lombok.Data;
 import java.util.List;
 import java.util.UUID;
 
-/** Omitted lists default to empty and omitted chatOptions fields to {@link ChatOptions#defaults()}. */
+/** Omitted lists default to empty and omitted chatOptions fields to {@link com.thinkxecai.model.ChatOptions#defaults()}. */
 @Data
 public class CreateAgentRequest {
 
@@ -30,6 +30,6 @@ public class CreateAgentRequest {
     /** Each id must refer to an existing knowledge base (checked by the service). */
     private List<@NotNull UUID> allowedKbs;
     @Valid
-    private ChatOptions chatOptions;
+    private ChatOptionsInput chatOptions;
 
 }

@@ -44,6 +44,14 @@ spring:
           options:
             model: gemini-3.8-flash
 
+springdoc:
+  # The API description (/v3/api-docs) is generated from the controllers; CI turns it into the frontend's types.
+  default-produces-media-type: application/json
+  # Only the JSON API is described; /health and /sse-test are plain-text diagnostics outside it.
+  paths-to-match: /api/**
+  # Sorted keys keep the exported document byte-for-byte stable between runs (CI diffs the generated types).
+  writer-with-order-by-keys: true
+
 mybatis:
   mapper-locations: classpath:mapper/**/*.xml
   type-aliases-package: com.thinkxecai.model

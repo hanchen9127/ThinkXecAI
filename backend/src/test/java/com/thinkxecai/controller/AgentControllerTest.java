@@ -1,6 +1,7 @@
 package com.thinkxecai.controller;
 
 import com.thinkxecai.model.ChatOptions;
+import com.thinkxecai.model.ChatOptionsInput;
 import com.thinkxecai.model.request.CreateAgentRequest;
 import com.thinkxecai.model.request.UpdateAgentRequest;
 import com.thinkxecai.model.vo.AgentVO;
@@ -82,7 +83,7 @@ class AgentControllerTest {
 
         verify(service).createAgent(argThat((CreateAgentRequest request) ->
                 request.getAllowedKbs().equals(List.of(KB))
-                        && request.getChatOptions().equals(ChatOptions.builder().messageLength(20).build())));
+                        && request.getChatOptions().equals(ChatOptionsInput.builder().messageLength(20).build())));
     }
 
     @Test
