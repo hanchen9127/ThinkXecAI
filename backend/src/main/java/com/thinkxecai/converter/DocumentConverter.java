@@ -13,7 +13,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
-import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -67,16 +66,14 @@ public class DocumentConverter {
 
     public DocumentDTO fromCreateRequest(CreateDocumentRequest request) {
         return DocumentDTO.builder()
-                .kbId(UUID.fromString(request.getKbId()))
+                .kbId(request.getKbId())
                 .name(request.getName())
-                .metadata(request.getMetadata())
                 .build();
     }
 
     /** Merges non-null fields from an UpdateDocumentRequest onto the existing DTO (PATCH semantics). */
     public DocumentDTO applyUpdateRequest(DocumentDTO existing, UpdateDocumentRequest request) {
         if (request.getName() != null) existing.setName(request.getName());
-        if (request.getMetadata() != null) existing.setMetadata(request.getMetadata());
         return existing;
     }
 

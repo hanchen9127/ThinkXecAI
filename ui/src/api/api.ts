@@ -224,15 +224,14 @@ export interface Document {
   updatedAt: string
 }
 
+// metadata is server-managed (it holds the stored file path), so requests cannot set it.
 export interface CreateDocumentRequest {
   kbId: string
   name: string
-  metadata?: Record<string, unknown> | null
 }
 
 export interface UpdateDocumentRequest {
   name?: string
-  metadata?: Record<string, unknown> | null
 }
 
 export function listDocuments() {
