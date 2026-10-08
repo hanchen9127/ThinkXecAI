@@ -79,7 +79,7 @@ class ConverterTimestampTest {
         ChatMessageConverter converter = new ChatMessageConverter(objectMapper);
 
         CreateChatMessageRequest create = new CreateChatMessageRequest();
-        create.setSessionId(UUID.randomUUID().toString());
+        create.setSessionId(UUID.randomUUID());
         create.setRole(ChatMessageRole.USER);
         create.setContent("hi");
         ChatMessageDTO created = converter.fromCreateRequest(create);

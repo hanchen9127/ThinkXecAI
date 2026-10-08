@@ -40,6 +40,12 @@
         WHERE id = #{id}
     </update>
 
+    <update id="touch">
+        UPDATE chat_session
+        SET updated_at = now()
+        WHERE id = #{id}
+    </update>
+
     <delete id="deleteById">
         DELETE FROM chat_session
         WHERE id = #{id}
