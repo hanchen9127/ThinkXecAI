@@ -53,7 +53,7 @@ This project is being built phase by phase. Current status:
 - [x] Phase 4 — Frontend setup (React/Vite app, typed API client)
 - [x] Phase 5 — Common backend foundation (`ApiResponse`, DTOs, entities, converters)
 - [x] Phase 6 — MyBatis persistence layer (six mappers, tested against PostgreSQL + pgvector)
-- [ ] Phase 7 — Facade services and REST APIs
+- [x] Phase 7 — Facade services and REST APIs (CRUD for five resources, request validation, CI contract check)
 - [ ] Phase 8 — Markdown ingestion and RAG
 - [ ] Phase 9 — Tool system
 - [ ] Phase 10 — Chat model registry
@@ -62,8 +62,9 @@ This project is being built phase by phase. Current status:
 - [ ] Phase 13 — Frontend features (full UI)
 - [ ] Phase 14 — End-to-end verification
 
-The backend's data layer is in place, but there are no REST endpoints yet (Phase 7), so the
-backend starts without serving any API and the frontend runs as an empty shell.
+The REST API is in place except document upload (Phase 8), tools (Phase 9), and SSE (Phase 12).
+Creating a user message stores it and emits a chat event, but nothing runs the agent until
+Phase 11. The frontend has a typed API client and still runs as an empty shell.
 
 ## Getting Started
 
@@ -146,7 +147,10 @@ All JSON REST endpoints live under `/api` and return a consistent envelope:
 { "code": 200, "message": "success", "data": { } }
 ```
 
-Errors use `code: 500` (or a specific error code) with `data: null`.
+The HTTP status is always 200; errors set `code` and `data: null`, with an English `message`:
+`400` for invalid input (the message names the field), `404` for a missing resource, `409` for a
+conflict (such as a user message to a session whose agent was deleted), and a generic `500` for
+anything else.
 
 | Resource        | Endpoints                                                                 |
 |-----------------|---------------------------------------------------------------------------|
@@ -157,9 +161,19 @@ Errors use `code: 500` (or a specific error code) with `data: null`.
 | Documents       | `GET/POST /documents`, `GET /documents/kb/{kbId}`, `POST /documents/upload`, `PATCH/DELETE /documents/{documentId}` |
 | Tools           | `GET /tools` (optional tools only) |
 
+`POST /documents/upload` and `GET /tools` arrive in Phases 8 and 9. Outside `/api`, `GET /health` and
+`GET /sse-test` return plain text `ok`.
+
 Live agent output streams from `GET /sse/connect/{chatSessionId}` (`text/event-stream`):
 an `init` event on connect, then `message` events carrying JSON of the form
 `{ "type": ..., "payload": { "message", "statusText", "done" }, "metadata": { "chatMessageId" } }`.
+
+### API contract
+
+The backend describes its API with OpenAPI (`/v3/api-docs`), and the frontend's request and
+response types are generated from it into `ui/src/api/schema.d.ts`. After changing the API, run
+the backend tests (they export `backend/target/openapi.json`) and then `npm run gen:api` in `ui/`,
+and commit the regenerated file. The `build / contract` CI job fails when the two sides differ.
 
 ## License
 
