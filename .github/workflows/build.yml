@@ -49,3 +49,57 @@ jobs:
 
       - name: Typecheck and bundle
         run: npm run build # tsc -b && vite build
+
+  # Fails when the backend's API and the frontend's types drift apart: the OpenAPI document is
+  # exported from the backend, the frontend types are regenerated from it, and the result must
+  # match what is committed and still typecheck.
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Throwaway values: the export test starts the full Spring context against a disposable database.
+      THINKXECAI_DB_PASSWORD: ci-postgres
+      THINKXECAI_MAIL_USERNAME: ci@example.com
+      THINKXECAI_MAIL_PASSWORD: ci-dummy
+      THINKXECAI_GEMINI_API_KEY: ci-dummy
+      THINKXECAI_DEEPSEEK_API_KEY: ci-dummy
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Start PostgreSQL and run db/init
+        run: docker compose up -d --wait --wait-timeout 120
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+
+      - name: Export the OpenAPI document
+        working-directory: backend
+        run: mvn -B -ntp test -Dtest=OpenApiExportTest -Dsurefire.failIfNoSpecifiedTests=false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: ui
+        run: npm ci
+
+      - name: Regenerated types must match the committed ones
+        working-directory: ui
+        run: |
+          npm run gen:api
+          if [ -n "$(git status --porcelain -- src/api/schema.d.ts)" ]; then
+            git --no-pager diff -- src/api/schema.d.ts
+            echo "::error file=ui/src/api/schema.d.ts::The backend API changed. Run 'npm run gen:api' in ui/ (after the backend tests) and commit src/api/schema.d.ts."
+            exit 1
+          fi
+
+      - name: Frontend API code must match the regenerated types
+        working-directory: ui
+        run: npm run typecheck
