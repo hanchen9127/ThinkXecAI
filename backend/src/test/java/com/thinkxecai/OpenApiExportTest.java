@@ -91,6 +91,9 @@ class OpenApiExportTest {
         assertThat(message.at("/properties/metadata/oneOf/1/type").asText()).isEqualTo("null");
 
         assertThat(names(schema("ChatOptions").get("required"))).containsExactlyInAnyOrder("temperature", "topP", "messageLength");
+
+        assertThat(names(agent.at("/properties/model/enum"))).containsExactly("deepseek-chat", "gemini-3.8-flash");
+        assertThat(names(schema("ApiResponseVoid").get("required"))).containsExactlyInAnyOrder("code", "message", "data");
     }
 
     @Test
@@ -99,6 +102,7 @@ class OpenApiExportTest {
         assertThat(schema("CreateAgentRequest").at("/properties/chatOptions/$ref").asText())
                 .isEqualTo("#/components/schemas/ChatOptionsInput");
         assertThat(schema("ChatOptionsInput").has("required")).isFalse();
+        assertThat(names(schema("CreateAgentRequest").at("/properties/model/enum"))).containsExactly("deepseek-chat", "gemini-3.8-flash");
         assertThat(schema("UpdateChatSessionRequest").get("properties").has("agentId")).isFalse();
         assertThat(schema("CreateDocumentRequest").get("properties").has("metadata")).isFalse();
     }

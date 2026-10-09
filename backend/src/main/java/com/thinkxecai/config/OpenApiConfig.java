@@ -18,8 +18,8 @@ import java.util.Set;
  * generated from it are exact:
  * <ul>
  *   <li>Every field of a response object is always present (Jackson writes nulls too), so all
- *       properties of {@code *VO} schemas, and of the nested types that are always complete in
- *       responses, are marked required.</li>
+ *       properties of {@code *VO} schemas, of the {@code ApiResponse*} envelopes, and of the nested
+ *       types that are always complete in responses, are marked required.</li>
  *   <li>A field annotated {@code @Nullable} may be null, so null is added to its type.</li>
  * </ul>
  * Request schemas keep the required list derived from their Bean Validation annotations.
@@ -33,7 +33,7 @@ public class OpenApiConfig {
     @Bean
     public OpenApiCustomizer responseFieldsAreRequired() {
         return openApi -> openApi.getComponents().getSchemas().forEach((name, schema) -> {
-            if ((name.endsWith("VO") || ALWAYS_COMPLETE.contains(name)) && schema.getProperties() != null) {
+            if ((name.endsWith("VO") || name.startsWith("ApiResponse") || ALWAYS_COMPLETE.contains(name)) && schema.getProperties() != null) {
                 schema.setRequired(new ArrayList<>(schema.getProperties().keySet()));
             }
         });

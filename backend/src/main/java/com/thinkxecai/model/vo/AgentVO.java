@@ -1,6 +1,8 @@
 package com.thinkxecai.model.vo;
 
+import com.thinkxecai.model.ChatModelNames;
 import com.thinkxecai.model.ChatOptions;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.annotation.Nullable;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -22,6 +24,7 @@ public class AgentVO {
     private String description;
     @Nullable
     private String systemPrompt;
+    @Schema(allowableValues = {ChatModelNames.DEEPSEEK_CHAT, ChatModelNames.GEMINI_FLASH})
     private String model;
     private List<String> allowedTools;
     private List<String> allowedKbs;

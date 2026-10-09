@@ -10,7 +10,8 @@
     "typecheck": "tsc -b",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "gen:api": "openapi-typescript ../backend/target/openapi.json -o src/api/schema.d.ts"
   },
   "dependencies": {
     "@ant-design/icons": "6.1.0",
@@ -35,6 +36,7 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
+    "openapi-typescript": "7.13.0",
     "prettier": "3.6.2",
     "tailwindcss": "4.1.17",
     "typescript": "~5.9.3",
