@@ -1,19 +1,49 @@
 import { BASE_URL, http } from './http'
+import type { components, paths } from './schema'
+
+// Request and response types are derived from schema.d.ts, which is generated from the backend's
+// OpenAPI document (`npm run gen:api`). CI regenerates it and fails when it, or this file, no longer
+// matches the backend. Only endpoints the document does not describe yet are typed by hand below.
+
+// ---------------------------------------------------------------------------
+// Type helpers
+// ---------------------------------------------------------------------------
+
+type Schemas = components['schemas']
+
+type JsonContent<T> = T extends { content: { 'application/json': infer C } } ? C : never
+
+/** The `data` of a successful response to `method` on `path` (the envelope is unwrapped by http.ts). */
+type ResponseData<P extends keyof paths, M extends keyof paths[P]> = paths[P][M] extends {
+  responses: { 200: infer R }
+}
+  ? JsonContent<R> extends { data: infer D }
+    ? D
+    : never
+  : never
+
+/** The JSON request body of `method` on `path`. */
+type RequestBody<P extends keyof paths, M extends keyof paths[P]> = paths[P][M] extends {
+  requestBody?: infer B
+}
+  ? JsonContent<B>
+  : never
 
 // ---------------------------------------------------------------------------
 // Shared types
 // ---------------------------------------------------------------------------
 
-export type AgentModel = 'deepseek-chat' | 'gemini-3.8-flash'
+export type AgentModel = Schemas['AgentVO']['model']
 
-export interface ChatOptions {
-  temperature: number
-  topP: number
-  messageLength: number
-}
+/** Chat options as stored and returned: all fields present. */
+export type ChatOptions = Schemas['ChatOptions']
 
-export type ChatMessageRole = 'user' | 'assistant' | 'system' | 'tool'
+/** Chat options in requests: any field may be left out. */
+export type ChatOptionsInput = Schemas['ChatOptionsInput']
 
+export type ChatMessageRole = Schemas['ChatMessageVO']['role']
+
+// Not in the OpenAPI document until the tool system exists (Phase 9).
 export type ToolType = 'FIXED' | 'OPTIONAL'
 
 export interface ToolVO {
@@ -26,43 +56,23 @@ export interface ToolVO {
 // Agent
 // ---------------------------------------------------------------------------
 
-export interface Agent {
-  id: string
-  name: string
-  description: string | null
-  systemPrompt: string | null
-  model: AgentModel
-  allowedTools: string[]
-  allowedKbs: string[]
-  chatOptions: ChatOptions
-  createdAt: string
-  updatedAt: string
-}
-
-export interface CreateAgentRequest {
-  name: string
-  description?: string | null
-  systemPrompt?: string | null
-  model: AgentModel
-  allowedTools?: string[]
-  allowedKbs?: string[]
-  chatOptions?: Partial<ChatOptions>
-}
-
-export type UpdateAgentRequest = Partial<CreateAgentRequest>
+export type Agent = Schemas['AgentVO']
+export type CreateAgentRequest = RequestBody<'/api/agents', 'post'>
+export type UpdateAgentRequest = RequestBody<'/api/agents/{agentId}', 'patch'>
 
 export function listAgents() {
-  return http.get<Agent[]>('/agents')
+  return http.get<ResponseData<'/api/agents', 'get'>>('/agents')
 }
 
 export function createAgent(request: CreateAgentRequest) {
-  return http.post<Agent>('/agents', request)
+  return http.post<ResponseData<'/api/agents', 'post'>>('/agents', request)
 }
 
 export function updateAgent(agentId: string, request: UpdateAgentRequest) {
-  return http.patch<Agent>(`/agents/${agentId}`, request)
+  return http.patch<ResponseData<'/api/agents/{agentId}', 'patch'>>(`/agents/${agentId}`, request)
 }
 
+// Delete endpoints always return data: null; the document can only say "no content type" (unknown).
 export function deleteAgent(agentId: string) {
   return http.delete<null>(`/agents/${agentId}`)
 }
@@ -71,39 +81,36 @@ export function deleteAgent(agentId: string) {
 // Chat session
 // ---------------------------------------------------------------------------
 
-export interface ChatSession {
-  id: string
-  agentId: string | null
-  title: string | null
-  createdAt: string
-  updatedAt: string
-}
-
-export interface CreateChatSessionRequest {
-  agentId?: string | null
-  title?: string | null
-}
-
-export type UpdateChatSessionRequest = Partial<CreateChatSessionRequest>
+export type ChatSession = Schemas['ChatSessionVO']
+export type CreateChatSessionRequest = RequestBody<'/api/chat-sessions', 'post'>
+/** Only the title can change; the agent is fixed when the session is created. */
+export type UpdateChatSessionRequest = RequestBody<'/api/chat-sessions/{chatSessionId}', 'patch'>
 
 export function listChatSessions() {
-  return http.get<ChatSession[]>('/chat-sessions')
+  return http.get<ResponseData<'/api/chat-sessions', 'get'>>('/chat-sessions')
 }
 
 export function getChatSession(chatSessionId: string) {
-  return http.get<ChatSession>(`/chat-sessions/${chatSessionId}`)
+  return http.get<ResponseData<'/api/chat-sessions/{chatSessionId}', 'get'>>(
+    `/chat-sessions/${chatSessionId}`,
+  )
 }
 
 export function listChatSessionsByAgent(agentId: string) {
-  return http.get<ChatSession[]>(`/chat-sessions/agent/${agentId}`)
+  return http.get<ResponseData<'/api/chat-sessions/agent/{agentId}', 'get'>>(
+    `/chat-sessions/agent/${agentId}`,
+  )
 }
 
 export function createChatSession(request: CreateChatSessionRequest) {
-  return http.post<ChatSession>('/chat-sessions', request)
+  return http.post<ResponseData<'/api/chat-sessions', 'post'>>('/chat-sessions', request)
 }
 
 export function updateChatSession(chatSessionId: string, request: UpdateChatSessionRequest) {
-  return http.patch<ChatSession>(`/chat-sessions/${chatSessionId}`, request)
+  return http.patch<ResponseData<'/api/chat-sessions/{chatSessionId}', 'patch'>>(
+    `/chat-sessions/${chatSessionId}`,
+    request,
+  )
 }
 
 export function deleteChatSession(chatSessionId: string) {
@@ -114,59 +121,29 @@ export function deleteChatSession(chatSessionId: string) {
 // Chat message
 // ---------------------------------------------------------------------------
 
-export interface ToolCallMetadata {
-  id: string
-  type: string
-  name: string
-  /** Raw JSON argument string, as produced by the model. */
-  arguments: string
-}
-
-export interface ToolResponseMetadata {
-  /** Matches the id of the ToolCallMetadata this response answers. */
-  id: string
-  name: string
-  responseData: string
-}
-
+export type ToolCallMetadata = Schemas['ToolCallMetadata']
+export type ToolResponseMetadata = Schemas['ToolResponseMetadata']
 /** Assistant messages that request tools carry toolCalls; tool messages carry toolResponse. */
-export interface ChatMessageMetadata {
-  toolCalls?: ToolCallMetadata[]
-  toolResponse?: ToolResponseMetadata
-}
-
-export interface ChatMessage {
-  id: string
-  sessionId: string
-  role: ChatMessageRole
-  content: string | null
-  metadata: ChatMessageMetadata | null
-  createdAt: string
-  updatedAt: string
-}
-
-export interface CreateChatMessageRequest {
-  sessionId: string
-  role: ChatMessageRole
-  content?: string | null
-  metadata?: ChatMessageMetadata | null
-}
-
-export interface UpdateChatMessageRequest {
-  content?: string | null
-  metadata?: ChatMessageMetadata | null
-}
+export type ChatMessageMetadata = Schemas['ChatMessageMetadata']
+export type ChatMessage = Schemas['ChatMessageVO']
+export type CreateChatMessageRequest = RequestBody<'/api/chat-messages', 'post'>
+export type UpdateChatMessageRequest = RequestBody<'/api/chat-messages/{chatMessageId}', 'patch'>
 
 export function listChatMessagesBySession(sessionId: string) {
-  return http.get<ChatMessage[]>(`/chat-messages/session/${sessionId}`)
+  return http.get<ResponseData<'/api/chat-messages/session/{sessionId}', 'get'>>(
+    `/chat-messages/session/${sessionId}`,
+  )
 }
 
 export function createChatMessage(request: CreateChatMessageRequest) {
-  return http.post<ChatMessage>('/chat-messages', request)
+  return http.post<ResponseData<'/api/chat-messages', 'post'>>('/chat-messages', request)
 }
 
 export function updateChatMessage(chatMessageId: string, request: UpdateChatMessageRequest) {
-  return http.patch<ChatMessage>(`/chat-messages/${chatMessageId}`, request)
+  return http.patch<ResponseData<'/api/chat-messages/{chatMessageId}', 'patch'>>(
+    `/chat-messages/${chatMessageId}`,
+    request,
+  )
 }
 
 export function deleteChatMessage(chatMessageId: string) {
@@ -177,31 +154,26 @@ export function deleteChatMessage(chatMessageId: string) {
 // Knowledge base
 // ---------------------------------------------------------------------------
 
-export interface KnowledgeBase {
-  id: string
-  name: string
-  description: string | null
-  createdAt: string
-  updatedAt: string
-}
-
-export interface CreateKnowledgeBaseRequest {
-  name: string
-  description?: string | null
-}
-
-export type UpdateKnowledgeBaseRequest = Partial<CreateKnowledgeBaseRequest>
+export type KnowledgeBase = Schemas['KnowledgeBaseVO']
+export type CreateKnowledgeBaseRequest = RequestBody<'/api/knowledge-bases', 'post'>
+export type UpdateKnowledgeBaseRequest = RequestBody<
+  '/api/knowledge-bases/{knowledgeBaseId}',
+  'patch'
+>
 
 export function listKnowledgeBases() {
-  return http.get<KnowledgeBase[]>('/knowledge-bases')
+  return http.get<ResponseData<'/api/knowledge-bases', 'get'>>('/knowledge-bases')
 }
 
 export function createKnowledgeBase(request: CreateKnowledgeBaseRequest) {
-  return http.post<KnowledgeBase>('/knowledge-bases', request)
+  return http.post<ResponseData<'/api/knowledge-bases', 'post'>>('/knowledge-bases', request)
 }
 
 export function updateKnowledgeBase(knowledgeBaseId: string, request: UpdateKnowledgeBaseRequest) {
-  return http.patch<KnowledgeBase>(`/knowledge-bases/${knowledgeBaseId}`, request)
+  return http.patch<ResponseData<'/api/knowledge-bases/{knowledgeBaseId}', 'patch'>>(
+    `/knowledge-bases/${knowledgeBaseId}`,
+    request,
+  )
 }
 
 export function deleteKnowledgeBase(knowledgeBaseId: string) {
@@ -212,38 +184,24 @@ export function deleteKnowledgeBase(knowledgeBaseId: string) {
 // Document
 // ---------------------------------------------------------------------------
 
-export interface Document {
-  id: string
-  kbId: string
-  name: string
-  metadata: Record<string, unknown> | null
-  createdAt: string
-  updatedAt: string
-}
-
-export interface CreateDocumentRequest {
-  kbId: string
-  name: string
-  metadata?: Record<string, unknown> | null
-}
-
-export interface UpdateDocumentRequest {
-  name?: string
-  metadata?: Record<string, unknown> | null
-}
+export type Document = Schemas['DocumentVO']
+/** metadata is server-managed (it holds the stored file path), so requests cannot set it. */
+export type CreateDocumentRequest = RequestBody<'/api/documents', 'post'>
+export type UpdateDocumentRequest = RequestBody<'/api/documents/{documentId}', 'patch'>
 
 export function listDocuments() {
-  return http.get<Document[]>('/documents')
+  return http.get<ResponseData<'/api/documents', 'get'>>('/documents')
 }
 
 export function listDocumentsByKb(kbId: string) {
-  return http.get<Document[]>(`/documents/kb/${kbId}`)
+  return http.get<ResponseData<'/api/documents/kb/{kbId}', 'get'>>(`/documents/kb/${kbId}`)
 }
 
 export function createDocument(request: CreateDocumentRequest) {
-  return http.post<Document>('/documents', request)
+  return http.post<ResponseData<'/api/documents', 'post'>>('/documents', request)
 }
 
+// Upload is not in the OpenAPI document until Phase 8; it returns the created document.
 export function uploadDocument(kbId: string, file: File) {
   const formData = new FormData()
   formData.append('kbId', kbId)
@@ -252,7 +210,10 @@ export function uploadDocument(kbId: string, file: File) {
 }
 
 export function updateDocument(documentId: string, request: UpdateDocumentRequest) {
-  return http.patch<Document>(`/documents/${documentId}`, request)
+  return http.patch<ResponseData<'/api/documents/{documentId}', 'patch'>>(
+    `/documents/${documentId}`,
+    request,
+  )
 }
 
 export function deleteDocument(documentId: string) {
@@ -268,7 +229,7 @@ export function listOptionalTools() {
 }
 
 // ---------------------------------------------------------------------------
-// SSE
+// SSE (not described by OpenAPI, so typed by hand)
 // ---------------------------------------------------------------------------
 
 export type SseMessageType =

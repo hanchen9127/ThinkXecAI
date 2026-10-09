@@ -1,5 +1,6 @@
 package com.thinkxecai.model.vo;
 
+import jakarta.annotation.Nullable;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -15,6 +16,7 @@ public class KnowledgeBaseVO {
 
     private String id;
     private String name;
+    @Nullable
     private String description;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

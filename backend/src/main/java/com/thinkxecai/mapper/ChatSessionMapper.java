@@ -23,6 +23,12 @@ public interface ChatSessionMapper {
     /** PATCH semantics: only non-null fields change; updated_at is always set to now(). */
     int update(ChatSessionEntity entity);
 
+    /**
+     * Sets updated_at = now() and nothing else. Called when a message is added, so session lists
+     * (ordered by updated_at DESC) show the most recently active session first.
+     */
+    int touch(@Param("id") UUID id);
+
     /** The session's messages are deleted with it (ON DELETE CASCADE). */
     int deleteById(@Param("id") UUID id);
 

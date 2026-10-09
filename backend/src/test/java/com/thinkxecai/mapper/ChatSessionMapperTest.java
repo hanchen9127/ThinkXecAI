@@ -90,6 +90,22 @@ class ChatSessionMapperTest extends MapperTestSupport {
     }
 
     @Test
+    void touchRefreshesOnlyUpdatedAt() {
+        UUID agent = insertAgent("agent");
+        ChatSessionEntity session = insert(agent, "Trip planning");
+        LocalDateTime longAgo = LocalDateTime.of(2026, 1, 1, 0, 0);
+        setUpdatedAt(session.getId(), longAgo);
+
+        assertThat(mapper.touch(session.getId())).isEqualTo(1);
+
+        ChatSessionEntity found = mapper.selectById(session.getId());
+        assertThat(found.getUpdatedAt()).isAfter(longAgo);
+        assertThat(found.getTitle()).isEqualTo("Trip planning");
+        assertThat(found.getAgentId()).isEqualTo(agent);
+        assertThat(mapper.touch(UUID.randomUUID())).isZero();
+    }
+
+    @Test
     void deleteByIdRemovesTheRow() {
         ChatSessionEntity session = insert(null, "temporary");
 

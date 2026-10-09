@@ -5,6 +5,12 @@ spring:
   application:
     name: thinkxecai-backend
 
+  # API messages are always English: a fixed locale makes validation messages ignore the
+  # browser's Accept-Language header (otherwise a zh-CN browser gets Chinese messages).
+  web:
+    locale: en
+    locale-resolver: fixed
+
   datasource:
     url: jdbc:postgresql://localhost:5433/thinkxecai
     username: postgres
@@ -37,6 +43,14 @@ spring:
         chat:
           options:
             model: gemini-3.8-flash
+
+springdoc:
+  # The API description (/v3/api-docs) is generated from the controllers; CI turns it into the frontend's types.
+  default-produces-media-type: application/json
+  # Only the JSON API is described; /health and /sse-test are plain-text diagnostics outside it.
+  paths-to-match: /api/**
+  # Sorted keys keep the exported document byte-for-byte stable between runs (CI diffs the generated types).
+  writer-with-order-by-keys: true
 
 mybatis:
   mapper-locations: classpath:mapper/**/*.xml

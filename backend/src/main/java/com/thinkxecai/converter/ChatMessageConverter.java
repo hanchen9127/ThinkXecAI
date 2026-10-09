@@ -13,7 +13,6 @@ import com.thinkxecai.model.vo.ChatMessageVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -68,7 +67,7 @@ public class ChatMessageConverter {
 
     public ChatMessageDTO fromCreateRequest(CreateChatMessageRequest request) {
         return ChatMessageDTO.builder()
-                .sessionId(UUID.fromString(request.getSessionId()))
+                .sessionId(request.getSessionId())
                 .role(request.getRole())
                 .content(request.getContent())
                 .metadata(request.getMetadata())

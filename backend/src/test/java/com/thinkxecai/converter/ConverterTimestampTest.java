@@ -79,7 +79,7 @@ class ConverterTimestampTest {
         ChatMessageConverter converter = new ChatMessageConverter(objectMapper);
 
         CreateChatMessageRequest create = new CreateChatMessageRequest();
-        create.setSessionId(UUID.randomUUID().toString());
+        create.setSessionId(UUID.randomUUID());
         create.setRole(ChatMessageRole.USER);
         create.setContent("hi");
         ChatMessageDTO created = converter.fromCreateRequest(create);
@@ -119,7 +119,7 @@ class ConverterTimestampTest {
         DocumentConverter converter = new DocumentConverter(objectMapper);
 
         CreateDocumentRequest create = new CreateDocumentRequest();
-        create.setKbId(UUID.randomUUID().toString());
+        create.setKbId(UUID.randomUUID());
         create.setName("doc.md");
         DocumentDTO created = converter.fromCreateRequest(create);
         assertThat(created.getCreatedAt()).isNull();

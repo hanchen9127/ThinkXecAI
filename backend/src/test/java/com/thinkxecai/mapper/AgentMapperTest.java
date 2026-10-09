@@ -119,6 +119,26 @@ class AgentMapperTest extends MapperTestSupport {
         assertThat(countRows("chat_session", "id = ? AND agent_id IS NULL", sessionId)).isEqualTo(1);
     }
 
+    @Test
+    void removeAllowedKbDropsTheIdOnlyFromAgentsThatReferenceIt() {
+        UUID removed = UUID.randomUUID();
+        UUID kept = UUID.randomUUID();
+        AgentEntity both = insertWithAllowedKbs("both", "[\"" + kept + "\", \"" + removed + "\"]");
+        AgentEntity onlyRemoved = insertWithAllowedKbs("onlyRemoved", "[\"" + removed + "\"]");
+        AgentEntity unrelated = insertWithAllowedKbs("unrelated", "[\"" + kept + "\"]");
+        LocalDateTime old = LocalDateTime.of(2026, 1, 1, 0, 0);
+        jdbcTemplate.update("UPDATE agent SET updated_at = ?", old);
+
+        assertThat(mapper.removeAllowedKb(removed)).isEqualTo(2);
+
+        assertThat(json(mapper.selectById(both.getId()).getAllowedKbs())).isEqualTo(json("[\"" + kept + "\"]"));
+        assertThat(json(mapper.selectById(onlyRemoved.getId()).getAllowedKbs())).isEqualTo(json("[]"));
+        assertThat(mapper.selectById(both.getId()).getUpdatedAt()).isAfter(old);
+        AgentEntity untouched = mapper.selectById(unrelated.getId());
+        assertThat(json(untouched.getAllowedKbs())).isEqualTo(json("[\"" + kept + "\"]"));
+        assertThat(untouched.getUpdatedAt()).isEqualTo(old);
+    }
+
     private static AgentEntity agent(String name) {
         return AgentEntity.builder()
                 .name(name)
@@ -133,6 +153,13 @@ class AgentMapperTest extends MapperTestSupport {
 
     private AgentEntity insert(String name) {
         AgentEntity agent = agent(name);
+        mapper.insert(agent);
+        return agent;
+    }
+
+    private AgentEntity insertWithAllowedKbs(String name, String allowedKbs) {
+        AgentEntity agent = agent(name);
+        agent.setAllowedKbs(allowedKbs);
         mapper.insert(agent);
         return agent;
     }
