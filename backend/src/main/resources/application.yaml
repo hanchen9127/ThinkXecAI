@@ -5,6 +5,11 @@ spring:
   application:
     name: thinkxecai-backend
 
+  # The Ollama starter is only here for embeddings. Its chat model can't be switched off through
+  # spring.ai.model.chat without also switching off DeepSeek and Gemini, so its auto-configuration is excluded.
+  autoconfigure:
+    exclude: org.springframework.ai.model.ollama.autoconfigure.OllamaChatAutoConfiguration
+
   # API messages are always English: a fixed locale makes validation messages ignore the
   # browser's Accept-Language header (otherwise a zh-CN browser gets Chinese messages).
   web:
@@ -30,6 +35,20 @@ spring:
             enable: true
 
   ai:
+    model:
+      embedding:
+        # The Gemini starter also registers a text embedding model, under this key (Ollama's is
+        # spring.ai.model.embedding). Turning it off leaves Ollama's bge-m3 as the only EmbeddingModel.
+        text: none
+    ollama:
+      base-url: http://localhost:11434
+      # Never pull at startup: the app starts without contacting Ollama (CI has none), and bge-m3 must already be installed.
+      init:
+        pull-model-strategy: never
+      embedding:
+        options:
+          # Called through /api/embed, which returns unit-length vectors; ingestion and search must both use it.
+          model: bge-m3
     deepseek:
       api-key: ${THINKXECAI_DEEPSEEK_API_KEY:}
       chat:
