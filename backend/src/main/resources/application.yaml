@@ -16,6 +16,13 @@ spring:
     locale: en
     locale-resolver: fixed
 
+  # One Markdown file per upload, at most 1 MB. The request limit stays separate (Spring's default,
+  # 10 MB) so a later batch upload can send several files, each still checked against max-file-size.
+  servlet:
+    multipart:
+      max-file-size: 1MB
+      max-request-size: 10MB
+
   datasource:
     url: jdbc:postgresql://localhost:5433/thinkxecai
     username: postgres

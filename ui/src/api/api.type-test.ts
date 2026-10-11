@@ -7,11 +7,13 @@ import type {
   ChatMessageMetadata,
   ChatOptionsInput,
   CreateAgentRequest,
+  Document,
   UpdateChatSessionRequest,
   createAgent,
   deleteAgent,
   listAgents,
   listChatMessagesBySession,
+  uploadDocument,
 } from './api'
 
 type Equal<A, B> =
@@ -24,6 +26,7 @@ export type ApiTypeChecks = [
   Expect<Equal<Data<typeof createAgent>, Agent>>,
   Expect<Equal<Data<typeof deleteAgent>, null>>,
   Expect<Equal<Data<typeof listChatMessagesBySession>, ChatMessage[]>>,
+  Expect<Equal<Data<typeof uploadDocument>, Document>>,
   Expect<Equal<AgentModel, 'deepseek-chat' | 'gemini-3.8-flash'>>,
   Expect<Equal<Agent['id'], string>>,
   Expect<Equal<Agent['description'], string | null>>,

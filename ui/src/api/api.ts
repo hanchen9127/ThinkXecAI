@@ -201,12 +201,12 @@ export function createDocument(request: CreateDocumentRequest) {
   return http.post<ResponseData<'/api/documents', 'post'>>('/documents', request)
 }
 
-// Upload is not in the OpenAPI document until Phase 8; it returns the created document.
+/** One Markdown file (.md / .markdown, UTF-8, at most 1 MB, at least one heading); returns the created document. */
 export function uploadDocument(kbId: string, file: File) {
   const formData = new FormData()
   formData.append('kbId', kbId)
   formData.append('file', file)
-  return http.postForm<Document>('/documents/upload', formData)
+  return http.postForm<ResponseData<'/api/documents/upload', 'post'>>('/documents/upload', formData)
 }
 
 export function updateDocument(documentId: string, request: UpdateDocumentRequest) {

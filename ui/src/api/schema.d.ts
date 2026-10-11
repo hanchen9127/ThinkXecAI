@@ -164,6 +164,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/documents/upload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["uploadDocument"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/documents/{documentId}": {
         parameters: {
             query?: never;
@@ -425,6 +441,12 @@ export interface components {
         UpdateKnowledgeBaseRequest: {
             description?: string;
             name?: string;
+        };
+        UploadDocumentRequest: {
+            /** Format: binary */
+            file: string;
+            /** Format: uuid */
+            kbId: string;
         };
     };
     responses: never;
@@ -819,6 +841,30 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiResponseListDocumentVO"];
+                };
+            };
+        };
+    };
+    uploadDocument: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "multipart/form-data": components["schemas"]["UploadDocumentRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponseDocumentVO"];
                 };
             };
         };
