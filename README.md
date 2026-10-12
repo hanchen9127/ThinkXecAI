@@ -54,7 +54,7 @@ This project is being built phase by phase. Current status:
 - [x] Phase 5 — Common backend foundation (`ApiResponse`, DTOs, entities, converters)
 - [x] Phase 6 — MyBatis persistence layer (six mappers, tested against PostgreSQL + pgvector)
 - [x] Phase 7 — Facade services and REST APIs (CRUD for five resources, request validation, CI contract check)
-- [ ] Phase 8 — Markdown ingestion and RAG
+- [x] Phase 8 — Markdown ingestion and RAG (all-or-nothing upload, heading-based sections, local `bge-m3` embeddings, filtered vector search)
 - [ ] Phase 9 — Tool system
 - [ ] Phase 10 — Chat model registry
 - [ ] Phase 11 — Agent runtime (Think-Execute loop)
@@ -62,7 +62,9 @@ This project is being built phase by phase. Current status:
 - [ ] Phase 13 — Frontend features (full UI)
 - [ ] Phase 14 — End-to-end verification
 
-The REST API is in place except document upload (Phase 8), tools (Phase 9), and SSE (Phase 12).
+The REST API is in place except tools (Phase 9) and SSE (Phase 12). Uploaded Markdown is split
+into sections, embedded, and searchable per knowledge base, but no agent searches it until the
+tool system and agent runtime arrive (Phases 9 and 11).
 Creating a user message stores it and emits a chat event, but nothing runs the agent until
 Phase 11. The frontend has a typed API client and still runs as an empty shell.
 
@@ -118,6 +120,9 @@ mvn spring-boot:run
 The API listens on `http://localhost:8080`, with all REST endpoints under `/api` and SSE
 under `/sse`. Env vars in `.env` need to be loaded into the process environment (e.g. via
 your shell, an IDE run configuration, or a tool like `direnv`).
+Uploaded files are stored under `data/documents/` relative to the working directory (gitignored).
+The backend starts without Ollama; it is needed when a document is uploaded or a knowledge base is
+searched.
 
 ### 4. Run the frontend
 
@@ -161,8 +166,12 @@ anything else.
 | Documents       | `GET/POST /documents`, `GET /documents/kb/{kbId}`, `POST /documents/upload`, `PATCH/DELETE /documents/{documentId}` |
 | Tools           | `GET /tools` (optional tools only) |
 
-`POST /documents/upload` and `GET /tools` arrive in Phases 8 and 9. Outside `/api`, `GET /health` and
-`GET /sse-test` return plain text `ok`.
+`POST /documents/upload` takes a `multipart/form-data` form with `kbId` and one `file`: a UTF-8
+Markdown file (`.md` or `.markdown`, at most 1 MB) with at least one heading. Each heading starts
+a section; the section titles are embedded and the original Markdown below each heading is stored
+as the chunk. The upload either fully succeeds or leaves no document, chunk, or file behind.
+`GET /tools` arrives in Phase 9. Outside `/api`, `GET /health` and `GET /sse-test` return plain
+text `ok`.
 
 Live agent output streams from `GET /sse/connect/{chatSessionId}` (`text/event-stream`):
 an `init` event on connect, then `message` events carrying JSON of the form
