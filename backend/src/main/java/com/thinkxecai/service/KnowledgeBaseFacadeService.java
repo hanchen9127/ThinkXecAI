@@ -19,7 +19,7 @@ public interface KnowledgeBaseFacadeService {
 
     /**
      * Deletes the knowledge base with its documents and chunks (foreign key cascade) and removes it
-     * from every agent's allowedKbs. Unknown id → BizException 404.
+     * from every agent's allowedKbs; its stored files go after the commit. Unknown id → BizException 404.
      */
     void deleteKnowledgeBase(UUID knowledgeBaseId);
 

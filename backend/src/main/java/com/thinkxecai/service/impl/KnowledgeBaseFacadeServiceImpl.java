@@ -9,6 +9,7 @@ import com.thinkxecai.model.entity.KnowledgeBaseEntity;
 import com.thinkxecai.model.request.CreateKnowledgeBaseRequest;
 import com.thinkxecai.model.request.UpdateKnowledgeBaseRequest;
 import com.thinkxecai.model.vo.KnowledgeBaseVO;
+import com.thinkxecai.service.DocumentStorageService;
 import com.thinkxecai.service.KnowledgeBaseFacadeService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -24,6 +25,7 @@ public class KnowledgeBaseFacadeServiceImpl implements KnowledgeBaseFacadeServic
     private final KnowledgeBaseMapper knowledgeBaseMapper;
     private final AgentMapper agentMapper;
     private final KnowledgeBaseConverter knowledgeBaseConverter;
+    private final DocumentStorageService documentStorageService;
 
     @Override
     public List<KnowledgeBaseVO> listKnowledgeBases() {
@@ -57,6 +59,8 @@ public class KnowledgeBaseFacadeServiceImpl implements KnowledgeBaseFacadeServic
             throw notFound();
         }
         agentMapper.removeAllowedKb(knowledgeBaseId);
+        FileCleanup.afterCommit("knowledge base " + knowledgeBaseId,
+                () -> documentStorageService.deleteKnowledgeBaseFiles(knowledgeBaseId));
     }
 
     private KnowledgeBaseEntity findExisting(UUID knowledgeBaseId) {

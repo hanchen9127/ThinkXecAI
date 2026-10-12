@@ -30,7 +30,7 @@ public interface DocumentFacadeService {
     /** Changes the name only. Unknown id → BizException 404. */
     DocumentVO updateDocument(UUID documentId, UpdateDocumentRequest request);
 
-    /** Deletes the document and its chunks (foreign key cascade). Unknown id → BizException 404. */
+    /** Deletes the document and its chunks (foreign key cascade); its stored files go after the commit. Unknown id → BizException 404. */
     void deleteDocument(UUID documentId);
 
 }

@@ -19,8 +19,6 @@ import com.thinkxecai.service.RagService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.ByteBuffer;
@@ -101,7 +99,9 @@ public class DocumentFacadeServiceImpl implements DocumentFacadeService {
             DocumentEntity document = DocumentEntity.builder().kbId(kbId).name(name).build();
             documentMapper.insert(document);
             UUID documentId = document.getId();
-            deleteFilesUnlessCommitted(kbId, documentId);
+            // Registered before the file is written, so a rollback also removes a partly written directory.
+            FileCleanup.unlessCommitted("failed upload " + documentId,
+                    () -> documentStorageService.deleteDocumentFiles(kbId, documentId));
 
             String filePath = documentStorageService.save(kbId, documentId, extension, content);
             DocumentDTO withMetadata = DocumentDTO.builder().id(documentId).metadata(Map.of("filePath", filePath)).build();
@@ -131,21 +131,9 @@ public class DocumentFacadeServiceImpl implements DocumentFacadeService {
     @Override
     @Transactional
     public void deleteDocument(UUID documentId) {
-        if (documentMapper.deleteById(documentId) == 0) {
-            throw notFound();
-        }
-    }
-
-    /** Registered before the file is written, so a rollback also removes a partly created directory. */
-    private void deleteFilesUnlessCommitted(UUID kbId, UUID documentId) {
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCompletion(int status) {
-                if (status != STATUS_COMMITTED) {
-                    documentStorageService.deleteDocumentFiles(kbId, documentId);
-                }
-            }
-        });
+        UUID kbId = findExisting(documentId).getKbId();
+        documentMapper.deleteById(documentId);
+        FileCleanup.afterCommit("document " + documentId, () -> documentStorageService.deleteDocumentFiles(kbId, documentId));
     }
 
     /** Browsers send a bare file name, but some clients include a path; only the last segment is kept. */
