@@ -32,6 +32,11 @@
         WHERE doc_id = #{docId}
     </delete>
 
+    <!-- Transaction-scoped; see ChunkMapper.enableStrictOrderScan. -->
+    <update id="enableStrictOrderScan">
+        SET LOCAL hnsw.iterative_scan = strict_order
+    </update>
+
     <!-- <-> is pgvector's L2 distance; it matches the vector_l2_ops HNSW index. -->
     <select id="searchSimilar" resultType="com.thinkxecai.model.entity.ChunkEntity">
         SELECT <include refid="columnsWithoutEmbedding"/>

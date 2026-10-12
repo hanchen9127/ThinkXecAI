@@ -26,6 +26,9 @@ replay_pid*
 # Maven build output
 target/
 
+# Uploaded documents (thinkxecai.document.storage-path, relative to where the backend runs)
+**/data/documents/
+
 # IDE
 .idea/
 *.iml

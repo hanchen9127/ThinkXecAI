@@ -3,12 +3,17 @@ package com.thinkxecai.exception;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.thinkxecai.common.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.TypeMismatchException;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.util.unit.DataSize;
+import org.springframework.validation.FieldError;
 import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -26,6 +31,9 @@ public class GlobalExceptionHandler {
 
     static final String INTERNAL_ERROR_MESSAGE = "Internal server error";
 
+    @Value("${spring.servlet.multipart.max-file-size}")
+    private DataSize maxFileSize;
+
     @ExceptionHandler(BizException.class)
     public ApiResponse<Void> handleBizException(BizException ex) {
         Integer code = ex.getCode();
@@ -41,7 +49,7 @@ public class GlobalExceptionHandler {
     public ApiResponse<Void> handleInvalidBody(MethodArgumentNotValidException ex) {
         String message = Stream.concat(
                         ex.getBindingResult().getFieldErrors().stream()
-                                .map(error -> error.getField() + ": " + error.getDefaultMessage()),
+                                .map(error -> error.getField() + ": " + fieldMessage(error)),
                         ex.getBindingResult().getGlobalErrors().stream()
                                 .map(error -> error.getObjectName() + ": " + error.getDefaultMessage()))
                 .sorted()
@@ -65,6 +73,14 @@ public class GlobalExceptionHandler {
         return badRequest(ex.getName() + ": " + expected);
     }
 
+    /** Thrown while the multipart request is read, before any controller; names the limit instead of a generic message. */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ApiResponse<Void> handleUploadTooLarge(MaxUploadSizeExceededException ex) {
+        long kilobytes = maxFileSize.toKilobytes();
+        String limit = kilobytes % 1024 == 0 ? kilobytes / 1024 + " MB" : kilobytes + " KB";
+        return badRequest("file: too large (maximum " + limit + ")");
+    }
+
     @ExceptionHandler(Exception.class)
     public ApiResponse<Void> handleException(Exception ex) {
         // Spring MVC's own client errors (unknown path, wrong method or content type, missing
@@ -84,6 +100,19 @@ public class GlobalExceptionHandler {
     private static ApiResponse<Void> badRequest(String message) {
         log.warn("Bad request: {}", message);
         return ApiResponse.error(400, message);
+    }
+
+    /**
+     * A form field that cannot be converted (e.g. a multipart {@code kbId} that is not a UUID) carries
+     * a message with Java type names; it is replaced like a path variable type mismatch.
+     */
+    private static String fieldMessage(FieldError error) {
+        if (!error.isBindingFailure()) {
+            return error.getDefaultMessage();
+        }
+        boolean uuid = error.contains(TypeMismatchException.class)
+                && UUID.class.equals(error.unwrap(TypeMismatchException.class).getRequiredType());
+        return uuid ? "must be a UUID" : "invalid value";
     }
 
     /** Builds a client-facing path such as {@code metadata.toolCalls[0].id}, without Java class names. */

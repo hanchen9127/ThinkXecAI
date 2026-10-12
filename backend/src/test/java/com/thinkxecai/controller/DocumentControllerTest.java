@@ -8,18 +8,22 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
+import static org.mockito.AdditionalMatchers.aryEq;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -28,6 +32,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -92,6 +97,39 @@ class DocumentControllerTest {
         send(post("/api/documents"), "{\"kbId\": \"%s\", \"name\": \"\"}".formatted(KB))
                 .andExpect(jsonPath("$.code").value(400))
                 .andExpect(jsonPath("$.message").value("name: must not be blank"));
+
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void uploadPassesTheFileToTheServiceAndReturnsTheDocumentObject() throws Exception {
+        byte[] content = "# Title\nbody".getBytes(StandardCharsets.UTF_8);
+        when(service.uploadDocument(eq(KB), eq("guide.md"), any())).thenReturn(vo("guide.md"));
+
+        mockMvc.perform(multipart("/api/documents/upload")
+                        .file(new MockMultipartFile("file", "guide.md", "text/markdown", content))
+                        .param("kbId", KB.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.id").value(ID.toString()))
+                .andExpect(jsonPath("$.data.metadata.filePath").value("kb/doc/file.md"));
+
+        verify(service).uploadDocument(eq(KB), eq("guide.md"), aryEq(content));
+    }
+
+    @Test
+    void uploadRequiresAValidKbIdAndAFile() throws Exception {
+        MockMultipartFile file = new MockMultipartFile("file", "guide.md", "text/markdown", new byte[]{'#'});
+
+        mockMvc.perform(multipart("/api/documents/upload").file(file))
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value(containsString("kbId")));
+        mockMvc.perform(multipart("/api/documents/upload").file(file).param("kbId", "not-a-uuid"))
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value("kbId: must be a UUID"));
+        mockMvc.perform(multipart("/api/documents/upload").param("kbId", KB.toString()))
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value(containsString("file")));
 
         verifyNoInteractions(service);
     }

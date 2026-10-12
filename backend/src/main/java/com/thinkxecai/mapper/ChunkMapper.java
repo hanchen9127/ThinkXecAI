@@ -26,6 +26,14 @@ public interface ChunkMapper {
     int deleteByDocId(@Param("docId") UUID docId);
 
     /**
+     * Makes filtered HNSW searches in the current transaction keep scanning until {@code limit} rows
+     * pass the {@code kb_id} filter. Without it the index returns about {@code hnsw.ef_search} (40)
+     * nearest rows across all knowledge bases and filters afterwards, so a small knowledge base can
+     * get fewer results than exist. Has no effect outside a transaction.
+     */
+    void enableStrictOrderScan();
+
+    /**
      * The {@code limit} chunks of one knowledge base closest to {@code queryEmbedding} by L2
      * distance, nearest first. Returned without embeddings: retrieval only needs the text.
      */

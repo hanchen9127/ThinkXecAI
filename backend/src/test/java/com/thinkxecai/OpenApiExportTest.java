@@ -46,7 +46,8 @@ class OpenApiExportTest {
             Map.entry("/api/knowledge-bases/{knowledgeBaseId}", List.of("delete", "patch")),
             Map.entry("/api/documents", List.of("get", "post")),
             Map.entry("/api/documents/{documentId}", List.of("delete", "patch")),
-            Map.entry("/api/documents/kb/{kbId}", List.of("get"))));
+            Map.entry("/api/documents/kb/{kbId}", List.of("get")),
+            Map.entry("/api/documents/upload", List.of("post"))));
 
     @Autowired
     private MockMvc mockMvc;
