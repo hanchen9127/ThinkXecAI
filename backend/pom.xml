@@ -24,6 +24,8 @@
         <flexmark.version>0.64.8</flexmark.version>
         <lombok.version>1.18.32</lombok.version>
         <springdoc.version>2.8.17</springdoc.version>
+        <!-- The version the Gemini SDK already brings in, so only one google-auth version is on the classpath. -->
+        <google-auth.version>1.33.0</google-auth.version>
         <!-- Surefire skips tests tagged @Tag("external") (live Ollama / LLM calls) by default, so CI never
              reaches external services. Run them locally with: mvn test -DexcludedGroups= -Dgroups=external -->
         <excludedGroups>external</excludedGroups>
@@ -100,9 +102,16 @@
             <artifactId>spring-ai-starter-model-ollama</artifactId>
         </dependency>
 
+        <!-- Email through the Gmail API: OAuth 2.0 access tokens from a stored refresh token, and the MIME
+             message built with Jakarta Mail (sent over HTTPS, not SMTP). -->
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-mail</artifactId>
+            <groupId>com.google.auth</groupId>
+            <artifactId>google-auth-library-oauth2-http</artifactId>
+            <version>${google-auth.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.angus</groupId>
+            <artifactId>jakarta.mail</artifactId>
         </dependency>
 
         <dependency>

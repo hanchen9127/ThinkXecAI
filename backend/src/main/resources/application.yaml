@@ -29,18 +29,6 @@ spring:
     password: ${THINKXECAI_DB_PASSWORD:}
     driver-class-name: org.postgresql.Driver
 
-  mail:
-    host: smtp.qq.com
-    port: 587
-    username: ${THINKXECAI_MAIL_USERNAME:}
-    password: ${THINKXECAI_MAIL_PASSWORD:}
-    properties:
-      mail:
-        smtp:
-          auth: true
-          starttls:
-            enable: true
-
   ai:
     model:
       embedding:
@@ -88,3 +76,13 @@ mybatis:
 thinkxecai:
   document:
     storage-path: ./data/documents
+  # The email tool sends through the Gmail API. Everything here is optional: startup never checks it, and
+  # a send with any Gmail value missing tells the model which variables are missing (values never shown).
+  mail:
+    gmail:
+      sender: ${THINKXECAI_GMAIL_SENDER:}
+      client-id: ${THINKXECAI_GMAIL_CLIENT_ID:}
+      client-secret: ${THINKXECAI_GMAIL_CLIENT_SECRET:}
+      refresh-token: ${THINKXECAI_GMAIL_REFRESH_TOKEN:}
+    # Comma-separated addresses the tool may send to. Empty means no email is sent at all (fail-closed).
+    allowed-recipients: ${THINKXECAI_MAIL_ALLOWED_RECIPIENTS:}
