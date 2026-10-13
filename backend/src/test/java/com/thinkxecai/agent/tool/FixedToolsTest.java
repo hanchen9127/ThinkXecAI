@@ -2,6 +2,7 @@ package com.thinkxecai.agent.tool;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.thinkxecai.service.RagService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -16,6 +17,7 @@ import java.time.ZoneId;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 /**
  * The tool names agents store and the method names the model sees are part of the spec, so they are
@@ -27,6 +29,7 @@ class FixedToolsTest {
 
     static Stream<Arguments> fixedTools() {
         return Stream.of(
+                Arguments.of(new KnowledgeTool(mock(RagService.class)), "KnowledgeTool", "KnowledgeTool"),
                 Arguments.of(new TerminateTool(), "terminate", "terminate"),
                 Arguments.of(new CityTool(), "cityTool", "getCity"),
                 Arguments.of(new DateTool(), "dateTool", "getDate"),
