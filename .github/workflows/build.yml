@@ -59,8 +59,6 @@ jobs:
     env:
       # Throwaway values: the export test starts the full Spring context against a disposable database.
       THINKXECAI_DB_PASSWORD: ci-postgres
-      THINKXECAI_MAIL_USERNAME: ci@example.com
-      THINKXECAI_MAIL_PASSWORD: ci-dummy
       THINKXECAI_GEMINI_API_KEY: ci-dummy
       THINKXECAI_DEEPSEEK_API_KEY: ci-dummy
     steps:

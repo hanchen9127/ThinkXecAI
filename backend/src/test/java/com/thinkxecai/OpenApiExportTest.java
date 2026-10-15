@@ -32,7 +32,7 @@ class OpenApiExportTest {
 
     static final Path OUTPUT = Path.of("target", "openapi.json");
 
-    /** Every endpoint in tech-stack.md implemented so far (upload: Phase 8, tools: Phase 9, SSE: not JSON). */
+    /** Every JSON endpoint in tech-stack.md (SSE is not JSON and is not described). */
     private static final Map<String, List<String>> ENDPOINTS = new TreeMap<>(Map.ofEntries(
             Map.entry("/api/agents", List.of("get", "post")),
             Map.entry("/api/agents/{agentId}", List.of("delete", "patch")),
@@ -47,7 +47,8 @@ class OpenApiExportTest {
             Map.entry("/api/documents", List.of("get", "post")),
             Map.entry("/api/documents/{documentId}", List.of("delete", "patch")),
             Map.entry("/api/documents/kb/{kbId}", List.of("get")),
-            Map.entry("/api/documents/upload", List.of("post"))));
+            Map.entry("/api/documents/upload", List.of("post")),
+            Map.entry("/api/tools", List.of("get"))));
 
     @Autowired
     private MockMvc mockMvc;
@@ -95,6 +96,10 @@ class OpenApiExportTest {
 
         assertThat(names(agent.at("/properties/model/enum"))).containsExactly("deepseek-chat", "gemini-3.8-flash");
         assertThat(names(schema("ApiResponseVoid").get("required"))).containsExactlyInAnyOrder("code", "message", "data");
+
+        JsonNode tool = schema("ToolVO");
+        assertThat(names(tool.get("required"))).containsExactlyInAnyOrder("name", "description", "type");
+        assertThat(names(tool.at("/properties/type/enum"))).containsExactly("FIXED", "OPTIONAL");
     }
 
     @Test

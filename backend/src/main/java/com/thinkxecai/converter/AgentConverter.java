@@ -89,7 +89,7 @@ public class AgentConverter {
                 .description(request.getDescription())
                 .systemPrompt(request.getSystemPrompt())
                 .model(request.getModel())
-                .allowedTools(request.getAllowedTools() != null ? request.getAllowedTools() : List.of())
+                .allowedTools(request.getAllowedTools() != null ? toolNames(request.getAllowedTools()) : List.of())
                 .allowedKbs(request.getAllowedKbs() != null ? kbIds(request.getAllowedKbs()) : List.of())
                 .chatOptions(ChatOptions.defaults().overriddenBy(request.getChatOptions()))
                 .build();
@@ -101,10 +101,15 @@ public class AgentConverter {
         if (request.getDescription() != null) existing.setDescription(request.getDescription());
         if (request.getSystemPrompt() != null) existing.setSystemPrompt(request.getSystemPrompt());
         if (request.getModel() != null) existing.setModel(request.getModel());
-        if (request.getAllowedTools() != null) existing.setAllowedTools(request.getAllowedTools());
+        if (request.getAllowedTools() != null) existing.setAllowedTools(toolNames(request.getAllowedTools()));
         if (request.getAllowedKbs() != null) existing.setAllowedKbs(kbIds(request.getAllowedKbs()));
         if (request.getChatOptions() != null) existing.setChatOptions(existing.getChatOptions().overriddenBy(request.getChatOptions()));
         return existing;
+    }
+
+    /** Tool names as stored in allowed_tools: duplicates dropped, order kept. */
+    private static List<String> toolNames(List<String> names) {
+        return names.stream().distinct().toList();
     }
 
     /** Knowledge base ids as stored in allowed_kbs: canonical lowercase text, duplicates dropped, order kept. */

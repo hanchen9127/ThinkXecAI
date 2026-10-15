@@ -22,8 +22,8 @@ public class UpdateAgentRequest {
     @Pattern(regexp = ChatModelNames.PATTERN, message = ChatModelNames.PATTERN_MESSAGE)
     @Schema(allowableValues = {ChatModelNames.DEEPSEEK_CHAT, ChatModelNames.GEMINI_FLASH})
     private String model;
-    /** Not validated until the tool system exists (Phase 9). */
-    private List<String> allowedTools;
+    /** Each name must be an optional tool (checked by the service); duplicates are dropped. */
+    private List<@NotNull String> allowedTools;
     /** Each id must refer to an existing knowledge base (checked by the service). */
     private List<@NotNull UUID> allowedKbs;
     @Valid

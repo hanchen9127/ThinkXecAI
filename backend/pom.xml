@@ -78,7 +78,7 @@
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
-            <scope>runtime</scope>
+            <!-- Compile scope: the database tool uses the driver's own SQL parser to allow exactly one statement. -->
         </dependency>
 
         <dependency>
@@ -100,9 +100,11 @@
             <artifactId>spring-ai-starter-model-ollama</artifactId>
         </dependency>
 
+        <!-- Email through the Gmail API: the MIME message is built with Jakarta Mail and sent over HTTPS
+             (not SMTP); the OAuth access token is refreshed with the JDK HTTP client (ADR 027). -->
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-mail</artifactId>
+            <groupId>org.eclipse.angus</groupId>
+            <artifactId>jakarta.mail</artifactId>
         </dependency>
 
         <dependency>

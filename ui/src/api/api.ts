@@ -43,14 +43,8 @@ export type ChatOptionsInput = Schemas['ChatOptionsInput']
 
 export type ChatMessageRole = Schemas['ChatMessageVO']['role']
 
-// Not in the OpenAPI document until the tool system exists (Phase 9).
-export type ToolType = 'FIXED' | 'OPTIONAL'
-
-export interface ToolVO {
-  name: string
-  description: string
-  type: ToolType
-}
+export type ToolVO = Schemas['ToolVO']
+export type ToolType = ToolVO['type']
 
 // ---------------------------------------------------------------------------
 // Agent
@@ -224,8 +218,9 @@ export function deleteDocument(documentId: string) {
 // Tools
 // ---------------------------------------------------------------------------
 
+/** The tools an agent can choose for `allowedTools`; fixed tools are always given and not listed. */
 export function listOptionalTools() {
-  return http.get<ToolVO[]>('/tools')
+  return http.get<ResponseData<'/api/tools', 'get'>>('/tools')
 }
 
 // ---------------------------------------------------------------------------
