@@ -118,6 +118,18 @@ class AgentControllerTest {
     }
 
     @Test
+    void allowedToolsMustNotContainNull() throws Exception {
+        send(post("/api/agents"), "{\"name\": \"Research\", \"model\": \"deepseek-chat\", \"allowedTools\": [\"emailTool\", null]}")
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value("allowedTools[1]: must not be null"));
+        send(patch("/api/agents/" + ID), "{\"allowedTools\": [null]}")
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value("allowedTools[0]: must not be null"));
+
+        verifyNoInteractions(service);
+    }
+
+    @Test
     void allowedKbsMustBeUuids() throws Exception {
         send(post("/api/agents"), "{\"name\": \"Research\", \"model\": \"deepseek-chat\", \"allowedKbs\": [\"kb-1\"]}")
                 .andExpect(jsonPath("$.code").value(400))

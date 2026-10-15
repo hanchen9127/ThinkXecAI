@@ -69,6 +69,55 @@ class AgentFacadeServiceTest extends ServiceTestSupport {
     }
 
     @Test
+    void createStoresOptionalToolsWithoutDuplicates() {
+        CreateAgentRequest request = createRequest("Research");
+        request.setAllowedTools(List.of("emailTool", "dataBaseTool", "emailTool"));
+
+        AgentVO created = service.createAgent(request);
+
+        assertThat(created.getAllowedTools()).containsExactly("emailTool", "dataBaseTool");
+    }
+
+    @Test
+    void createWithAnUnknownOrFixedToolIsRejectedAndWritesNothing() {
+        CreateAgentRequest request = createRequest("Rejected");
+        request.setAllowedTools(List.of("dataBaseTool", "databaseQuery", "KnowledgeTool", "databaseQuery"));
+
+        assertThatThrownBy(() -> service.createAgent(request))
+                .isInstanceOfSatisfying(BizException.class, ex -> {
+                    assertThat(ex.getCode()).isEqualTo(400);
+                    assertThat(ex.getMessage()).isEqualTo("allowedTools: not an optional tool: databaseQuery, KnowledgeTool");
+                });
+        assertThat(countRows("agent", "name = ?", "Rejected")).isZero();
+    }
+
+    @Test
+    void toolNamesAreCaseSensitive() {
+        CreateAgentRequest request = createRequest("Rejected");
+        request.setAllowedTools(List.of("EmailTool"));
+
+        assertThatThrownBy(() -> service.createAgent(request))
+                .hasMessage("allowedTools: not an optional tool: EmailTool");
+    }
+
+    @Test
+    void updateValidatesToolsAndKeepsTheStoredListWhenRejected() {
+        CreateAgentRequest create = createRequest("Research");
+        create.setAllowedTools(List.of("dataBaseTool"));
+        UUID id = UUID.fromString(service.createAgent(create).getId());
+        UpdateAgentRequest rejected = new UpdateAgentRequest();
+        rejected.setAllowedTools(List.of("emailTool", "terminate"));
+        UpdateAgentRequest accepted = new UpdateAgentRequest();
+        accepted.setAllowedTools(List.of("emailTool", "emailTool"));
+
+        assertThatThrownBy(() -> service.updateAgent(id, rejected)).hasMessage("allowedTools: not an optional tool: terminate");
+        assertThat(service.listAgents()).filteredOn(agent -> agent.getId().equals(id.toString()))
+                .singleElement().satisfies(agent -> assertThat(agent.getAllowedTools()).containsExactly("dataBaseTool"));
+
+        assertThat(service.updateAgent(id, accepted).getAllowedTools()).containsExactly("emailTool");
+    }
+
+    @Test
     void createWithUnknownKnowledgeBaseIsRejectedAndWritesNothing() {
         UUID unknown = UUID.randomUUID();
         CreateAgentRequest request = createRequest("Rejected");
