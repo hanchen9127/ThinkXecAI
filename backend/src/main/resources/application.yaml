@@ -84,5 +84,8 @@ thinkxecai:
       client-id: ${THINKXECAI_GMAIL_CLIENT_ID:}
       client-secret: ${THINKXECAI_GMAIL_CLIENT_SECRET:}
       refresh-token: ${THINKXECAI_GMAIL_REFRESH_TOKEN:}
+      # Google's OAuth token endpoint and the Gmail API; tests point both at a local fake server.
+      token-uri: https://oauth2.googleapis.com/token
+      api-base-url: https://gmail.googleapis.com
     # Comma-separated addresses the tool may send to. Empty means no email is sent at all (fail-closed).
     allowed-recipients: ${THINKXECAI_MAIL_ALLOWED_RECIPIENTS:}
