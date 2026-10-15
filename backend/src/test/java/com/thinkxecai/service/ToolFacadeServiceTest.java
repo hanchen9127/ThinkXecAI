@@ -1,18 +1,26 @@
 package com.thinkxecai.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.thinkxecai.agent.tool.Tool;
 import com.thinkxecai.agent.tool.ToolType;
 import com.thinkxecai.model.vo.ToolVO;
 import com.thinkxecai.service.impl.ToolFacadeServiceImpl;
 import org.junit.jupiter.api.Test;
+import org.springframework.ai.tool.ToolCallback;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ToolFacadeServiceTest extends ServiceTestSupport {
+
+    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final List<String> FIXED_METHODS = List.of("KnowledgeTool", "getCity", "getDate", "terminate", "weather");
 
     @Autowired
     private ToolFacadeService service;
@@ -32,6 +40,39 @@ class ToolFacadeServiceTest extends ServiceTestSupport {
         assertThat(service.listOptionalTools()).isNotEmpty()
                 .allSatisfy(tool -> assertThat(tool.getType()).isEqualTo(ToolType.OPTIONAL))
                 .allSatisfy(tool -> assertThat(tool.getDescription()).isNotBlank());
+    }
+
+    @Test
+    void everyAgentGetsAllFixedToolsAndOnlyTheOptionalOnesItLists() {
+        assertThat(modelFacingNames(service.toolCallbacksFor(List.of()))).containsExactlyElementsOf(FIXED_METHODS);
+        assertThat(modelFacingNames(service.toolCallbacksFor(null))).containsExactlyElementsOf(FIXED_METHODS);
+        assertThat(modelFacingNames(service.toolCallbacksFor(List.of("emailTool"))))
+                .containsExactlyElementsOf(plus(FIXED_METHODS, "sendEmail"));
+        assertThat(modelFacingNames(service.toolCallbacksFor(List.of("emailTool", "dataBaseTool"))))
+                .containsExactlyElementsOf(plus(FIXED_METHODS, "databaseQuery", "sendEmail"));
+    }
+
+    /** Rows saved before allowedTools was validated may hold anything; the agent still runs with what is valid. */
+    @Test
+    void duplicateUnknownFixedAndNullNamesAreSkippedWithoutDuplicates() {
+        List<String> stored = Arrays.asList("dataBaseTool", "dataBaseTool", "databaseQuery", "KnowledgeTool", null, "");
+
+        assertThat(modelFacingNames(service.toolCallbacksFor(stored)))
+                .containsExactlyElementsOf(plus(FIXED_METHODS, "databaseQuery"))
+                .doesNotHaveDuplicates();
+    }
+
+    /** The runtime's tool context (allowed knowledge bases) must never become a model-facing argument. */
+    @Test
+    void noInputSchemaExposesTheToolContext() throws Exception {
+        for (ToolCallback callback : service.toolCallbacksFor(List.of("emailTool", "dataBaseTool"))) {
+            JsonNode properties = JSON.readTree(callback.getToolDefinition().inputSchema()).path("properties");
+            List<String> arguments = new ArrayList<>();
+            properties.fieldNames().forEachRemaining(arguments::add);
+
+            assertThat(arguments).as(callback.getToolDefinition().name()).doesNotContain("toolContext");
+            assertThat(callback.getToolDefinition().inputSchema()).doesNotContainIgnoringCase("ToolContext");
+        }
     }
 
     @Test
@@ -71,6 +112,16 @@ class ToolFacadeServiceTest extends ServiceTestSupport {
                 return type;
             }
         };
+    }
+
+    private static List<String> modelFacingNames(List<ToolCallback> callbacks) {
+        return callbacks.stream().map(callback -> callback.getToolDefinition().name()).toList();
+    }
+
+    private static List<String> plus(List<String> names, String... more) {
+        List<String> all = new ArrayList<>(names);
+        all.addAll(List.of(more));
+        return all;
     }
 
 }
