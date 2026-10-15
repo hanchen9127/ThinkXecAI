@@ -6,6 +6,8 @@ import com.thinkxecai.mapper.MapperTestSupport;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,14 +21,16 @@ import java.time.Instant;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * The read-only guarantee comes from the database, so it is tested against the real one (ISSUE-005).
- * Tests run without the test transaction, as the agent loop does. Attacks target a table the test
- * creates and drops itself, so a broken guard cannot damage the seeded sample data.
+ * The read-only guarantee comes from the database, so it is tested against the real one (ISSUE-005,
+ * ADR 030). Tests run without the test transaction, as the agent loop does. Attacks target a table and
+ * a sequence the test creates and drops itself, so a broken guard cannot damage the seeded sample data.
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class DatabaseToolTest extends MapperTestSupport {
 
     private static final ObjectMapper JSON = new ObjectMapper();
+    private static final String ONE_STATEMENT_ONLY =
+            "Only one SQL statement is allowed; remove the extra statements after the first semicolon.";
 
     @Autowired
     private DatabaseTool tool;
@@ -35,15 +39,17 @@ class DatabaseToolTest extends MapperTestSupport {
     private TransactionTemplate transactionTemplate;
 
     @BeforeEach
-    void createProbeTable() {
-        jdbcTemplate.execute("DROP TABLE IF EXISTS database_tool_probe, database_tool_select_into");
+    void createProbeObjects() {
+        dropProbeObjects();
         jdbcTemplate.execute("CREATE TABLE database_tool_probe (k TEXT PRIMARY KEY, v TEXT)");
+        jdbcTemplate.execute("CREATE SEQUENCE database_tool_probe_seq");
         jdbcTemplate.update("INSERT INTO database_tool_probe VALUES ('a', '1'), ('b', '2'), ('c', '3')");
     }
 
     @AfterEach
-    void dropProbeTable() {
+    void dropProbeObjects() {
         jdbcTemplate.execute("DROP TABLE IF EXISTS database_tool_probe, database_tool_select_into");
+        jdbcTemplate.execute("DROP SEQUENCE IF EXISTS database_tool_probe_seq");
     }
 
     @Test
@@ -77,20 +83,47 @@ class DatabaseToolTest extends MapperTestSupport {
                 .contains("| on | 5s |");
     }
 
-    @Test
-    void aWriteAfterASemicolonIsRejectedByTheDatabase() {
-        String answer = tool.databaseQuery("SELECT 1; DROP TABLE database_tool_probe");
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "SELECT 1; DROP TABLE database_tool_probe",
+            "SELECT 1;DROP TABLE database_tool_probe;",
+            "SELECT 1; SELECT 2",
+            "SELECT * FROM (SELECT 1) s; WITH d AS (DELETE FROM database_tool_probe RETURNING *) SELECT * FROM d",
+            "SELECT set_config('statement_timeout', '0', true); SELECT pg_sleep(10)"})
+    void moreThanOneStatementIsRefusedBeforeTheDatabase(String sql) {
+        assertThat(tool.databaseQuery(sql)).isEqualTo(ONE_STATEMENT_ONLY);
+        assertThat(probeTableExists("database_tool_probe")).isTrue();
+        assertThat(countRows("database_tool_probe", "true")).isEqualTo(3);
+    }
 
-        assertThat(answer).startsWith("Query failed:").contains("read-only transaction");
+    /** A statement that ends the read-only transaction would let the next one run read-write. */
+    @ParameterizedTest
+    @ValueSource(strings = {"COMMIT", "ROLLBACK", "END", "ABORT"})
+    void endingTheTransactionMidStringCannotUnlockWrites(String ending) {
+        String answer = tool.databaseQuery("SELECT 1; " + ending + "; DROP TABLE database_tool_probe");
+
+        assertThat(answer).isEqualTo(ONE_STATEMENT_ONLY);
+        assertThat(probeTableExists("database_tool_probe")).isTrue();
+    }
+
+    /** The driver's own parser decides, so semicolons inside literals and comments are not statement breaks. */
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "SELECT 'a;b' AS v;",
+            "SELECT $$x;y$$ AS v",
+            "SELECT 1 AS v -- ; DROP TABLE database_tool_probe",
+            "SELECT 1 AS v /* ; DROP TABLE database_tool_probe */"})
+    void semicolonsInLiteralsAndCommentsAndATrailingOneAreOneStatement(String sql) {
+        assertThat(tool.databaseQuery(sql)).startsWith("| v |").endsWith("(1 row)");
         assertThat(probeTableExists("database_tool_probe")).isTrue();
     }
 
     @Test
-    void aWriteInsideACteIsRejectedByTheDatabase() {
-        String answer = tool.databaseQuery("SELECT * FROM (SELECT 1) s; WITH d AS (DELETE FROM database_tool_probe RETURNING *) SELECT * FROM d");
+    void aWriteHiddenInAFunctionIsRejectedByTheDatabase() {
+        String answer = tool.databaseQuery("SELECT nextval('database_tool_probe_seq')");
 
-        assertThat(answer).contains("read-only transaction");
-        assertThat(countRows("database_tool_probe", "true")).isEqualTo(3);
+        assertThat(answer).startsWith("Query failed:").contains("read-only transaction");
+        assertThat(jdbcTemplate.queryForObject("SELECT nextval('database_tool_probe_seq')", Long.class)).isEqualTo(1L);
     }
 
     @Test
@@ -121,12 +154,12 @@ class DatabaseToolTest extends MapperTestSupport {
         assertThat(Duration.between(start, Instant.now())).isLessThan(Duration.ofSeconds(9));
     }
 
-    /** set_config can turn off the server's statement_timeout for the next statement, but not the driver's. */
+    /** The server's timer already runs for the statement, and the driver's cannot be reached at all. */
     @Test
     void theTimeoutCannotBeSwitchedOffByTheQuery() {
         Instant start = Instant.now();
 
-        String answer = tool.databaseQuery("SELECT set_config('statement_timeout', '0', true); SELECT pg_sleep(10)");
+        String answer = tool.databaseQuery("SELECT set_config('statement_timeout', '0', true), pg_sleep(10)");
 
         assertThat(answer).isEqualTo("Query stopped: it ran longer than 5 seconds.");
         assertThat(Duration.between(start, Instant.now())).isLessThan(Duration.ofSeconds(9));
@@ -143,6 +176,17 @@ class DatabaseToolTest extends MapperTestSupport {
     }
 
     @Test
+    void longValuesAndLongAnswersAreShortenedAndMarked() {
+        String longValue = tool.databaseQuery("SELECT repeat('x', 5000) AS v");
+        String longAnswer = tool.databaseQuery("SELECT repeat('y', 500) AS v FROM generate_series(1, 100)");
+
+        assertThat(longValue).contains("| " + "x".repeat(1_000) + "… (5000 characters, shortened) |").endsWith("(1 row)");
+        assertThat(longAnswer).hasSizeLessThanOrEqualTo(20_000 + 60)
+                .contains("(truncated after ")
+                .endsWith(" rows at 20,000 characters)");
+    }
+
+    @Test
     void errorsReturnTheDatabaseMessageWithoutJavaDetails() {
         String answer = tool.databaseQuery("SELECT * FROM no_such_table");
 
@@ -150,9 +194,30 @@ class DatabaseToolTest extends MapperTestSupport {
         assertThat(answer).doesNotContain("Exception", "java.", "at org.");
     }
 
+    /** Each call has a connection of its own, so nothing a query does to its session outlives the call. */
+    @Test
+    void sessionSettingsAndAdvisoryLocksEndWithTheCall() throws Exception {
+        String answer = tool.databaseQuery("SELECT set_config('search_path', 'pg_catalog', false) AS a, "
+                + "set_config('statement_timeout', '1ms', false) AS b, pg_advisory_lock(730001) AS c");
+
+        assertThat(answer).endsWith("(1 row)");
+        assertThat(tool.databaseQuery("SELECT count(*) AS n FROM database_tool_probe")).contains("| 3 |");
+        for (int i = 0; i < 10; i++) {
+            assertThat(jdbcTemplate.queryForObject("SHOW search_path", String.class)).isEqualTo("\"$user\", public");
+            assertThat(jdbcTemplate.queryForObject("SHOW statement_timeout", String.class)).isEqualTo("0");
+        }
+        assertThat(advisoryLockReleased(730001)).isTrue();
+    }
+
+    @Test
+    void theQueryDoesNotRunOnAPooledConnection() {
+        assertThat(tool.databaseQuery("SELECT current_setting('application_name') AS app"))
+                .contains("| thinkxecai-database-tool |");
+    }
+
     @Test
     void failedQueriesLeaveNoReadOnlyOrTimeoutSettingBehind() {
-        tool.databaseQuery("SELECT 1; DROP TABLE database_tool_probe");
+        tool.databaseQuery("SELECT * INTO database_tool_select_into FROM database_tool_probe");
         tool.databaseQuery("SELECT pg_sleep(10)");
 
         assertThat(tool.databaseQuery("SELECT count(*) AS n FROM database_tool_probe")).contains("| 3 |");
@@ -162,7 +227,7 @@ class DatabaseToolTest extends MapperTestSupport {
         }
     }
 
-    /** The tool runs in its own transaction, so a caller's transaction is neither made read-only nor time-limited. */
+    /** The tool runs on its own connection, so a caller's transaction is neither made read-only nor time-limited. */
     @Test
     void aCallersTransactionIsNotChangedByTheTool() {
         transactionTemplate.executeWithoutResult(status -> {
@@ -185,6 +250,19 @@ class DatabaseToolTest extends MapperTestSupport {
         assertThat(tool.getType()).isEqualTo(ToolType.OPTIONAL);
         assertThat(callback.getToolDefinition().name()).isEqualTo("databaseQuery");
         assertThat(schema.get("properties").fieldNames()).toIterable().containsExactly("sql");
+    }
+
+    /** The server releases a closed session's locks shortly after the client disconnects. */
+    private boolean advisoryLockReleased(long key) throws InterruptedException {
+        for (int attempt = 0; attempt < 20; attempt++) {
+            Integer held = jdbcTemplate.queryForObject(
+                    "SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND objid = ?", Integer.class, key);
+            if (held != null && held == 0) {
+                return true;
+            }
+            Thread.sleep(100);
+        }
+        return false;
     }
 
     private boolean probeTableExists(String table) {

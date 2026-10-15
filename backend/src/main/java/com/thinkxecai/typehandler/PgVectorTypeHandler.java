@@ -13,9 +13,9 @@ import java.sql.SQLException;
 /**
  * Bridges pgvector's {@code vector} column type and a Java {@code float[]}, since MyBatis
  * has no built-in handler for it. Values travel as the pgvector text literal, e.g. "[0.1,0.2]".
- * The {@code postgresql} driver is runtime-scoped (see backend/pom.xml), so this handler binds
- * the literal as a plain string; mapper XML statements must cast the placeholder with
- * {@code ::vector}, the same convention used for similarity-search query vectors.
+ * The handler binds the literal as a plain string rather than a driver-specific {@code PGobject},
+ * so mapper XML statements must cast the placeholder with {@code ::vector}, the same convention
+ * used for similarity-search query vectors.
  */
 @MappedTypes(float[].class)
 @MappedJdbcTypes(JdbcType.OTHER)
