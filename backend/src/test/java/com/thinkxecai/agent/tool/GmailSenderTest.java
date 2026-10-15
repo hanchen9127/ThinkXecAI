@@ -13,7 +13,11 @@ import org.junit.jupiter.api.Test;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.net.URLDecoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
@@ -33,7 +37,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class GmailSenderTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final Duration TEST_TIMEOUT = Duration.ofSeconds(1);
+    private static final Duration TEST_TIMEOUT = Duration.ofSeconds(2);
     private static final String TOKEN_PATH = "/token";
     private static final String SEND_PATH = "/gmail/v1/users/me/messages/send";
 
@@ -70,7 +74,24 @@ class GmailSenderTest {
             }
         });
         server.start();
+        warmUpHttpClient();
         sender = sender("bot@example.com");
+    }
+
+    /**
+     * The first JDK HttpClient request in a JVM spends time loading classes, which on a busy machine
+     * can exceed the short test deadline; one request beforehand keeps that out of the timed tests.
+     */
+    private void warmUpHttpClient() {
+        try (HttpClient client = HttpClient.newHttpClient()) {
+            client.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/warm-up")).build(),
+                    HttpResponse.BodyHandlers.discarding());
+        } catch (IOException e) {
+            throw new IllegalStateException("Fake Google server did not answer", e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        requests.clear();
     }
 
     @AfterEach
@@ -169,14 +190,14 @@ class GmailSenderTest {
     @Test
     void aSlowTokenEndpointStopsTheSendWithinTheDeadline() {
         tokenAnswer = exchange -> {
-            Thread.sleep(3_000);
+            Thread.sleep(5_000);
             respond(exchange, 200, "{\"access_token\":\"late\",\"expires_in\":3599}");
         };
         Instant start = Instant.now();
 
         assertThatThrownBy(() -> sender.send(new InternetAddress("alice@example.com"), "S", "B"))
-                .hasMessage("Not sent: Google did not issue an access token within 1 seconds.");
-        assertThat(Duration.between(start, Instant.now())).isLessThan(Duration.ofMillis(2_500));
+                .hasMessage("Not sent: Google did not issue an access token within 2 seconds.");
+        assertThat(Duration.between(start, Instant.now())).isLessThan(Duration.ofMillis(3_500));
         assertThat(requests).extracting(Recorded::path).containsExactly(TOKEN_PATH);
     }
 
@@ -184,19 +205,19 @@ class GmailSenderTest {
     @Test
     void aSlowSendIsReportedAsPossiblySentWithinTheSameDeadline() {
         tokenAnswer = exchange -> {
-            Thread.sleep(700);
+            Thread.sleep(1_200);
             respond(exchange, 200, "{\"access_token\":\"tok-1\",\"expires_in\":3599}");
         };
         sendAnswer = exchange -> {
-            Thread.sleep(3_000);
+            Thread.sleep(5_000);
             respond(exchange, 200, "{\"id\":\"late\"}");
         };
         Instant start = Instant.now();
 
         assertThatThrownBy(() -> sender.send(new InternetAddress("alice@example.com"), "S", "B"))
-                .hasMessage("Gmail did not answer within 1 seconds. The email may or may not have been sent; check before trying again.");
-        // About 1 s in total; a full second for the send on top of the token's 0.7 s would take 1.7 s.
-        assertThat(Duration.between(start, Instant.now())).isLessThan(Duration.ofMillis(1_400));
+                .hasMessage("Gmail did not answer within 2 seconds. The email may or may not have been sent; check before trying again.");
+        // About 2 s in total; two full seconds for the send on top of the token's 1.2 s would take 3.2 s.
+        assertThat(Duration.between(start, Instant.now())).isLessThan(Duration.ofMillis(2_700));
     }
 
     @Test
