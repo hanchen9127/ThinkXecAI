@@ -19,8 +19,10 @@ on the frontend, and PostgreSQL + pgvector for storage and retrieval.
   detects and manually executes tool calls, persists generated messages, and stops on
   completion, `terminate`, or a 20-step cap.
 - **Tool system** — fixed tools (knowledge retrieval, terminate, city, date, weather) are
-  always available; optional tools (read-only PostgreSQL query, QQ email sending) are
-  selected per agent.
+  always available; optional tools (read-only PostgreSQL query, email through Gmail) are
+  selected per agent. Knowledge retrieval only searches the agent's own knowledge bases; SQL
+  runs in a read-only transaction with a 5-second limit and a 200-row cap; email goes only to an
+  allowlist of recipients.
 - **Knowledge bases & RAG** — upload Markdown documents, parse them into sections, embed
   section titles with a local Ollama `bge-m3` model, and retrieve the top matching chunks
   via pgvector similarity search.
@@ -55,18 +57,18 @@ This project is being built phase by phase. Current status:
 - [x] Phase 6 — MyBatis persistence layer (six mappers, tested against PostgreSQL + pgvector)
 - [x] Phase 7 — Facade services and REST APIs (CRUD for five resources, request validation, CI contract check)
 - [x] Phase 8 — Markdown ingestion and RAG (all-or-nothing upload, heading-based sections, local `bge-m3` embeddings, filtered vector search)
-- [ ] Phase 9 — Tool system
+- [x] Phase 9 — Tool system (fixed and optional tools, read-only SQL, Gmail with a recipient allowlist, `GET /tools`)
 - [ ] Phase 10 — Chat model registry
 - [ ] Phase 11 — Agent runtime (Think-Execute loop)
 - [ ] Phase 12 — SSE
 - [ ] Phase 13 — Frontend features (full UI)
 - [ ] Phase 14 — End-to-end verification
 
-The REST API is in place except tools (Phase 9) and SSE (Phase 12). Uploaded Markdown is split
-into sections, embedded, and searchable per knowledge base, but no agent searches it until the
-tool system and agent runtime arrive (Phases 9 and 11).
-Creating a user message stores it and emits a chat event, but nothing runs the agent until
-Phase 11. The frontend has a typed API client and still runs as an empty shell.
+The REST API is in place except SSE (Phase 12). Uploaded Markdown is split into sections,
+embedded, and searchable per knowledge base, and the tools are ready, but no agent uses them until
+the chat model registry and agent runtime arrive (Phases 10 and 11). Creating a user message stores
+it and emits a chat event, but nothing runs the agent until Phase 11. The frontend has a typed API
+client and still runs as an empty shell.
 
 ## Getting Started
 
@@ -88,17 +90,68 @@ Copy the example env file and fill in real values (never commit `.env`):
 cp .env.example .env
 ```
 
-Required variables:
+Required variables (the backend fails fast at startup if any is missing):
 
-| Variable                      | Purpose                          |
-|--------------------------------|-----------------------------------|
-| `THINKXECAI_DB_PASSWORD`       | PostgreSQL password               |
-| `THINKXECAI_MAIL_USERNAME`     | QQ mail account for the email tool|
-| `THINKXECAI_MAIL_PASSWORD`     | QQ mail authorization code        |
-| `THINKXECAI_GEMINI_API_KEY`    | Gemini API key (`gemini-3.8-flash`) |
-| `THINKXECAI_DEEPSEEK_API_KEY`  | DeepSeek API key (`deepseek-chat`)|
+| Variable                      | Purpose                             |
+|-------------------------------|-------------------------------------|
+| `THINKXECAI_DB_PASSWORD`      | PostgreSQL password                 |
+| `THINKXECAI_GEMINI_API_KEY`   | Gemini API key (`gemini-3.8-flash`) |
+| `THINKXECAI_DEEPSEEK_API_KEY` | DeepSeek API key (`deepseek-chat`)  |
 
-The backend fails fast at startup if any of these are missing.
+Optional variables, only for the email tool. Startup never checks them; until all four Gmail
+values are set, the tool answers that email is not configured and names what is missing.
+
+| Variable                             | Purpose                                                   |
+|--------------------------------------|-----------------------------------------------------------|
+| `THINKXECAI_GMAIL_SENDER`            | The Gmail address that sends                              |
+| `THINKXECAI_GMAIL_CLIENT_ID`         | OAuth client ID (see below)                               |
+| `THINKXECAI_GMAIL_CLIENT_SECRET`     | OAuth client secret                                       |
+| `THINKXECAI_GMAIL_REFRESH_TOKEN`     | Refresh token granted the `gmail.send` scope              |
+| `THINKXECAI_MAIL_ALLOWED_RECIPIENTS` | Comma-separated addresses the tool may send to; empty means no email is sent |
+
+#### Gmail setup (one time, only for the email tool)
+
+The tool sends through the Gmail API with OAuth 2.0 and asks only for the send-only scope
+`https://www.googleapis.com/auth/gmail.send`: it cannot read or delete mail, and no password or
+App Password is used.
+
+1. In the [Google Cloud console](https://console.cloud.google.com/), create a project and enable
+   the **Gmail API**.
+2. Configure the **OAuth consent screen** (user type *External*), add your Gmail address as a
+   user, and add the scope `https://www.googleapis.com/auth/gmail.send`. Set the publishing
+   status to **In production**: while it is *Testing*, Google expires refresh tokens after 7 days.
+   An unverified app in production still works for its owner, after an "unverified app" warning
+   during consent.
+3. Create an **OAuth client ID** of type **Desktop app** and note its client ID and secret.
+4. Get a refresh token once. Open this URL in a browser (fill in your client ID), sign in with
+   the sending account, and allow access:
+
+   ```
+   https://accounts.google.com/o/oauth2/v2/auth?client_id=CLIENT_ID&redirect_uri=http://127.0.0.1:8765&response_type=code&scope=https://www.googleapis.com/auth/gmail.send&access_type=offline&prompt=consent
+   ```
+
+   The browser then fails to load `http://127.0.0.1:8765/?code=...` (nothing listens there). Copy
+   the `code` value from the address bar and exchange it:
+
+   ```bash
+   curl -s https://oauth2.googleapis.com/token \
+     -d client_id=CLIENT_ID -d client_secret=CLIENT_SECRET \
+     --data-urlencode "code=CODE_FROM_THE_ADDRESS_BAR" \
+     -d grant_type=authorization_code -d redirect_uri=http://127.0.0.1:8765
+   ```
+
+   The `refresh_token` in the answer is `THINKXECAI_GMAIL_REFRESH_TOKEN`.
+5. Set the four Gmail variables and `THINKXECAI_MAIL_ALLOWED_RECIPIENTS` in `.env`. To check the
+   setup, send one real email to the first allowed address:
+
+   ```bash
+   cd backend
+   mvn test -Dtest=EmailToolExternalTest -DexcludedGroups= -Dgroups=external
+   ```
+
+The tool sends synchronously and tells the agent the real outcome (sent, refused, not configured,
+rejected by Google, or timed out after 10 seconds). It sends to exactly one address per call, and
+only when that address is on the allowlist.
 
 ### 2. Start PostgreSQL
 
@@ -170,8 +223,10 @@ anything else.
 Markdown file (`.md` or `.markdown`, at most 1 MB) with at least one heading. Each heading starts
 a section; the section titles are embedded and the original Markdown below each heading is stored
 as the chunk. The upload either fully succeeds or leaves no document, chunk, or file behind.
-`GET /tools` arrives in Phase 9. Outside `/api`, `GET /health` and `GET /sse-test` return plain
-text `ok`.
+`GET /tools` returns the optional tools an agent can choose, as `{ name, description, type }`;
+fixed tools are given to every agent and are not listed. An agent's `allowedTools` may only name
+optional tools (`dataBaseTool`, `emailTool`); anything else is rejected with `400`. Outside `/api`,
+`GET /health` and `GET /sse-test` return plain text `ok`.
 
 Live agent output streams from `GET /sse/connect/{chatSessionId}` (`text/event-stream`):
 an `init` event on connect, then `message` events carrying JSON of the form
