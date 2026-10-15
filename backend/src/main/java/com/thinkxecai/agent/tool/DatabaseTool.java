@@ -1,6 +1,7 @@
 package com.thinkxecai.agent.tool;
 
 import lombok.extern.slf4j.Slf4j;
+import org.postgresql.core.BaseConnection;
 import org.postgresql.core.NativeQuery;
 import org.postgresql.core.Parser;
 import org.springframework.ai.tool.annotation.ToolParam;
@@ -21,10 +22,12 @@ import java.util.Properties;
  * Lets the model read the database with SQL (ISSUE-005, ADR 028, ADR 030). The database does the
  * enforcing; the checks here only keep a query inside it:
  * <ul>
- *   <li>Exactly one statement, counted with the JDBC driver's own parser, so the split matches what
- *       would run. A second statement could end the read-only transaction ({@code SELECT 1; COMMIT;
- *       DROP ...} would run the {@code DROP} in a new read-write transaction) or switch the
- *       timeout off for itself.</li>
+ *   <li>Exactly one statement, counted with the JDBC driver's own parser on the exact text it will
+ *       send: JDBC escape processing is off (rewriting {@code {fn ...}} first could change the split),
+ *       and the connection's own {@code standard_conforming_strings} is used. With the extended query
+ *       protocol the server also refuses several commands in one statement. A second statement could
+ *       end the read-only transaction ({@code SELECT 1; COMMIT; DROP ...} would run the {@code DROP}
+ *       in a new read-write transaction) or switch the timeout off for itself.</li>
  *   <li>The statement must start with {@code SELECT} and runs in a read-only transaction, so
  *       PostgreSQL rejects any write it hides ({@code SELECT INTO}, functions that write).</li>
  *   <li>It runs on a connection of its own, opened for this call and closed afterwards, never one
@@ -32,8 +35,9 @@ import java.util.Properties;
  *       and session-level advisory locks end with that connection. The transaction is also always
  *       rolled back.</li>
  *   <li>It is stopped after 5 seconds by the server's {@code statement_timeout} and by the
- *       driver's query timeout; at most 200 rows, 1,000 characters per value and 20,000 characters
- *       in total are returned, each cut marked.</li>
+ *       driver's query timeout; a silent server or network is given up after 10 seconds. The driver
+ *       refuses results over 16 MB before they fill memory; at most 200 rows, 1,000 characters per
+ *       value and 20,000 characters in total are returned, each cut marked.</li>
  * </ul>
  * Known limit, accepted for now: the application connects as a superuser, so superuser functions that
  * do not write (reading server files, ending other connections) still work, and the application's own
@@ -47,6 +51,8 @@ public class DatabaseTool implements Tool {
     static final int MAX_VALUE_CHARS = 1_000;
     static final int MAX_ANSWER_CHARS = 20_000;
     static final int TIMEOUT_SECONDS = 5;
+    static final int SOCKET_TIMEOUT_SECONDS = 10;
+    static final String MAX_RESULT_BUFFER = "16M";
 
     /** PostgreSQL {@code query_canceled}: statement timeout or a cancel sent by the driver's query timeout. */
     private static final String QUERY_CANCELED = "57014";
@@ -62,6 +68,9 @@ public class DatabaseTool implements Tool {
             connectionProperties.setProperty("password", dataSource.determinePassword());
         }
         connectionProperties.setProperty("connectTimeout", String.valueOf(TIMEOUT_SECONDS));
+        connectionProperties.setProperty("socketTimeout", String.valueOf(SOCKET_TIMEOUT_SECONDS));
+        connectionProperties.setProperty("maxResultBuffer", MAX_RESULT_BUFFER);
+        connectionProperties.setProperty("preferQueryMode", "extended");
         connectionProperties.setProperty("ApplicationName", "thinkxecai-database-tool");
     }
 
@@ -92,12 +101,14 @@ public class DatabaseTool implements Tool {
         if (!sql.trim().toUpperCase(Locale.ROOT).startsWith("SELECT")) {
             return "Only SELECT statements are allowed.";
         }
-        if (statementCount(sql) != 1) {
-            return "Only one SQL statement is allowed; remove the extra statements after the first semicolon.";
-        }
         try (Connection connection = DriverManager.getConnection(url, connectionProperties)) {
+            if (statementCount(sql, connection) != 1) {
+                return "Only one SQL statement is allowed; remove the extra statements after the first semicolon.";
+            }
             connection.setAutoCommit(false);
             try (Statement statement = connection.createStatement()) {
+                // Send the text exactly as counted: no rewriting of JDBC escapes such as {fn ...}.
+                statement.setEscapeProcessing(false);
                 statement.execute("SET TRANSACTION READ ONLY");
                 statement.execute("SET LOCAL statement_timeout = '" + TIMEOUT_SECONDS + "s'");
                 // One row more than returned, so a full result can be told apart from a truncated one.
@@ -126,10 +137,11 @@ public class DatabaseTool implements Tool {
         }
     }
 
-    /** Statements as the driver would split and send them; 0 when the text cannot be parsed. */
-    private static int statementCount(String sql) {
+    /** Statements as the driver will split and send this text on this connection; 0 when it cannot be parsed. */
+    private static int statementCount(String sql, Connection connection) {
         try {
-            List<NativeQuery> queries = Parser.parseJdbcSql(sql, true, false, true, false, false);
+            boolean standardConformingStrings = connection.unwrap(BaseConnection.class).getStandardConformingStrings();
+            List<NativeQuery> queries = Parser.parseJdbcSql(sql, standardConformingStrings, false, true, false, false);
             return queries.size();
         } catch (SQLException e) {
             return 0;

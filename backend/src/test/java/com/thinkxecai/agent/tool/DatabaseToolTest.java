@@ -106,6 +106,28 @@ class DatabaseToolTest extends MapperTestSupport {
         assertThat(probeTableExists("database_tool_probe")).isTrue();
     }
 
+    /**
+     * JDBC escape syntax ({@code {d ...}}, {@code {fn ...}}) is not processed, so the driver splits
+     * exactly the text that was counted; rewriting it first could turn one counted statement into several.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "SELECT {d '}', '{fn concat(a, b)}; COMMIT; DROP TABLE database_tool_probe; --'",
+            "SELECT {d '}', '{fn ucase(a}; COMMIT; DROP TABLE database_tool_probe; --)}'",
+            "SELECT {d '}' , '{fn locate(a, b''; COMMIT; DROP TABLE database_tool_probe; --, c)}'",
+            "SELECT {d 'x}', '; COMMIT; DROP TABLE database_tool_probe; SELECT 1 --'"})
+    void jdbcEscapesCannotSplitOneCountedStatement(String sql) {
+        String answer = tool.databaseQuery(sql);
+
+        assertThat(probeTableExists("database_tool_probe")).as(answer).isTrue();
+        assertThat(answer).as("no part may run read-write").doesNotStartWith("|");
+    }
+
+    @Test
+    void jdbcEscapesAreSentAsWritten() {
+        assertThat(tool.databaseQuery("SELECT {fn ucase('a')} AS v")).startsWith("Query failed:");
+    }
+
     /** The driver's own parser decides, so semicolons inside literals and comments are not statement breaks. */
     @ParameterizedTest
     @ValueSource(strings = {
@@ -184,6 +206,16 @@ class DatabaseToolTest extends MapperTestSupport {
         assertThat(longAnswer).hasSizeLessThanOrEqualTo(20_000 + 60)
                 .contains("(truncated after ")
                 .endsWith(" rows at 20,000 characters)");
+    }
+
+    /** The driver stops reading a result over 16 MB instead of loading it into memory and cutting it afterwards. */
+    @Test
+    void aResultOverTheBufferLimitIsRefusedByTheDriver() {
+        String tooLarge = tool.databaseQuery("SELECT repeat('x', 20000000) AS v");
+        String belowLimit = tool.databaseQuery("SELECT repeat('x', 5000000) AS v");
+
+        assertThat(tooLarge).startsWith("Query failed:").doesNotContain("xxxxxxxxxx");
+        assertThat(belowLimit).contains("… (5000000 characters, shortened) |").endsWith("(1 row)");
     }
 
     @Test
