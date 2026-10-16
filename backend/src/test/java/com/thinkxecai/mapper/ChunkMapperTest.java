@@ -72,29 +72,17 @@ class ChunkMapperTest extends MapperTestSupport {
     }
 
     @Test
-    void listAndDeleteByDocIdOnlyTouchThatDocument() {
+    void deletingADocumentDeletesOnlyItsChunks() {
         UUID kb = insertKnowledgeBase("kb");
         UUID doc = insertDocument(kb, "a.md");
         UUID otherDoc = insertDocument(kb, "b.md");
         insert(kb, doc, "a1", "a1", unit(1));
-        insert(kb, doc, "a2", "a2", unit(2));
         insert(kb, otherDoc, "b1", "b1", unit(3));
-
-        assertThat(mapper.listByDocId(doc)).extracting(ChunkEntity::getTitle).containsExactlyInAnyOrder("a1", "a2");
-        assertThat(mapper.deleteByDocId(doc)).isEqualTo(2);
-        assertThat(mapper.listByDocId(doc)).isEmpty();
-        assertThat(mapper.listByDocId(otherDoc)).extracting(ChunkEntity::getTitle).containsExactly("b1");
-    }
-
-    @Test
-    void deletingADocumentDeletesItsChunks() {
-        UUID kb = insertKnowledgeBase("kb");
-        UUID doc = insertDocument(kb, "a.md");
-        insert(kb, doc, "a1", "a1", unit(1));
 
         jdbcTemplate.update("DELETE FROM document WHERE id = ?", doc);
 
-        assertThat(mapper.listByDocId(doc)).isEmpty();
+        assertThat(countRows("chunk_bge_m3", "doc_id = ?", doc)).isZero();
+        assertThat(countRows("chunk_bge_m3", "doc_id = ?", otherDoc)).isEqualTo(1);
     }
 
     @Test

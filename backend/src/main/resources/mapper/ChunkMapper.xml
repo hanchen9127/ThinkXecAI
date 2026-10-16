@@ -20,18 +20,6 @@
         WHERE id = #{id}
     </select>
 
-    <select id="listByDocId" resultType="com.thinkxecai.model.entity.ChunkEntity">
-        SELECT <include refid="columnsWithoutEmbedding"/>
-        FROM chunk_bge_m3
-        WHERE doc_id = #{docId}
-        ORDER BY created_at
-    </select>
-
-    <delete id="deleteByDocId">
-        DELETE FROM chunk_bge_m3
-        WHERE doc_id = #{docId}
-    </delete>
-
     <!-- Transaction-scoped; see ChunkMapper.enableStrictOrderScan. -->
     <update id="enableStrictOrderScan">
         SET LOCAL hnsw.iterative_scan = strict_order

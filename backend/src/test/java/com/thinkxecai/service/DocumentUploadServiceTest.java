@@ -7,6 +7,7 @@ import com.thinkxecai.model.vo.DocumentVO;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.BeanPropertyRowMapper;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -68,7 +69,8 @@ class DocumentUploadServiceTest extends ServiceTestSupport {
         assertThat(filePath).matches(kb + "/" + document.getId() + "/[0-9a-f-]{36}\\.md");
         assertThat(Files.readString(STORAGE.resolve(filePath))).isEqualTo(MARKDOWN);
 
-        List<ChunkEntity> chunks = chunkMapper.listByDocId(UUID.fromString(document.getId()));
+        List<ChunkEntity> chunks = jdbcTemplate.query("SELECT id, kb_id, title, content FROM chunk_bge_m3 WHERE doc_id = ?",
+                new BeanPropertyRowMapper<>(ChunkEntity.class), UUID.fromString(document.getId()));
         assertThat(chunks).extracting(ChunkEntity::getTitle).containsExactlyInAnyOrderElementsOf(TITLES);
         assertThat(chunks).filteredOn(chunk -> chunk.getTitle().equals("Usage"))
                 .extracting(ChunkEntity::getContent).containsExactly("| a | b |\n|---|---|\n| 1 | 2 |");
