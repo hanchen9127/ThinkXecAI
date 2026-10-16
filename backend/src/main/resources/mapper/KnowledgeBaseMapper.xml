@@ -17,6 +17,22 @@
         WHERE id = #{id}
     </select>
 
+    <!-- A reference check: the row cannot be deleted until this transaction ends (ADR 037). -->
+    <select id="selectByIdForShare" resultType="com.thinkxecai.model.entity.KnowledgeBaseEntity">
+        SELECT <include refid="columns"/>
+        FROM knowledge_base
+        WHERE id = #{id}
+        FOR SHARE
+    </select>
+
+    <!-- Read before a merge-and-write update; concurrent updates of the row wait (ADR 037). -->
+    <select id="selectByIdForUpdate" resultType="com.thinkxecai.model.entity.KnowledgeBaseEntity">
+        SELECT <include refid="columns"/>
+        FROM knowledge_base
+        WHERE id = #{id}
+        FOR UPDATE
+    </select>
+
     <select id="listAll" resultType="com.thinkxecai.model.entity.KnowledgeBaseEntity">
         SELECT <include refid="columns"/>
         FROM knowledge_base
@@ -31,6 +47,14 @@
         SELECT <include refid="columns"/>
         FROM knowledge_base
         WHERE id = ANY(#{ids})
+    </select>
+
+    <!-- An agent's allowedKbs check: the listed rows cannot be deleted until this transaction ends (ADR 037). -->
+    <select id="selectByIdsForShare" resultType="com.thinkxecai.model.entity.KnowledgeBaseEntity">
+        SELECT <include refid="columns"/>
+        FROM knowledge_base
+        WHERE id = ANY(#{ids})
+        FOR SHARE
     </select>
 
     <update id="update">

@@ -39,7 +39,12 @@ public class ChatMessageFacadeServiceImpl implements ChatMessageFacadeService {
     @Override
     @Transactional
     public ChatMessageVO createChatMessage(CreateChatMessageRequest request) {
-        ChatSessionEntity session = findSession(request.getSessionId());
+        // Locked like the touch below: the session cannot be deleted or lose its agent before the message
+        // is saved, and two messages to one session take turns (ADR 037).
+        ChatSessionEntity session = chatSessionMapper.selectByIdForNoKeyUpdate(request.getSessionId());
+        if (session == null) {
+            throw new BizException(404, "Chat session not found");
+        }
         if (session.getAgentId() == null) {
             throw new BizException(409, "Chat session has no agent");
         }

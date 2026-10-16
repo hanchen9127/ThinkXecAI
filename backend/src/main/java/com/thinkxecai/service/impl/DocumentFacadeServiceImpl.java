@@ -66,7 +66,8 @@ public class DocumentFacadeServiceImpl implements DocumentFacadeService {
     @Override
     @Transactional
     public DocumentVO createDocument(CreateDocumentRequest request) {
-        if (knowledgeBaseMapper.selectById(request.getKbId()) == null) {
+        // FOR SHARE: the knowledge base cannot be deleted before this document is saved (ADR 037).
+        if (knowledgeBaseMapper.selectByIdForShare(request.getKbId()) == null) {
             throw new BizException(400, "kbId: unknown knowledge base " + request.getKbId());
         }
         DocumentDTO dto = documentConverter.fromCreateRequest(request);
@@ -111,6 +112,11 @@ public class DocumentFacadeServiceImpl implements DocumentFacadeService {
         }
 
         DocumentEntity stored = transactionTemplate.execute(status -> {
+            // Checked again with a lock: the knowledge base may have been deleted during the embedding call,
+            // and now it cannot be until this upload is saved (ADR 037).
+            if (knowledgeBaseMapper.selectByIdForShare(kbId) == null) {
+                throw new BizException(400, "kbId: unknown knowledge base " + kbId);
+            }
             DocumentEntity document = DocumentEntity.builder().kbId(kbId).name(name).build();
             documentMapper.insert(document);
             UUID documentId = document.getId();

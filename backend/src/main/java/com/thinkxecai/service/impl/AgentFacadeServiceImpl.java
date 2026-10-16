@@ -52,10 +52,16 @@ public class AgentFacadeServiceImpl implements AgentFacadeService {
     @Override
     @Transactional
     public AgentVO updateAgent(UUID agentId, UpdateAgentRequest request) {
-        AgentDTO existing = agentConverter.toDTO(findExisting(agentId));
+        findExisting(agentId);
         requireOptionalTools(request.getAllowedTools());
+        // Knowledge bases are locked before the agent, the same order as a knowledge-base delete
+        // (its row, then the agents), so the two cannot deadlock (ADR 037).
         requireKnowledgeBasesExist(request.getAllowedKbs());
-        AgentDTO updated = agentConverter.applyUpdateRequest(existing, request);
+        AgentEntity locked = agentMapper.selectByIdForUpdate(agentId);
+        if (locked == null) {
+            throw notFound();
+        }
+        AgentDTO updated = agentConverter.applyUpdateRequest(agentConverter.toDTO(locked), request);
         agentMapper.update(agentConverter.toEntity(updated));
         return toVO(findExisting(agentId));
     }
@@ -90,7 +96,8 @@ public class AgentFacadeServiceImpl implements AgentFacadeService {
         if (kbIds == null || kbIds.isEmpty()) {
             return;
         }
-        Set<UUID> found = knowledgeBaseMapper.selectByIds(kbIds.toArray(UUID[]::new)).stream()
+        // FOR SHARE: a knowledge base found here cannot be deleted before this agent is saved (ADR 037).
+        Set<UUID> found = knowledgeBaseMapper.selectByIdsForShare(kbIds.toArray(UUID[]::new)).stream()
                 .map(KnowledgeBaseEntity::getId)
                 .collect(Collectors.toSet());
         List<String> unknown = kbIds.stream()
