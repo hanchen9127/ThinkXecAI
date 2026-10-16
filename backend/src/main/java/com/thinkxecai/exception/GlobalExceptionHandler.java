@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
 
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -79,6 +80,12 @@ public class GlobalExceptionHandler {
         long kilobytes = maxFileSize.toKilobytes();
         String limit = kilobytes % 1024 == 0 ? kilobytes / 1024 + " MB" : kilobytes + " KB";
         return badRequest("file: too large (maximum " + limit + ")");
+    }
+
+    /** A body that is not valid multipart (MaxUploadSizeExceededException, a subclass, is handled above). */
+    @ExceptionHandler(MultipartException.class)
+    public ApiResponse<Void> handleMalformedMultipart(MultipartException ex) {
+        return badRequest("Malformed multipart request");
     }
 
     @ExceptionHandler(Exception.class)

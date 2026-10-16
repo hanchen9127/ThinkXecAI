@@ -38,6 +38,8 @@ public class DocumentFacadeServiceImpl implements DocumentFacadeService {
 
     /** The stored file's extension always comes from this list, never from the client's file name. */
     private static final Set<String> MARKDOWN_EXTENSIONS = Set.of("md", "markdown");
+    /** Sections per upload (ADR 036): one embedding request carries every title. */
+    private static final int MAX_SECTIONS = 500;
 
     private final DocumentMapper documentMapper;
     private final KnowledgeBaseMapper knowledgeBaseMapper;
@@ -90,9 +92,18 @@ public class DocumentFacadeServiceImpl implements DocumentFacadeService {
         if (content.length == 0) {
             throw new BizException(400, "file: is empty");
         }
-        List<MarkdownSection> sections = markdownParserService.parse(decodeUtf8(content));
+        String text = decodeUtf8(content);
+        if (text.indexOf('\u0000') >= 0) {
+            // Valid UTF-8, but PostgreSQL text cannot hold it: the chunk insert would fail after the embedding call.
+            throw new BizException(400, "file: must not contain NUL characters");
+        }
+        List<MarkdownSection> sections = parse(text);
         if (sections.isEmpty()) {
             throw new BizException(400, "file: has no heading with text; at least one is needed to create searchable sections");
+        }
+        if (sections.size() > MAX_SECTIONS) {
+            // All titles go to Ollama in one request and every section becomes a row (ADR 036).
+            throw new BizException(400, "file: has more than " + MAX_SECTIONS + " sections (headings with text)");
         }
         List<float[]> embeddings = ragService.embed(sections.stream().map(MarkdownSection::title).toList());
         if (embeddings.size() != sections.size()) {
@@ -155,6 +166,15 @@ public class DocumentFacadeServiceImpl implements DocumentFacadeService {
             throw new BizException(400, "file: only Markdown files (.md, .markdown) are accepted");
         }
         return extension;
+    }
+
+    /** flexmark parses nested blocks recursively: about 10,000 nested list markers (20 KB) overflow the stack. */
+    private List<MarkdownSection> parse(String text) {
+        try {
+            return markdownParserService.parse(text);
+        } catch (StackOverflowError e) {
+            throw new BizException(400, "file: is nested too deeply to read");
+        }
     }
 
     private static String decodeUtf8(byte[] content) {

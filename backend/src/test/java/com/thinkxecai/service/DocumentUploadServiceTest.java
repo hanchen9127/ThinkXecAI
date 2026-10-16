@@ -24,6 +24,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -115,6 +116,40 @@ class DocumentUploadServiceTest extends ServiceTestSupport {
     void refusesAFileNameLongerThan200Characters() {
         assertRefusedBeforeAnyWork(insertKnowledgeBase("kb"), "a".repeat(198) + ".md", bytes(MARKDOWN),
                 "file: name is longer than 200 characters");
+    }
+
+    @Test
+    void acceptsAtMost500SectionsAndEmbedsThemInOneCall() {
+        UUID kb = insertKnowledgeBase("kb");
+        // Distinct vectors away from RagServiceTest's query point: rolled-back rows stay in the HNSW index until
+        // VACUUM, and 500 copies of one vector there crowded that test's small knowledge base out of the scan.
+        when(embeddingModel.embed(anyList())).thenAnswer(call -> IntStream.range(0, ((List<?>) call.getArgument(0)).size())
+                .mapToObj(i -> vector(100 + i)).toList());
+
+        DocumentVO document = documentFacadeService.uploadDocument(kb, "guide.md", bytes("# s\nx\n".repeat(500)));
+
+        assertThat(countRows("chunk_bge_m3", "doc_id = ?", UUID.fromString(document.getId()))).isEqualTo(500);
+        verify(embeddingModel).embed(anyList());
+    }
+
+    @Test
+    void refusesMoreThan500Sections() {
+        assertRefusedBeforeAnyWork(insertKnowledgeBase("kb"), "guide.md", bytes("# s\n".repeat(501)),
+                "file: has more than 500 sections");
+    }
+
+    @Test
+    void refusesNulCharacters() {
+        // valid UTF-8, but PostgreSQL cannot store it; refused before the embedding call instead of failing after it
+        assertRefusedBeforeAnyWork(insertKnowledgeBase("kb"), "guide.md", bytes("# A\na\u0000b"),
+                "file: must not contain NUL characters");
+    }
+
+    @Test
+    void refusesADocumentNestedTooDeeplyToParse() {
+        // 20,000 nested list markers overflow the parser's stack (10,000 already do)
+        assertRefusedBeforeAnyWork(insertKnowledgeBase("kb"), "guide.md", bytes("# A\n" + "- ".repeat(20_000) + "x"),
+                "file: is nested too deeply to read");
     }
 
     @Test

@@ -20,6 +20,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +39,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class EmbeddingModelConfigurationTest {
 
     private static final String FAILING_INPUT = "fail";
+    private static final String SLOW_INPUT = "slow";
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final List<RecordedRequest> requests = new CopyOnWriteArrayList<>();
     private static final HttpServer fakeOllama = startFakeOllama();
@@ -54,6 +57,7 @@ class EmbeddingModelConfigurationTest {
     static void pointOllamaAtFakeServer(DynamicPropertyRegistry registry) {
         registry.add("spring.ai.ollama.base-url",
                 () -> "http://127.0.0.1:" + fakeOllama.getAddress().getPort());
+        registry.add("thinkxecai.ollama.read-timeout", () -> "1s");
     }
 
     @BeforeEach
@@ -93,6 +97,24 @@ class EmbeddingModelConfigurationTest {
         assertThat(requests).hasSize(1);
     }
 
+    @Test
+    void aHangingOllamaFailsAfterTheReadTimeout() {
+        Instant start = Instant.now();
+
+        assertThatThrownBy(() -> embeddingModel.embed(SLOW_INPUT)).isInstanceOf(RuntimeException.class);
+
+        // 1 s here (thinkxecai.ollama.read-timeout); the fake server would answer only after 4 s
+        assertThat(Duration.between(start, Instant.now())).isLessThan(Duration.ofMillis(3_000));
+    }
+
+    private static void sleep(Duration duration) {
+        try {
+            Thread.sleep(duration);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
     private static HttpServer startFakeOllama() {
         try {
             HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
@@ -110,6 +132,9 @@ class EmbeddingModelConfigurationTest {
         requests.add(new RecordedRequest(exchange.getRequestURI().getPath(), body));
 
         JsonNode input = JSON.readTree(body).get("input");
+        if (input.size() == 1 && SLOW_INPUT.equals(input.get(0).asText())) {
+            sleep(Duration.ofSeconds(4));
+        }
         boolean fail = input.size() == 1 && FAILING_INPUT.equals(input.get(0).asText());
         String vectors = String.join(",", Collections.nCopies(input.size(), "[0.6,0.8]"));
         byte[] response = (fail ? "{\"error\":\"model failed\"}" : "{\"model\":\"bge-m3\",\"embeddings\":[" + vectors + "]}")

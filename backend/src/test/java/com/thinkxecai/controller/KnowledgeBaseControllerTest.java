@@ -88,6 +88,18 @@ class KnowledgeBaseControllerTest {
     }
 
     @Test
+    void aNulCharacterInAnyTextIsRejectedBeforeTheService() throws Exception {
+        // PostgreSQL cannot store U+0000 in text or jsonb; without this check the insert failed with a 500
+        mockMvc.perform(post("/api/knowledge-bases")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\": \"Docs\", \"description\": \"a\\u0000b\"}"))
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value("description: invalid value"));
+
+        verifyNoInteractions(service);
+    }
+
+    @Test
     void updateReturnsTheKnowledgeBaseObject() throws Exception {
         when(service.updateKnowledgeBase(eq(ID), any())).thenReturn(vo("Manuals"));
 

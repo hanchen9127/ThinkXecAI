@@ -176,7 +176,7 @@ addressed to `localhost` or `127.0.0.1` (others get HTTP 403); open it as `http:
 not by a LAN address. Env vars in `.env` need to be loaded into the process environment (e.g. via
 your shell, an IDE run configuration, or a tool like `direnv`).
 Uploaded files are stored under `data/documents/` relative to the working directory (gitignored).
-The backend starts without Ollama; it is needed when a document is uploaded or a knowledge base is
+The backend starts without Ollama; it is needed (and given 60 seconds per call) when a document is uploaded or a knowledge base is
 searched.
 
 ### 4. Run the frontend
@@ -225,8 +225,9 @@ Timestamps (`createdAt`, `updatedAt`) are UTC, written without an offset (`2026-
 | Tools           | `GET /tools` (optional tools only) |
 
 `POST /documents/upload` takes a `multipart/form-data` form with `kbId` and one `file`: a UTF-8
-Markdown file (`.md` or `.markdown`, at most 1 MB) with at least one heading. Each heading starts
-a section; the section titles are embedded and the original Markdown below each heading is stored
+Markdown file (`.md` or `.markdown`, at most 1 MB, no NUL characters) with at least one and at most 500
+headings with text. Each heading starts a section; the section titles are embedded and the original
+Markdown below each heading is stored
 as the chunk. The upload either fully succeeds or leaves no document, chunk, or file behind.
 `GET /tools` returns the optional tools an agent can choose, as `{ name, description, type }`;
 fixed tools are given to every agent and are not listed. An agent's `allowedTools` may only name

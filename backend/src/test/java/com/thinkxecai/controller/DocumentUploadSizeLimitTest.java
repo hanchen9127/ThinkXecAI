@@ -45,6 +45,20 @@ class DocumentUploadSizeLimitTest {
         assertThat(response.get("message").asText()).isEqualTo("file: too large (maximum 1 MB)");
     }
 
+    @Test
+    void aMalformedMultipartBodyIsAClientError() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType("multipart/form-data; boundary=b"));
+        // a part that starts but never ends: the container cannot read the body
+        String truncated = "--b\r\nContent-Disposition: form-data; name=\"kbId\"\r\n\r\nabc";
+
+        JsonNode response = restTemplate.postForObject("/api/documents/upload",
+                new HttpEntity<>(truncated, headers), JsonNode.class);
+
+        assertThat(response.get("code").asInt()).isEqualTo(400);
+        assertThat(response.get("message").asText()).isEqualTo("Malformed multipart request");
+    }
+
     private JsonNode upload(int size) {
         byte[] content = new byte[size];
         content[0] = '#';
