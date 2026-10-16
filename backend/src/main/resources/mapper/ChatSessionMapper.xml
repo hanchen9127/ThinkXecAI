@@ -45,7 +45,6 @@
     <update id="update">
         UPDATE chat_session
         <set>
-            <if test="agentId != null">agent_id = #{agentId},</if>
             <if test="title != null">title = #{title},</if>
             updated_at = now()
         </set>
