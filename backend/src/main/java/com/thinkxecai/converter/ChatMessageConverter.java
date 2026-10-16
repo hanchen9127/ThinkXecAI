@@ -12,6 +12,7 @@ import com.thinkxecai.model.vo.ChatMessageVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.Locale;
 
 @Component
 @RequiredArgsConstructor
@@ -26,7 +27,7 @@ public class ChatMessageConverter {
         return ChatMessageDTO.builder()
                 .id(entity.getId())
                 .sessionId(entity.getSessionId())
-                .role(ChatMessageRole.valueOf(entity.getRole().toUpperCase()))
+                .role(ChatMessageRole.valueOf(entity.getRole().toUpperCase(Locale.ROOT)))
                 .content(entity.getContent())
                 .metadata(readMetadata(entity.getMetadata()))
                 .createdAt(entity.getCreatedAt())

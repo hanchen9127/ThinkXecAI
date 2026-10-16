@@ -140,7 +140,11 @@ public class AgentConverter {
         }
     }
 
+    /** Java null stays null, so the mapper omits the column and the database default applies (ADR 009). */
     private String writeJson(Object value) {
+        if (value == null) {
+            return null;
+        }
         try {
             return objectMapper.writeValueAsString(value);
         } catch (JsonProcessingException e) {

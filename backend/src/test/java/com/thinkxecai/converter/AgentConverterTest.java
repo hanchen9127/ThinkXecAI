@@ -43,6 +43,16 @@ class AgentConverterTest {
     }
 
     @Test
+    void absentJsonFieldsStayNullSoTheColumnDefaultsApply() {
+        // a JSON null would be stored instead of the column default (ADR 009) and read back as null
+        AgentEntity entity = converter.toEntity(AgentDTO.builder().name("a").model("deepseek-chat").build());
+
+        assertThat(entity.getAllowedTools()).isNull();
+        assertThat(entity.getAllowedKbs()).isNull();
+        assertThat(entity.getChatOptions()).isNull();
+    }
+
+    @Test
     void createRequestAppliesSpecDefaultsWhenOmitted() {
         CreateAgentRequest request = new CreateAgentRequest();
         request.setName("Bare Agent");
