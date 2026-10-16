@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.thinkxecai.common.ApiResponse;
 import com.thinkxecai.common.LogText;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.tomcat.util.http.fileupload.impl.SizeLimitExceededException;
 import org.springframework.beans.TypeMismatchException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -32,6 +33,9 @@ import java.util.stream.Stream;
 public class GlobalExceptionHandler {
 
     static final String INTERNAL_ERROR_MESSAGE = "Internal server error";
+
+    @Value("${spring.servlet.multipart.max-request-size}")
+    private DataSize maxRequestSize;
 
     @Value("${spring.servlet.multipart.max-file-size}")
     private DataSize maxFileSize;
@@ -78,9 +82,18 @@ public class GlobalExceptionHandler {
     /** Thrown while the multipart request is read, before any controller; names the limit instead of a generic message. */
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ApiResponse<Void> handleUploadTooLarge(MaxUploadSizeExceededException ex) {
-        long kilobytes = maxFileSize.toKilobytes();
-        String limit = kilobytes % 1024 == 0 ? kilobytes / 1024 + " MB" : kilobytes + " KB";
-        return badRequest("file: too large (maximum " + limit + ")");
+        // Tomcat reports the whole request (all parts together) over max-request-size with its own exception.
+        for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
+            if (cause instanceof SizeLimitExceededException) {
+                return badRequest("request: too large (maximum " + readable(maxRequestSize) + ")");
+            }
+        }
+        return badRequest("file: too large (maximum " + readable(maxFileSize) + ")");
+    }
+
+    private static String readable(DataSize size) {
+        long kilobytes = size.toKilobytes();
+        return kilobytes % 1024 == 0 ? kilobytes / 1024 + " MB" : kilobytes + " KB";
     }
 
     /** A body that is not valid multipart (MaxUploadSizeExceededException, a subclass, is handled above). */
