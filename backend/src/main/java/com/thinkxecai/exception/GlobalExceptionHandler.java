@@ -2,6 +2,7 @@ package com.thinkxecai.exception;
 
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.thinkxecai.common.ApiResponse;
+import com.thinkxecai.common.LogText;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.TypeMismatchException;
 import org.springframework.beans.factory.annotation.Value;
@@ -42,7 +43,7 @@ public class GlobalExceptionHandler {
             log.error("Internal business exception", ex);
             return ApiResponse.error(INTERNAL_ERROR_MESSAGE);
         }
-        log.warn("Business exception {}: {}", code, ex.getMessage());
+        log.warn("Business exception {}: {}", code, LogText.safe(ex.getMessage()));
         return ApiResponse.error(code, ex.getMessage());
     }
 
@@ -94,7 +95,7 @@ public class GlobalExceptionHandler {
         // parameter) carry a 4xx status; they are not server failures.
         if (ex instanceof ErrorResponse errorResponse && errorResponse.getStatusCode().is4xxClientError()) {
             if (errorResponse.getStatusCode().value() == 404) {
-                log.warn("Not found: {}", ex.getMessage());
+                log.warn("Not found: {}", LogText.safe(ex.getMessage()));
                 return ApiResponse.error(404, "Not found");
             }
             String detail = errorResponse.getBody().getDetail();
@@ -105,7 +106,7 @@ public class GlobalExceptionHandler {
     }
 
     private static ApiResponse<Void> badRequest(String message) {
-        log.warn("Bad request: {}", message);
+        log.warn("Bad request: {}", LogText.safe(message));
         return ApiResponse.error(400, message);
     }
 
