@@ -21,6 +21,10 @@ import java.util.Set;
  *       properties of {@code *VO} schemas, of the {@code ApiResponse*} envelopes, and of the nested
  *       types that are always complete in responses, are marked required.</li>
  *   <li>A field annotated {@code @Nullable} may be null, so null is added to its type.</li>
+ *   <li>A named object type is never null itself: only the fields that refer to it are. In OpenAPI
+ *       3.1 mode swagger-core copies a field's {@code @Nullable} onto the shared type when that
+ *       field is the first place the type is seen, which turned {@code ChatMessageMetadata} into
+ *       {@code type: null} once no request used it.</li>
  * </ul>
  * Request schemas keep the required list derived from their Bean Validation annotations.
  */
@@ -35,6 +39,20 @@ public class OpenApiConfig {
         return openApi -> openApi.getComponents().getSchemas().forEach((name, schema) -> {
             if ((name.endsWith("VO") || name.startsWith("ApiResponse") || ALWAYS_COMPLETE.contains(name)) && schema.getProperties() != null) {
                 schema.setRequired(new ArrayList<>(schema.getProperties().keySet()));
+            }
+        });
+    }
+
+    @Bean
+    @SuppressWarnings("rawtypes")
+    public OpenApiCustomizer namedObjectTypesAreNeverNull() {
+        return openApi -> openApi.getComponents().getSchemas().values().forEach(schema -> {
+            Set<String> types = schema.getTypes();
+            if (schema.getProperties() != null && types != null && types.contains("null")) {
+                Set<String> nonNull = new LinkedHashSet<>(types);
+                nonNull.remove("null");
+                nonNull.add("object");
+                ((Schema) schema).setTypes(nonNull);
             }
         });
     }

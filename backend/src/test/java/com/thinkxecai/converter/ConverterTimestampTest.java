@@ -1,7 +1,6 @@
 package com.thinkxecai.converter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.thinkxecai.model.ChatMessageRole;
 import com.thinkxecai.model.dto.AgentDTO;
 import com.thinkxecai.model.dto.ChatMessageDTO;
 import com.thinkxecai.model.dto.ChatSessionDTO;
@@ -13,7 +12,6 @@ import com.thinkxecai.model.request.CreateChatSessionRequest;
 import com.thinkxecai.model.request.CreateDocumentRequest;
 import com.thinkxecai.model.request.CreateKnowledgeBaseRequest;
 import com.thinkxecai.model.request.UpdateAgentRequest;
-import com.thinkxecai.model.request.UpdateChatMessageRequest;
 import com.thinkxecai.model.request.UpdateChatSessionRequest;
 import com.thinkxecai.model.request.UpdateDocumentRequest;
 import com.thinkxecai.model.request.UpdateKnowledgeBaseRequest;
@@ -80,19 +78,10 @@ class ConverterTimestampTest {
 
         CreateChatMessageRequest create = new CreateChatMessageRequest();
         create.setSessionId(UUID.randomUUID());
-        create.setRole(ChatMessageRole.USER);
         create.setContent("hi");
         ChatMessageDTO created = converter.fromCreateRequest(create);
         assertThat(created.getCreatedAt()).isNull();
         assertThat(created.getUpdatedAt()).isNull();
-
-        UpdateChatMessageRequest update = new UpdateChatMessageRequest();
-        update.setContent("edited");
-        ChatMessageDTO updated = converter.applyUpdateRequest(
-                ChatMessageDTO.builder().createdAt(STORED_CREATED).updatedAt(STORED_UPDATED).build(), update);
-        assertThat(updated.getContent()).isEqualTo("edited");
-        assertThat(updated.getCreatedAt()).isEqualTo(STORED_CREATED);
-        assertThat(updated.getUpdatedAt()).isEqualTo(STORED_UPDATED);
     }
 
     @Test

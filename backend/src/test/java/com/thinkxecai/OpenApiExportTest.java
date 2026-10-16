@@ -40,7 +40,7 @@ class OpenApiExportTest {
             Map.entry("/api/chat-sessions/{chatSessionId}", List.of("delete", "get", "patch")),
             Map.entry("/api/chat-sessions/agent/{agentId}", List.of("get")),
             Map.entry("/api/chat-messages", List.of("post")),
-            Map.entry("/api/chat-messages/{chatMessageId}", List.of("delete", "patch")),
+            Map.entry("/api/chat-messages/{chatMessageId}", List.of("delete")),
             Map.entry("/api/chat-messages/session/{sessionId}", List.of("get")),
             Map.entry("/api/knowledge-bases", List.of("get", "post")),
             Map.entry("/api/knowledge-bases/{knowledgeBaseId}", List.of("delete", "patch")),
@@ -91,6 +91,10 @@ class OpenApiExportTest {
         JsonNode message = schema("ChatMessageVO");
         assertThat(message.at("/properties/metadata/oneOf/0/$ref").asText()).isEqualTo("#/components/schemas/ChatMessageMetadata");
         assertThat(message.at("/properties/metadata/oneOf/1/type").asText()).isEqualTo("null");
+        // the null belongs to the field, not to the shared type it refers to
+        JsonNode metadata = schema("ChatMessageMetadata");
+        assertThat(names(metadata.get("type"))).containsExactly("object");
+        assertThat(names(metadata.get("properties"))).containsExactlyInAnyOrder("toolCalls", "toolResponse");
 
         assertThat(names(schema("ChatOptions").get("required"))).containsExactlyInAnyOrder("temperature", "topP", "messageLength");
 

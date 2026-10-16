@@ -5,19 +5,16 @@ import com.thinkxecai.event.ChatEvent;
 import com.thinkxecai.exception.BizException;
 import com.thinkxecai.mapper.ChatMessageMapper;
 import com.thinkxecai.mapper.ChatSessionMapper;
-import com.thinkxecai.model.ChatMessageRole;
 import com.thinkxecai.model.dto.ChatMessageDTO;
 import com.thinkxecai.model.entity.ChatMessageEntity;
 import com.thinkxecai.model.entity.ChatSessionEntity;
 import com.thinkxecai.model.request.CreateChatMessageRequest;
-import com.thinkxecai.model.request.UpdateChatMessageRequest;
 import com.thinkxecai.model.vo.ChatMessageVO;
 import com.thinkxecai.service.ChatMessageFacadeService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.UUID;
@@ -42,12 +39,8 @@ public class ChatMessageFacadeServiceImpl implements ChatMessageFacadeService {
     @Override
     @Transactional
     public ChatMessageVO createChatMessage(CreateChatMessageRequest request) {
-        boolean userMessage = request.getRole() == ChatMessageRole.USER;
-        if (userMessage && !StringUtils.hasText(request.getContent())) {
-            throw new BizException(400, "content: must not be blank");
-        }
         ChatSessionEntity session = findSession(request.getSessionId());
-        if (userMessage && session.getAgentId() == null) {
+        if (session.getAgentId() == null) {
             throw new BizException(409, "Chat session has no agent");
         }
 
@@ -55,19 +48,8 @@ public class ChatMessageFacadeServiceImpl implements ChatMessageFacadeService {
         ChatMessageEntity entity = chatMessageConverter.toEntity(dto);
         chatMessageMapper.insert(entity);
         chatSessionMapper.touch(session.getId());
-        if (userMessage) {
-            eventPublisher.publishEvent(new ChatEvent(session.getAgentId(), session.getId()));
-        }
+        eventPublisher.publishEvent(new ChatEvent(session.getAgentId(), session.getId()));
         return toVO(findExisting(entity.getId()));
-    }
-
-    @Override
-    @Transactional
-    public ChatMessageVO updateChatMessage(UUID chatMessageId, UpdateChatMessageRequest request) {
-        ChatMessageDTO existing = chatMessageConverter.toDTO(findExisting(chatMessageId));
-        ChatMessageDTO updated = chatMessageConverter.applyUpdateRequest(existing, request);
-        chatMessageMapper.update(chatMessageConverter.toEntity(updated));
-        return toVO(findExisting(chatMessageId));
     }
 
     @Override

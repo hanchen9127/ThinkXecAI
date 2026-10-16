@@ -2,14 +2,12 @@ package com.thinkxecai.controller;
 
 import com.thinkxecai.common.ApiResponse;
 import com.thinkxecai.model.request.CreateChatMessageRequest;
-import com.thinkxecai.model.request.UpdateChatMessageRequest;
 import com.thinkxecai.model.vo.ChatMessageVO;
 import com.thinkxecai.service.ChatMessageFacadeService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -34,12 +32,6 @@ public class ChatMessageController {
     @PostMapping
     public ApiResponse<ChatMessageVO> createChatMessage(@Valid @RequestBody CreateChatMessageRequest request) {
         return ApiResponse.success(chatMessageFacadeService.createChatMessage(request));
-    }
-
-    @PatchMapping("/{chatMessageId}")
-    public ApiResponse<ChatMessageVO> updateChatMessage(@PathVariable UUID chatMessageId,
-                                                        @Valid @RequestBody UpdateChatMessageRequest request) {
-        return ApiResponse.success(chatMessageFacadeService.updateChatMessage(chatMessageId, request));
     }
 
     @DeleteMapping("/{chatMessageId}")

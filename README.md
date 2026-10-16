@@ -214,7 +214,7 @@ anything else.
 |-----------------|---------------------------------------------------------------------------|
 | Agents          | `GET/POST /agents`, `PATCH/DELETE /agents/{agentId}` |
 | Chat sessions   | `GET/POST /chat-sessions`, `GET/PATCH/DELETE /chat-sessions/{chatSessionId}`, `GET /chat-sessions/agent/{agentId}` |
-| Chat messages   | `GET /chat-messages/session/{sessionId}`, `POST /chat-messages`, `PATCH/DELETE /chat-messages/{chatMessageId}` |
+| Chat messages   | `GET /chat-messages/session/{sessionId}`, `POST /chat-messages` (user messages only), `DELETE /chat-messages/{chatMessageId}` |
 | Knowledge bases | `GET/POST /knowledge-bases`, `PATCH/DELETE /knowledge-bases/{knowledgeBaseId}` |
 | Documents       | `GET/POST /documents`, `GET /documents/kb/{kbId}`, `POST /documents/upload`, `PATCH/DELETE /documents/{documentId}` |
 | Tools           | `GET /tools` (optional tools only) |

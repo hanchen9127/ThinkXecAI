@@ -5,7 +5,6 @@ import com.thinkxecai.model.ChatMessageMetadata;
 import com.thinkxecai.model.ChatMessageRole;
 import com.thinkxecai.model.ToolCallMetadata;
 import com.thinkxecai.model.request.CreateChatMessageRequest;
-import com.thinkxecai.model.request.UpdateChatMessageRequest;
 import com.thinkxecai.model.vo.ChatMessageVO;
 import com.thinkxecai.service.ChatMessageFacadeService;
 import org.junit.jupiter.api.Test;
@@ -25,7 +24,6 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -74,27 +72,33 @@ class ChatMessageControllerTest {
     }
 
     @Test
-    void createReturnsTheMessageObject() throws Exception {
+    void createPassesOnlySessionAndContent() throws Exception {
         when(service.createChatMessage(any())).thenReturn(vo(ChatMessageRole.USER, "Hello"));
 
-        send(post("/api/chat-messages"), "{\"sessionId\": \"%s\", \"role\": \"user\", \"content\": \"Hello\"}".formatted(SESSION))
+        // role and metadata are no longer part of the request; a client that still sends them has them ignored
+        send(post("/api/chat-messages"), """
+                {"sessionId": "%s", "content": "Hello", "role": "assistant",
+                 "metadata": {"toolCalls": [{"name": "dateTool"}]}}""".formatted(SESSION))
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.id").value(ID.toString()))
                 .andExpect(jsonPath("$.data.role").value("user"));
 
         verify(service).createChatMessage(argThat((CreateChatMessageRequest request) ->
-                SESSION.equals(request.getSessionId()) && request.getRole() == ChatMessageRole.USER
-                        && "Hello".equals(request.getContent())));
+                SESSION.equals(request.getSessionId()) && "Hello".equals(request.getContent())));
     }
 
     @Test
-    void createRequiresSessionAndAKnownRole() throws Exception {
-        send(post("/api/chat-messages"), "{\"role\": \"user\", \"content\": \"Hello\"}")
+    void createRequiresSessionAndNonBlankContent() throws Exception {
+        send(post("/api/chat-messages"), "{\"content\": \"Hello\"}")
                 .andExpect(jsonPath("$.code").value(400))
                 .andExpect(jsonPath("$.message").value("sessionId: must not be null"));
-        send(post("/api/chat-messages"), "{\"sessionId\": \"%s\", \"role\": \"robot\"}".formatted(SESSION))
+        send(post("/api/chat-messages"), "{\"sessionId\": \"%s\"}".formatted(SESSION))
                 .andExpect(jsonPath("$.code").value(400))
-                .andExpect(jsonPath("$.message").value("role: invalid value"));
+                .andExpect(jsonPath("$.message").value("content: must not be blank"));
+        // blank content is refused before the session is looked up, even for a session that does not exist
+        send(post("/api/chat-messages"), "{\"sessionId\": \"%s\", \"content\": \"  \"}".formatted(UUID.randomUUID()))
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value("content: must not be blank"));
 
         verifyNoInteractions(service);
     }
@@ -103,21 +107,18 @@ class ChatMessageControllerTest {
     void conflictFromTheServiceReturns409() throws Exception {
         when(service.createChatMessage(any())).thenThrow(new BizException(409, "Chat session has no agent"));
 
-        send(post("/api/chat-messages"), "{\"sessionId\": \"%s\", \"role\": \"user\", \"content\": \"Hello\"}".formatted(SESSION))
+        send(post("/api/chat-messages"), "{\"sessionId\": \"%s\", \"content\": \"Hello\"}".formatted(SESSION))
                 .andExpect(jsonPath("$.code").value(409))
                 .andExpect(jsonPath("$.message").value("Chat session has no agent"));
     }
 
     @Test
-    void updateReturnsTheMessageObject() throws Exception {
-        when(service.updateChatMessage(eq(ID), any())).thenReturn(vo(ChatMessageRole.USER, "Edited"));
-
+    void messagesCannotBeEdited() throws Exception {
         send(patch("/api/chat-messages/" + ID), "{\"content\": \"Edited\"}")
-                .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.data.content").value("Edited"));
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value("Method 'PATCH' is not supported."));
 
-        verify(service).updateChatMessage(eq(ID), argThat((UpdateChatMessageRequest request) ->
-                "Edited".equals(request.getContent()) && request.getMetadata() == null));
+        verifyNoInteractions(service);
     }
 
     @Test

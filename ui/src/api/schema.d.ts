@@ -81,7 +81,7 @@ export interface paths {
         delete: operations["deleteChatMessage"];
         options?: never;
         head?: never;
-        patch: operations["updateChatMessage"];
+        patch?: never;
         trace?: never;
     };
     "/api/chat-sessions": {
@@ -387,10 +387,7 @@ export interface components {
             systemPrompt?: string;
         };
         CreateChatMessageRequest: {
-            content?: string;
-            metadata?: components["schemas"]["ChatMessageMetadata"];
-            /** @enum {string} */
-            role: "user" | "assistant" | "system" | "tool";
+            content: string;
             /** Format: uuid */
             sessionId: string;
         };
@@ -455,10 +452,6 @@ export interface components {
             model?: "deepseek-chat" | "gemini-3.8-flash";
             name?: string;
             systemPrompt?: string;
-        };
-        UpdateChatMessageRequest: {
-            content?: string;
-            metadata?: components["schemas"]["ChatMessageMetadata"];
         };
         UpdateChatSessionRequest: {
             title?: string;
@@ -641,32 +634,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiResponseVoid"];
-                };
-            };
-        };
-    };
-    updateChatMessage: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                chatMessageId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateChatMessageRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiResponseChatMessageVO"];
                 };
             };
         };

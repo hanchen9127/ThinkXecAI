@@ -6,7 +6,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.IntStream;
@@ -76,25 +75,6 @@ class ChatMessageMapperTest extends MapperTestSupport {
         assertThat(JSON.readTree(mapper.selectById(withMetadata.getId()).getMetadata()))
                 .isEqualTo(JSON.readTree(metadata));
         assertThat(mapper.selectById(withoutMetadata.getId()).getMetadata()).isNull();
-    }
-
-    @Test
-    void updateChangesOnlyNonNullFieldsAndRefreshesUpdatedAt() throws Exception {
-        UUID session = insertChatSession(null, "s");
-        String metadata = "{\"toolResponse\":{\"id\":\"call-1\",\"name\":\"getDate\",\"responseData\":\"2026-10-04\"}}";
-        ChatMessageEntity message = insert(session, "tool", "2026-10-04", metadata);
-        LocalDateTime longAgo = LocalDateTime.of(2026, 1, 1, 0, 0);
-        jdbcTemplate.update("UPDATE chat_message SET updated_at = ? WHERE id = ?", longAgo, message.getId());
-
-        int updated = mapper.update(ChatMessageEntity.builder().id(message.getId()).content("edited").build());
-
-        ChatMessageEntity found = mapper.selectById(message.getId());
-        assertThat(updated).isEqualTo(1);
-        assertThat(found.getContent()).isEqualTo("edited");
-        assertThat(JSON.readTree(found.getMetadata())).isEqualTo(JSON.readTree(metadata));
-        assertThat(found.getRole()).isEqualTo("tool");
-        assertThat(found.getCreatedAt()).isEqualTo(message.getCreatedAt());
-        assertThat(found.getUpdatedAt()).isAfter(longAgo);
     }
 
     @Test

@@ -120,8 +120,8 @@ export type ToolResponseMetadata = Schemas['ToolResponseMetadata']
 /** Assistant messages that request tools carry toolCalls; tool messages carry toolResponse. */
 export type ChatMessageMetadata = Schemas['ChatMessageMetadata']
 export type ChatMessage = Schemas['ChatMessageVO']
+/** Always a user message; assistant, tool, and system messages come only from the agent runtime. */
 export type CreateChatMessageRequest = RequestBody<'/api/chat-messages', 'post'>
-export type UpdateChatMessageRequest = RequestBody<'/api/chat-messages/{chatMessageId}', 'patch'>
 
 export function listChatMessagesBySession(sessionId: string) {
   return http.get<ResponseData<'/api/chat-messages/session/{sessionId}', 'get'>>(
@@ -131,13 +131,6 @@ export function listChatMessagesBySession(sessionId: string) {
 
 export function createChatMessage(request: CreateChatMessageRequest) {
   return http.post<ResponseData<'/api/chat-messages', 'post'>>('/chat-messages', request)
-}
-
-export function updateChatMessage(chatMessageId: string, request: UpdateChatMessageRequest) {
-  return http.patch<ResponseData<'/api/chat-messages/{chatMessageId}', 'patch'>>(
-    `/chat-messages/${chatMessageId}`,
-    request,
-  )
 }
 
 export function deleteChatMessage(chatMessageId: string) {
