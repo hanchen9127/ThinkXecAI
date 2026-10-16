@@ -90,7 +90,7 @@ public class AgentFacadeServiceImpl implements AgentFacadeService {
         if (kbIds == null || kbIds.isEmpty()) {
             return;
         }
-        Set<UUID> found = knowledgeBaseMapper.selectByIds(kbIds).stream()
+        Set<UUID> found = knowledgeBaseMapper.selectByIds(kbIds.toArray(UUID[]::new)).stream()
                 .map(KnowledgeBaseEntity::getId)
                 .collect(Collectors.toSet());
         List<String> unknown = kbIds.stream()

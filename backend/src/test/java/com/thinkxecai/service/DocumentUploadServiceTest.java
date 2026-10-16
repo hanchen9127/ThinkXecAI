@@ -101,6 +101,23 @@ class DocumentUploadServiceTest extends ServiceTestSupport {
     }
 
     @Test
+    void acceptsAFileNameOf200CharactersNotCountingTheClientPath() {
+        UUID kb = insertKnowledgeBase("kb");
+        when(embeddingModel.embed(List.of("Install"))).thenReturn(List.of(vector(0)));
+        String longest = "a".repeat(197) + ".md";
+
+        DocumentVO document = documentFacadeService.uploadDocument(kb, "C:\\docs\\" + longest, bytes("# Install\nx"));
+
+        assertThat(document.getName()).isEqualTo(longest);
+    }
+
+    @Test
+    void refusesAFileNameLongerThan200Characters() {
+        assertRefusedBeforeAnyWork(insertKnowledgeBase("kb"), "a".repeat(198) + ".md", bytes(MARKDOWN),
+                "file: name is longer than 200 characters");
+    }
+
+    @Test
     void refusesAnEmptyFile() {
         assertRefusedBeforeAnyWork(insertKnowledgeBase("kb"), "guide.md", new byte[0], "file: is empty");
     }

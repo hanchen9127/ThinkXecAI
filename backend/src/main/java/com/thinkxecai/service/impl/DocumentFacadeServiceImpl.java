@@ -10,6 +10,7 @@ import com.thinkxecai.model.dto.DocumentDTO;
 import com.thinkxecai.model.entity.ChunkEntity;
 import com.thinkxecai.model.entity.DocumentEntity;
 import com.thinkxecai.model.request.CreateDocumentRequest;
+import com.thinkxecai.model.request.RequestLimits;
 import com.thinkxecai.model.request.UpdateDocumentRequest;
 import com.thinkxecai.model.vo.DocumentVO;
 import com.thinkxecai.service.DocumentFacadeService;
@@ -82,6 +83,9 @@ public class DocumentFacadeServiceImpl implements DocumentFacadeService {
             throw new BizException(400, "kbId: unknown knowledge base " + kbId);
         }
         String name = baseName(fileName);
+        if (name.length() > RequestLimits.NAME) {
+            throw new BizException(400, "file: name is longer than " + RequestLimits.NAME + " characters");
+        }
         String extension = markdownExtension(name);
         if (content.length == 0) {
             throw new BizException(400, "file: is empty");

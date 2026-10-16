@@ -16,6 +16,7 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -137,6 +138,20 @@ class AgentControllerTest {
         send(post("/api/agents"), "{\"name\": \"Research\", \"model\": \"deepseek-chat\", \"allowedKbs\": [null]}")
                 .andExpect(jsonPath("$.code").value(400))
                 .andExpect(jsonPath("$.message").value("allowedKbs[0]: must not be null"));
+
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void tooManyListEntriesAreRejectedBeforeDuplicatesAreDropped() throws Exception {
+        String kbs = String.join(", ", Collections.nCopies(51, "\"" + ID + "\""));
+        send(post("/api/agents"), "{\"name\": \"Research\", \"model\": \"deepseek-chat\", \"allowedKbs\": [%s]}".formatted(kbs))
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value("allowedKbs: size must be between 0 and 50"));
+        String tools = String.join(", ", Collections.nCopies(51, "\"emailTool\""));
+        send(patch("/api/agents/" + ID), "{\"allowedTools\": [%s]}".formatted(tools))
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value("allowedTools: size must be between 0 and 50"));
 
         verifyNoInteractions(service);
     }

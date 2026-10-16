@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -61,16 +62,25 @@ class KnowledgeBaseMapperTest extends MapperTestSupport {
         UUID b = insert("b", null).getId();
         insert("not requested", null);
 
-        List<KnowledgeBaseEntity> found = mapper.selectByIds(List.of(a, b, UUID.randomUUID()));
+        List<KnowledgeBaseEntity> found = mapper.selectByIds(new UUID[]{a, b, UUID.randomUUID()});
 
         assertThat(found).extracting(KnowledgeBaseEntity::getId).containsExactlyInAnyOrder(a, b);
     }
 
     @Test
-    void selectByIdsWithEmptyCollectionReturnsEmptyList() {
+    void selectByIdsBindsAnyNumberOfIdsAsOneArray() {
+        UUID a = insert("a", null).getId();
+        // more ids than a statement may have parameters (65,535): one per id would be refused by the driver
+        UUID[] ids = Stream.concat(Stream.of(a), Stream.generate(UUID::randomUUID).limit(70_000)).toArray(UUID[]::new);
+
+        assertThat(mapper.selectByIds(ids)).extracting(KnowledgeBaseEntity::getId).containsExactly(a);
+    }
+
+    @Test
+    void selectByIdsWithNoIdsReturnsEmptyList() {
         insert("exists", null);
 
-        assertThat(mapper.selectByIds(List.of())).isEmpty();
+        assertThat(mapper.selectByIds(new UUID[0])).isEmpty();
     }
 
     @Test

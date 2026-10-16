@@ -115,6 +115,9 @@ class OpenApiExportTest {
         assertThat(names(schema("CreateAgentRequest").at("/properties/model/enum"))).containsExactly("deepseek-chat", "gemini-3.8-flash");
         assertThat(schema("UpdateChatSessionRequest").get("properties").has("agentId")).isFalse();
         assertThat(schema("CreateDocumentRequest").get("properties").has("metadata")).isFalse();
+        assertThat(schema("CreateAgentRequest").at("/properties/name/maxLength").asInt()).isEqualTo(200);
+        assertThat(schema("CreateAgentRequest").at("/properties/allowedKbs/maxItems").asInt()).isEqualTo(50);
+        assertThat(schema("CreateChatMessageRequest").at("/properties/content/maxLength").asInt()).isEqualTo(20_000);
     }
 
     private JsonNode schema(String name) {

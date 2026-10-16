@@ -2,6 +2,7 @@ package com.thinkxecai.model.request;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.util.UUID;
@@ -16,6 +17,7 @@ public class CreateChatMessageRequest {
     @NotNull
     private UUID sessionId;
     @NotBlank
+    @Size(max = RequestLimits.TEXT)
     private String content;
 
 }

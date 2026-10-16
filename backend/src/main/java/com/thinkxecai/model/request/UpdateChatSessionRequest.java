@@ -1,5 +1,6 @@
 package com.thinkxecai.model.request;
 
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 /**
@@ -10,6 +11,7 @@ import lombok.Data;
 public class UpdateChatSessionRequest {
 
     @NullOrNotBlank
+    @Size(max = RequestLimits.NAME)
     private String title;
 
 }
