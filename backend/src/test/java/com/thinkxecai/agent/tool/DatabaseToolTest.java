@@ -83,6 +83,11 @@ class DatabaseToolTest extends MapperTestSupport {
                 .contains("| on | 5s |");
     }
 
+    @Test
+    void theQueryRunsInUtcLikeTheApplication() {
+        assertThat(tool.databaseQuery("SELECT current_setting('TimeZone') AS tz")).contains("| UTC |");
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {
             "SELECT 1; DROP TABLE database_tool_probe",

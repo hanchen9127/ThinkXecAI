@@ -213,6 +213,8 @@ conflict (such as a user message to a session whose agent was deleted), and a ge
 anything else. The one exception is a request whose `Host` is not `localhost` / `127.0.0.1`: it
 never reaches the API and gets HTTP 403 (with the same envelope, code `403`).
 
+Timestamps (`createdAt`, `updatedAt`) are UTC, written without an offset (`2026-10-17T03:15:00`).
+
 | Resource        | Endpoints                                                                 |
 |-----------------|---------------------------------------------------------------------------|
 | Agents          | `GET/POST /agents`, `PATCH/DELETE /agents/{agentId}` |

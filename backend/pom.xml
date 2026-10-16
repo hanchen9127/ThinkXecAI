@@ -27,6 +27,9 @@
         <!-- Surefire skips tests tagged @Tag("external") (live Ollama / LLM calls) by default, so CI never
              reaches external services. Run them locally with: mvn test -DexcludedGroups= -Dgroups=external -->
         <excludedGroups>external</excludedGroups>
+        <!-- Tests run in a zone with daylight saving time on every machine (CI runners use UTC), so code that
+             lets the JVM zone reach database timestamps fails here and not only on a developer machine. -->
+        <argLine>-Duser.timezone=Australia/Sydney</argLine>
     </properties>
 
     <dependencyManagement>

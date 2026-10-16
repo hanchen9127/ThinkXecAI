@@ -33,6 +33,12 @@ spring:
     username: postgres
     password: ${THINKXECAI_DB_PASSWORD:}
     driver-class-name: org.postgresql.Driver
+    # Timestamp columns are TIMESTAMP (no zone) filled by now() / clock_timestamp(), which use the
+    # session zone. The driver sets that to the JVM zone at connect (an options=-c TimeZone=... URL
+    # parameter is overridden by it), so each pooled connection switches to UTC: no daylight-saving
+    # jump can make a later row look older. DatabaseTool sets the same for its own connections.
+    hikari:
+      connection-init-sql: SET TIME ZONE 'UTC'
 
   ai:
     model:
