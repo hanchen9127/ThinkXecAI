@@ -159,7 +159,7 @@ only when that address is on the allowlist.
 docker compose up -d
 ```
 
-This starts `pgvector/pgvector:pg18` on `localhost:5433`, database `thinkxecai`, and runs
+This starts `pgvector/pgvector:pg18` on `localhost:5433` (published on `127.0.0.1` only), database `thinkxecai`, and runs
 the initialization scripts in `db/init/` (core schema, vector index, and sample
 e-commerce data used by the database query tool).
 
@@ -171,7 +171,9 @@ mvn spring-boot:run
 ```
 
 The API listens on `http://localhost:8080`, with all REST endpoints under `/api` and SSE
-under `/sse`. Env vars in `.env` need to be loaded into the process environment (e.g. via
+under `/sse`. It has no authentication, so it listens on `127.0.0.1` only and answers only requests
+addressed to `localhost` or `127.0.0.1` (others get HTTP 403); open it as `http://localhost:8080`,
+not by a LAN address. Env vars in `.env` need to be loaded into the process environment (e.g. via
 your shell, an IDE run configuration, or a tool like `direnv`).
 Uploaded files are stored under `data/documents/` relative to the working directory (gitignored).
 The backend starts without Ollama; it is needed when a document is uploaded or a knowledge base is
@@ -208,7 +210,8 @@ All JSON REST endpoints live under `/api` and return a consistent envelope:
 The HTTP status is always 200; errors set `code` and `data: null`, with an English `message`:
 `400` for invalid input (the message names the field), `404` for a missing resource, `409` for a
 conflict (such as a user message to a session whose agent was deleted), and a generic `500` for
-anything else.
+anything else. The one exception is a request whose `Host` is not `localhost` / `127.0.0.1`: it
+never reaches the API and gets HTTP 403 (with the same envelope, code `403`).
 
 | Resource        | Endpoints                                                                 |
 |-----------------|---------------------------------------------------------------------------|

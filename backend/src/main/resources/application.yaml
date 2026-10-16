@@ -1,6 +1,11 @@
 # Secret placeholders below default to empty (${VAR:}) rather than failing here directly -
 # Spring's relaxed property binding silently accepts an unresolved bare ${VAR}, so the real
 # fail-fast check lives in RequiredSecretsValidator (com.thinkxecai.config), not in this file.
+# The API has no authentication, so it is reachable from this machine only; HostCheckFilter also
+# refuses host names other than localhost / 127.0.0.1 (DNS rebinding).
+server:
+  address: 127.0.0.1
+
 spring:
   application:
     name: thinkxecai-backend

@@ -8,7 +8,8 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${THINKXECAI_DB_PASSWORD}
     ports:
-      - "5433:5432"
+      # Loopback only: the superuser login must not be reachable from other machines.
+      - "127.0.0.1:5433:5432"
     volumes:
       - thinkxecai-postgres-data:/var/lib/postgresql
       - ./db/init:/docker-entrypoint-initdb.d
