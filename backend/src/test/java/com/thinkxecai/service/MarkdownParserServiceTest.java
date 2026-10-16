@@ -37,6 +37,16 @@ class MarkdownParserServiceTest {
     }
 
     @Test
+    void anIndentedCodeBlockThatOpensASectionKeepsItsIndentation() {
+        String body = "    mvn test\n    mvn package\n\nThen run it.";
+
+        // blank lines (also ones holding only spaces) before the content and whitespace after it are dropped
+        assertThat(parser.parse("# Build\n\n  \n" + body + "  \n\n# Next\ntext")).containsExactly(
+                new MarkdownSection("Build", body),
+                new MarkdownSection("Next", "text"));
+    }
+
+    @Test
     void everyHeadingLevelStartsASectionThatEndsAtTheNextHeading() {
         List<MarkdownSection> sections = parser.parse("""
                 # A
