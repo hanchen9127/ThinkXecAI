@@ -7,7 +7,8 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  # Only superseded pull-request runs are cancelled; every push to main is tested to the end.
+  # A running push-to-main build is never cancelled (GitHub may still drop a queued one when several
+  # pushes arrive at once); only superseded pull-request runs are cancelled.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
