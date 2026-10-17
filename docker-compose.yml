@@ -1,6 +1,7 @@
 services:
   postgres:
-    image: pgvector/pgvector:pg18
+    # Exact version: hnsw.iterative_scan (strict-order filtered search, ADR 024) needs pgvector 0.8 or later.
+    image: pgvector/pgvector:0.8.6-pg18
     container_name: thinkxecai-postgres
     restart: unless-stopped
     environment:

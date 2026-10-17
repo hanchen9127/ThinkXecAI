@@ -98,6 +98,10 @@ Required variables (the backend fails fast at startup if any is missing):
 | `THINKXECAI_GEMINI_API_KEY`   | Gemini API key (`gemini-3.8-flash`) |
 | `THINKXECAI_DEEPSEEK_API_KEY` | DeepSeek API key (`deepseek-chat`)  |
 
+Messages, documents found by the knowledge tool, and tool results are sent to the chosen model's
+provider. On Gemini's free tier Google may use submitted content to improve its products, so use a
+paid key (or DeepSeek) before working with private data.
+
 Optional variables, only for the email tool. Startup never checks them; until all four Gmail
 values are set, the tool answers that email is not configured and names what is missing.
 
@@ -159,9 +163,19 @@ only when that address is on the allowlist.
 docker compose up -d
 ```
 
-This starts `pgvector/pgvector:pg18` on `localhost:5433` (published on `127.0.0.1` only), database `thinkxecai`, and runs
-the initialization scripts in `db/init/` (core schema, vector index, and sample
+This starts `pgvector/pgvector:0.8.6-pg18` on `localhost:5433` (published on `127.0.0.1` only), database
+`thinkxecai`, and runs the initialization scripts in `db/init/` (core schema, vector index, and sample
 e-commerce data used by the database query tool).
+
+The scripts run only when the data volume is empty, so a database created by an older version of
+`db/init/` keeps its old schema. To start over (this deletes all data), and to check that the scripts
+succeeded — if one fails, the container restarts and then runs without finishing them:
+
+```bash
+docker compose down -v
+docker compose up -d --wait
+docker compose logs postgres | grep -E "ERROR|init process complete"
+```
 
 ### 3. Run the backend
 
