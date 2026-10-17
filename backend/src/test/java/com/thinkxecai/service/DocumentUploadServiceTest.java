@@ -11,6 +11,7 @@ import org.springframework.jdbc.core.BeanPropertyRowMapper;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -30,7 +31,9 @@ import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -50,6 +53,9 @@ class DocumentUploadServiceTest extends ServiceTestSupport {
 
     @MockitoBean
     private EmbeddingModel embeddingModel;
+
+    @MockitoSpyBean
+    private DocumentStorageService storage;
 
     @DynamicPropertySource
     static void useTemporaryStorage(DynamicPropertyRegistry registry) {
@@ -194,6 +200,27 @@ class DocumentUploadServiceTest extends ServiceTestSupport {
 
             assertThatThrownBy(() -> documentFacadeService.uploadDocument(kb, "guide.md", bytes(MARKDOWN)))
                     .hasMessageContaining("1024");
+
+            assertNothingStored(kb);
+        } finally {
+            deleteCommittedKnowledgeBase(kb);
+        }
+    }
+
+    /** The cleanup is registered before the file is written, so even a write that fails halfway is removed. */
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void aSaveThatFailsAfterWritingLeavesNoFile() {
+        UUID kb = insertKnowledgeBase("kb");
+        try {
+            when(embeddingModel.embed(TITLES)).thenReturn(List.of(vector(0), vector(1)));
+            doAnswer(invocation -> {
+                invocation.callRealMethod();
+                throw new UncheckedIOException(new IOException("disk full"));
+            }).when(storage).save(any(), any(), any(), any());
+
+            assertThatThrownBy(() -> documentFacadeService.uploadDocument(kb, "guide.md", bytes(MARKDOWN)))
+                    .hasMessageContaining("disk full");
 
             assertNothingStored(kb);
         } finally {

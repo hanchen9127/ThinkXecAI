@@ -116,6 +116,15 @@ class MarkdownParserServiceTest {
     }
 
     @Test
+    void headingsInsideListItemsAreContentNotABoundary() {
+        String body = "- step one\n  # inside the list item\n- step two";
+
+        assertThat(parser.parse("# A\n" + body + "\n# B\nb")).containsExactly(
+                new MarkdownSection("A", body),
+                new MarkdownSection("B", "b"));
+    }
+
+    @Test
     void windowsAndOldMacLineEndingsBecomeLineFeeds() {
         assertThat(parser.parse("# A\r\nline 1\r\nline 2\r\n# B\rx\ry")).containsExactly(
                 new MarkdownSection("A", "line 1\nline 2"),

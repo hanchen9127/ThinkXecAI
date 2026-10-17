@@ -13,10 +13,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class DocumentConverterTest {
 
-    private final DocumentConverter converter = new DocumentConverter(new ObjectMapper());
+    private static final ObjectMapper JSON = new ObjectMapper();
+
+    private final DocumentConverter converter = new DocumentConverter(JSON);
 
     @Test
-    void metadataRoundTripsBetweenDtoAndEntity() {
+    void metadataRoundTripsBetweenDtoAndEntity() throws Exception {
         DocumentDTO dto = DocumentDTO.builder()
                 .id(UUID.randomUUID())
                 .kbId(UUID.randomUUID())
@@ -27,7 +29,8 @@ class DocumentConverterTest {
                 .build();
 
         DocumentEntity entity = converter.toEntity(dto);
-        assertThat(entity.getMetadata()).contains("filePath").contains("kb-1/doc-1/uuid.md");
+        assertThat(JSON.readTree(entity.getMetadata()))
+                .isEqualTo(JSON.readTree("{\"filePath\": \"kb-1/doc-1/uuid.md\", \"sizeBytes\": 1024}"));
 
         DocumentDTO roundTripped = converter.toDTO(entity);
         assertThat(roundTripped.getMetadata()).isEqualTo(dto.getMetadata());

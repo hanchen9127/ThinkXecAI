@@ -119,6 +119,19 @@ class AgentControllerTest {
     }
 
     @Test
+    void chatOptionsAtTheBoundariesAreAccepted() throws Exception {
+        // pins the inclusive bounds: e.g. topP < 1 would refuse the default 1.0
+        for (String options : new String[]{
+                "{\"temperature\": 0, \"topP\": 0, \"messageLength\": 1}",
+                "{\"temperature\": 2, \"topP\": 1.0, \"messageLength\": 100}"}) {
+            send(post("/api/agents"), "{\"name\": \"Research\", \"model\": \"deepseek-chat\", \"chatOptions\": %s}".formatted(options))
+                    .andExpect(jsonPath("$.code").value(200));
+            send(patch("/api/agents/" + ID), "{\"chatOptions\": %s}".formatted(options))
+                    .andExpect(jsonPath("$.code").value(200));
+        }
+    }
+
+    @Test
     void allowedToolsMustNotContainNull() throws Exception {
         send(post("/api/agents"), "{\"name\": \"Research\", \"model\": \"deepseek-chat\", \"allowedTools\": [\"emailTool\", null]}")
                 .andExpect(jsonPath("$.code").value(400))

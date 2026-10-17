@@ -56,6 +56,19 @@ class ChatMessageMapperTest extends MapperTestSupport {
     }
 
     @Test
+    void selectRecentReturnsOnlyThatSessionsMessages() {
+        // the agent's memory must never include another chat's messages, even newer ones
+        UUID session = insertChatSession(null, "s");
+        UUID other = insertChatSession(null, "other");
+        insert(session, "user", "mine 1");
+        insert(other, "user", "theirs 1");
+        insert(session, "assistant", "mine 2");
+        insert(other, "user", "theirs 2");
+
+        assertThat(contents(mapper.selectRecentBySessionId(session, 10))).containsExactly("mine 1", "mine 2");
+    }
+
+    @Test
     void selectRecentWithLimitAboveRowCountReturnsAllMessages() {
         UUID session = insertChatSession(null, "s");
         insert(session, "user", "m1");
