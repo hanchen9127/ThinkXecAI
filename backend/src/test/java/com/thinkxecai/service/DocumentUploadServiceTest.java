@@ -154,6 +154,13 @@ class DocumentUploadServiceTest extends ServiceTestSupport {
     }
 
     @Test
+    void refusesANulCharacterInTheFileName() {
+        // a percent-encoded filename*= parameter can carry one; the document name is stored as text
+        assertRefusedBeforeAnyWork(insertKnowledgeBase("kb"), "gui\u0000de.md", bytes(MARKDOWN),
+                "file: name must not contain NUL characters");
+    }
+
+    @Test
     void refusesADocumentNestedTooDeeplyToParse() {
         // 20,000 nested list markers overflow the parser's stack (10,000 already do)
         assertRefusedBeforeAnyWork(insertKnowledgeBase("kb"), "guide.md", bytes("# A\n" + "- ".repeat(20_000) + "x"),

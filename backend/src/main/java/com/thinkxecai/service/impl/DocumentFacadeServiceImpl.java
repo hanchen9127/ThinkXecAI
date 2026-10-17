@@ -86,6 +86,10 @@ public class DocumentFacadeServiceImpl implements DocumentFacadeService {
             throw new BizException(400, "kbId: unknown knowledge base " + kbId);
         }
         String name = baseName(fileName);
+        if (name.indexOf('\u0000') >= 0) {
+            // A percent-encoded filename*= can carry one; the name is stored as text, which cannot hold it.
+            throw new BizException(400, "file: name must not contain NUL characters");
+        }
         if (name.length() > RequestLimits.NAME) {
             throw new BizException(400, "file: name is longer than " + RequestLimits.NAME + " characters");
         }

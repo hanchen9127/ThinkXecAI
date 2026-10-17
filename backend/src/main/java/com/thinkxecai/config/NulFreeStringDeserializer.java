@@ -5,16 +5,16 @@ import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.deser.std.StdScalarDeserializer;
 import com.fasterxml.jackson.databind.deser.std.StringDeserializer;
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
-import org.springframework.boot.jackson.JsonComponent;
 
 import java.io.IOException;
 
 /**
  * PostgreSQL cannot store the NUL character (U+0000) in text or jsonb, so a request text containing it
- * used to fail at the insert with a generic 500. Every JSON text value is checked while it is read, and
- * the request is refused with 400 naming the field ({@code name: invalid value}) before any service runs.
+ * used to fail at the insert with a generic 500. Every JSON text value of a request body is checked while
+ * it is read, and the request is refused with 400 naming the field ({@code name: invalid value}) before any
+ * service runs. Registered only for request bodies ({@link RequestBodyJsonConfig}), not on the shared
+ * ObjectMapper, which also reads chat-model replies.
  */
-@JsonComponent
 public class NulFreeStringDeserializer extends StdScalarDeserializer<String> {
 
     public NulFreeStringDeserializer() {
