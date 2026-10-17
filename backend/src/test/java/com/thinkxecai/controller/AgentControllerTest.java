@@ -16,6 +16,7 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -61,7 +62,7 @@ class AgentControllerTest {
                 .andExpect(jsonPath("$.data[0].description").value("Research agent"))
                 .andExpect(jsonPath("$.data[0].systemPrompt").value("Be brief."))
                 .andExpect(jsonPath("$.data[0].model").value("deepseek-chat"))
-                .andExpect(jsonPath("$.data[0].allowedTools[0]").value("databaseQuery"))
+                .andExpect(jsonPath("$.data[0].allowedTools[0]").value("dataBaseTool"))
                 .andExpect(jsonPath("$.data[0].allowedKbs[0]").value(KB.toString()))
                 .andExpect(jsonPath("$.data[0].chatOptions.temperature").value(0.7))
                 .andExpect(jsonPath("$.data[0].chatOptions.topP").value(1.0))
@@ -118,6 +119,19 @@ class AgentControllerTest {
     }
 
     @Test
+    void chatOptionsAtTheBoundariesAreAccepted() throws Exception {
+        // pins the inclusive bounds: e.g. topP < 1 would refuse the default 1.0
+        for (String options : new String[]{
+                "{\"temperature\": 0, \"topP\": 0, \"messageLength\": 1}",
+                "{\"temperature\": 2, \"topP\": 1.0, \"messageLength\": 100}"}) {
+            send(post("/api/agents"), "{\"name\": \"Research\", \"model\": \"deepseek-chat\", \"chatOptions\": %s}".formatted(options))
+                    .andExpect(jsonPath("$.code").value(200));
+            send(patch("/api/agents/" + ID), "{\"chatOptions\": %s}".formatted(options))
+                    .andExpect(jsonPath("$.code").value(200));
+        }
+    }
+
+    @Test
     void allowedToolsMustNotContainNull() throws Exception {
         send(post("/api/agents"), "{\"name\": \"Research\", \"model\": \"deepseek-chat\", \"allowedTools\": [\"emailTool\", null]}")
                 .andExpect(jsonPath("$.code").value(400))
@@ -137,6 +151,20 @@ class AgentControllerTest {
         send(post("/api/agents"), "{\"name\": \"Research\", \"model\": \"deepseek-chat\", \"allowedKbs\": [null]}")
                 .andExpect(jsonPath("$.code").value(400))
                 .andExpect(jsonPath("$.message").value("allowedKbs[0]: must not be null"));
+
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void tooManyListEntriesAreRejectedBeforeDuplicatesAreDropped() throws Exception {
+        String kbs = String.join(", ", Collections.nCopies(51, "\"" + ID + "\""));
+        send(post("/api/agents"), "{\"name\": \"Research\", \"model\": \"deepseek-chat\", \"allowedKbs\": [%s]}".formatted(kbs))
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value("allowedKbs: size must be between 0 and 50"));
+        String tools = String.join(", ", Collections.nCopies(51, "\"emailTool\""));
+        send(patch("/api/agents/" + ID), "{\"allowedTools\": [%s]}".formatted(tools))
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value("allowedTools: size must be between 0 and 50"));
 
         verifyNoInteractions(service);
     }
@@ -187,7 +215,7 @@ class AgentControllerTest {
                 .description(name + " agent")
                 .systemPrompt("Be brief.")
                 .model("deepseek-chat")
-                .allowedTools(List.of("databaseQuery"))
+                .allowedTools(List.of("dataBaseTool"))
                 .allowedKbs(List.of(KB.toString()))
                 .chatOptions(ChatOptions.defaults())
                 .createdAt(CREATED)

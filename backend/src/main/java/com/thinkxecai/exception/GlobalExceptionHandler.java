@@ -2,7 +2,9 @@ package com.thinkxecai.exception;
 
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.thinkxecai.common.ApiResponse;
+import com.thinkxecai.common.LogText;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.tomcat.util.http.fileupload.impl.SizeLimitExceededException;
 import org.springframework.beans.TypeMismatchException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -14,6 +16,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
 
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -31,6 +34,9 @@ public class GlobalExceptionHandler {
 
     static final String INTERNAL_ERROR_MESSAGE = "Internal server error";
 
+    @Value("${spring.servlet.multipart.max-request-size}")
+    private DataSize maxRequestSize;
+
     @Value("${spring.servlet.multipart.max-file-size}")
     private DataSize maxFileSize;
 
@@ -41,7 +47,7 @@ public class GlobalExceptionHandler {
             log.error("Internal business exception", ex);
             return ApiResponse.error(INTERNAL_ERROR_MESSAGE);
         }
-        log.warn("Business exception {}: {}", code, ex.getMessage());
+        log.warn("Business exception {}: {}", code, LogText.safe(ex.getMessage()));
         return ApiResponse.error(code, ex.getMessage());
     }
 
@@ -76,9 +82,24 @@ public class GlobalExceptionHandler {
     /** Thrown while the multipart request is read, before any controller; names the limit instead of a generic message. */
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ApiResponse<Void> handleUploadTooLarge(MaxUploadSizeExceededException ex) {
-        long kilobytes = maxFileSize.toKilobytes();
-        String limit = kilobytes % 1024 == 0 ? kilobytes / 1024 + " MB" : kilobytes + " KB";
-        return badRequest("file: too large (maximum " + limit + ")");
+        // Tomcat reports the whole request (all parts together) over max-request-size with its own exception.
+        for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
+            if (cause instanceof SizeLimitExceededException) {
+                return badRequest("request: too large (maximum " + readable(maxRequestSize) + ")");
+            }
+        }
+        return badRequest("file: too large (maximum " + readable(maxFileSize) + ")");
+    }
+
+    private static String readable(DataSize size) {
+        long kilobytes = size.toKilobytes();
+        return kilobytes % 1024 == 0 ? kilobytes / 1024 + " MB" : kilobytes + " KB";
+    }
+
+    /** A body that is not valid multipart (MaxUploadSizeExceededException, a subclass, is handled above). */
+    @ExceptionHandler(MultipartException.class)
+    public ApiResponse<Void> handleMalformedMultipart(MultipartException ex) {
+        return badRequest("Malformed multipart request");
     }
 
     @ExceptionHandler(Exception.class)
@@ -87,7 +108,7 @@ public class GlobalExceptionHandler {
         // parameter) carry a 4xx status; they are not server failures.
         if (ex instanceof ErrorResponse errorResponse && errorResponse.getStatusCode().is4xxClientError()) {
             if (errorResponse.getStatusCode().value() == 404) {
-                log.warn("Not found: {}", ex.getMessage());
+                log.warn("Not found: {}", LogText.safe(ex.getMessage()));
                 return ApiResponse.error(404, "Not found");
             }
             String detail = errorResponse.getBody().getDetail();
@@ -98,7 +119,7 @@ public class GlobalExceptionHandler {
     }
 
     private static ApiResponse<Void> badRequest(String message) {
-        log.warn("Bad request: {}", message);
+        log.warn("Bad request: {}", LogText.safe(message));
         return ApiResponse.error(400, message);
     }
 

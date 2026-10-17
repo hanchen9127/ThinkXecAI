@@ -1,6 +1,11 @@
 # Secret placeholders below default to empty (${VAR:}) rather than failing here directly -
 # Spring's relaxed property binding silently accepts an unresolved bare ${VAR}, so the real
 # fail-fast check lives in RequiredSecretsValidator (com.thinkxecai.config), not in this file.
+# The API has no authentication, so it is reachable from this machine only; HostCheckFilter also
+# refuses host names other than localhost / 127.0.0.1 (DNS rebinding).
+server:
+  address: 127.0.0.1
+
 spring:
   application:
     name: thinkxecai-backend
@@ -28,6 +33,12 @@ spring:
     username: postgres
     password: ${THINKXECAI_DB_PASSWORD:}
     driver-class-name: org.postgresql.Driver
+    # Timestamp columns are TIMESTAMP (no zone) filled by now() / clock_timestamp(), which use the
+    # session zone. The driver sets that to the JVM zone at connect (an options=-c TimeZone=... URL
+    # parameter is overridden by it), so each pooled connection switches to UTC: no daylight-saving
+    # jump can make a later row look older. DatabaseTool sets the same for its own connections.
+    hikari:
+      connection-init-sql: SET TIME ZONE 'UTC'
 
   ai:
     model:
@@ -76,6 +87,9 @@ mybatis:
 thinkxecai:
   document:
     storage-path: ./data/documents
+  # How long an Ollama call (embedding an upload's titles or a search query) may wait for an answer.
+  ollama:
+    read-timeout: 60s
   # The email tool sends through the Gmail API. Everything here is optional: startup never checks it, and
   # a send with any Gmail value missing tells the model which variables are missing (values never shown).
   mail:

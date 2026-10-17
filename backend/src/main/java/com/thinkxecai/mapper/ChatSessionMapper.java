@@ -14,6 +14,9 @@ public interface ChatSessionMapper {
 
     ChatSessionEntity selectById(@Param("id") UUID id);
 
+    /** Locks the row as the touch before a new message does: no delete, no agent change, one message at a time (ADR 037). */
+    ChatSessionEntity selectByIdForNoKeyUpdate(@Param("id") UUID id);
+
     /** Ordered by updated_at DESC. */
     List<ChatSessionEntity> listAll();
 

@@ -2,6 +2,7 @@ package com.thinkxecai.model.request;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.util.UUID;
@@ -18,6 +19,7 @@ public class CreateDocumentRequest {
     @NotNull
     private UUID kbId;
     @NotBlank
+    @Size(max = RequestLimits.NAME)
     private String name;
 
 }

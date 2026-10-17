@@ -106,6 +106,15 @@ class ChatSessionControllerTest {
     }
 
     @Test
+    void updateRejectsABlankTitle() throws Exception {
+        send(patch("/api/chat-sessions/" + ID), "{\"title\": \"  \"}")
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value("title: must not be blank"));
+
+        verifyNoInteractions(service);
+    }
+
+    @Test
     void updateReturnsTheSessionObject() throws Exception {
         when(service.updateChatSession(eq(ID), any())).thenReturn(vo("Renamed"));
 

@@ -7,9 +7,11 @@ import com.thinkxecai.model.vo.DocumentVO;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.BeanPropertyRowMapper;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -24,11 +26,14 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -49,6 +54,9 @@ class DocumentUploadServiceTest extends ServiceTestSupport {
     @MockitoBean
     private EmbeddingModel embeddingModel;
 
+    @MockitoSpyBean
+    private DocumentStorageService storage;
+
     @DynamicPropertySource
     static void useTemporaryStorage(DynamicPropertyRegistry registry) {
         registry.add("thinkxecai.document.storage-path", STORAGE::toString);
@@ -67,7 +75,8 @@ class DocumentUploadServiceTest extends ServiceTestSupport {
         assertThat(filePath).matches(kb + "/" + document.getId() + "/[0-9a-f-]{36}\\.md");
         assertThat(Files.readString(STORAGE.resolve(filePath))).isEqualTo(MARKDOWN);
 
-        List<ChunkEntity> chunks = chunkMapper.listByDocId(UUID.fromString(document.getId()));
+        List<ChunkEntity> chunks = jdbcTemplate.query("SELECT id, kb_id, title, content FROM chunk_bge_m3 WHERE doc_id = ?",
+                new BeanPropertyRowMapper<>(ChunkEntity.class), UUID.fromString(document.getId()));
         assertThat(chunks).extracting(ChunkEntity::getTitle).containsExactlyInAnyOrderElementsOf(TITLES);
         assertThat(chunks).filteredOn(chunk -> chunk.getTitle().equals("Usage"))
                 .extracting(ChunkEntity::getContent).containsExactly("| a | b |\n|---|---|\n| 1 | 2 |");
@@ -98,6 +107,64 @@ class DocumentUploadServiceTest extends ServiceTestSupport {
         for (String name : new String[]{"notes.txt", "README", ".md", "guide.md.exe", "", null}) {
             assertRefusedBeforeAnyWork(kb, name, bytes(MARKDOWN), "file: only Markdown files");
         }
+    }
+
+    @Test
+    void acceptsAFileNameOf200CharactersNotCountingTheClientPath() {
+        UUID kb = insertKnowledgeBase("kb");
+        when(embeddingModel.embed(List.of("Install"))).thenReturn(List.of(vector(0)));
+        String longest = "a".repeat(197) + ".md";
+
+        DocumentVO document = documentFacadeService.uploadDocument(kb, "C:\\docs\\" + longest, bytes("# Install\nx"));
+
+        assertThat(document.getName()).isEqualTo(longest);
+    }
+
+    @Test
+    void refusesAFileNameLongerThan200Characters() {
+        assertRefusedBeforeAnyWork(insertKnowledgeBase("kb"), "a".repeat(198) + ".md", bytes(MARKDOWN),
+                "file: name is longer than 200 characters");
+    }
+
+    @Test
+    void acceptsAtMost500SectionsAndEmbedsThemInOneCall() {
+        UUID kb = insertKnowledgeBase("kb");
+        // Distinct vectors away from RagServiceTest's query point: rolled-back rows stay in the HNSW index until
+        // VACUUM, and 500 copies of one vector there crowded that test's small knowledge base out of the scan.
+        when(embeddingModel.embed(anyList())).thenAnswer(call -> IntStream.range(0, ((List<?>) call.getArgument(0)).size())
+                .mapToObj(i -> vector(100 + i)).toList());
+
+        DocumentVO document = documentFacadeService.uploadDocument(kb, "guide.md", bytes("# s\nx\n".repeat(500)));
+
+        assertThat(countRows("chunk_bge_m3", "doc_id = ?", UUID.fromString(document.getId()))).isEqualTo(500);
+        verify(embeddingModel).embed(anyList());
+    }
+
+    @Test
+    void refusesMoreThan500Sections() {
+        assertRefusedBeforeAnyWork(insertKnowledgeBase("kb"), "guide.md", bytes("# s\n".repeat(501)),
+                "file: has more than 500 sections");
+    }
+
+    @Test
+    void refusesNulCharacters() {
+        // valid UTF-8, but PostgreSQL cannot store it; refused before the embedding call instead of failing after it
+        assertRefusedBeforeAnyWork(insertKnowledgeBase("kb"), "guide.md", bytes("# A\na\u0000b"),
+                "file: must not contain NUL characters");
+    }
+
+    @Test
+    void refusesANulCharacterInTheFileName() {
+        // a percent-encoded filename*= parameter can carry one; the document name is stored as text
+        assertRefusedBeforeAnyWork(insertKnowledgeBase("kb"), "gui\u0000de.md", bytes(MARKDOWN),
+                "file: name must not contain NUL characters");
+    }
+
+    @Test
+    void refusesADocumentNestedTooDeeplyToParse() {
+        // 20,000 nested list markers overflow the parser's stack (10,000 already do)
+        assertRefusedBeforeAnyWork(insertKnowledgeBase("kb"), "guide.md", bytes("# A\n" + "- ".repeat(20_000) + "x"),
+                "file: is nested too deeply to read");
     }
 
     @Test
@@ -140,6 +207,27 @@ class DocumentUploadServiceTest extends ServiceTestSupport {
 
             assertThatThrownBy(() -> documentFacadeService.uploadDocument(kb, "guide.md", bytes(MARKDOWN)))
                     .hasMessageContaining("1024");
+
+            assertNothingStored(kb);
+        } finally {
+            deleteCommittedKnowledgeBase(kb);
+        }
+    }
+
+    /** The cleanup is registered before the file is written, so even a write that fails halfway is removed. */
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void aSaveThatFailsAfterWritingLeavesNoFile() {
+        UUID kb = insertKnowledgeBase("kb");
+        try {
+            when(embeddingModel.embed(TITLES)).thenReturn(List.of(vector(0), vector(1)));
+            doAnswer(invocation -> {
+                invocation.callRealMethod();
+                throw new UncheckedIOException(new IOException("disk full"));
+            }).when(storage).save(any(), any(), any(), any());
+
+            assertThatThrownBy(() -> documentFacadeService.uploadDocument(kb, "guide.md", bytes(MARKDOWN)))
+                    .hasMessageContaining("disk full");
 
             assertNothingStored(kb);
         } finally {

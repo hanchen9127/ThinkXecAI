@@ -1,6 +1,7 @@
 services:
   postgres:
-    image: pgvector/pgvector:pg18
+    # Exact version: hnsw.iterative_scan (strict-order filtered search, ADR 024) needs pgvector 0.8 or later.
+    image: pgvector/pgvector:0.8.6-pg18
     container_name: thinkxecai-postgres
     restart: unless-stopped
     environment:
@@ -8,7 +9,8 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${THINKXECAI_DB_PASSWORD}
     ports:
-      - "5433:5432"
+      # Loopback only: the superuser login must not be reachable from other machines.
+      - "127.0.0.1:5433:5432"
     volumes:
       - thinkxecai-postgres-data:/var/lib/postgresql
       - ./db/init:/docker-entrypoint-initdb.d

@@ -9,7 +9,7 @@ import java.util.UUID;
 /**
  * SQL lives in resources/mapper/ChatMessageMapper.xml. Message order relies on
  * chat_message.created_at DEFAULT clock_timestamp(), which keeps insert order even within one
- * transaction.
+ * transaction. Messages are never updated: history stays what the agent saw (ADR 031).
  */
 public interface ChatMessageMapper {
 
@@ -26,9 +26,6 @@ public interface ChatMessageMapper {
      * Not the first {@code limit} messages: a long session must still include the newest question.
      */
     List<ChatMessageEntity> selectRecentBySessionId(@Param("sessionId") UUID sessionId, @Param("limit") int limit);
-
-    /** PATCH semantics: only non-null fields change; updated_at is always set to now(). */
-    int update(ChatMessageEntity entity);
 
     int deleteById(@Param("id") UUID id);
 

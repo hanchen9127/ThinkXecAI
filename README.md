@@ -98,6 +98,10 @@ Required variables (the backend fails fast at startup if any is missing):
 | `THINKXECAI_GEMINI_API_KEY`   | Gemini API key (`gemini-3.8-flash`) |
 | `THINKXECAI_DEEPSEEK_API_KEY` | DeepSeek API key (`deepseek-chat`)  |
 
+Messages, documents found by the knowledge tool, and tool results are sent to the chosen model's
+provider. On Gemini's free tier Google may use submitted content to improve its products, so use a
+paid key (or DeepSeek) before working with private data.
+
 Optional variables, only for the email tool. Startup never checks them; until all four Gmail
 values are set, the tool answers that email is not configured and names what is missing.
 
@@ -159,9 +163,19 @@ only when that address is on the allowlist.
 docker compose up -d
 ```
 
-This starts `pgvector/pgvector:pg18` on `localhost:5433`, database `thinkxecai`, and runs
-the initialization scripts in `db/init/` (core schema, vector index, and sample
+This starts `pgvector/pgvector:0.8.6-pg18` on `localhost:5433` (published on `127.0.0.1` only), database
+`thinkxecai`, and runs the initialization scripts in `db/init/` (core schema, vector index, and sample
 e-commerce data used by the database query tool).
+
+The scripts run only when the data volume is empty, so a database created by an older version of
+`db/init/` keeps its old schema. To start over (this deletes all data), and to check that the scripts
+succeeded — if one fails, the container restarts and then runs without finishing them:
+
+```bash
+docker compose down -v
+docker compose up -d --wait
+docker compose logs postgres | grep -E "ERROR|init process complete"
+```
 
 ### 3. Run the backend
 
@@ -171,10 +185,12 @@ mvn spring-boot:run
 ```
 
 The API listens on `http://localhost:8080`, with all REST endpoints under `/api` and SSE
-under `/sse`. Env vars in `.env` need to be loaded into the process environment (e.g. via
+under `/sse`. It has no authentication, so it listens on `127.0.0.1` only and answers only requests
+addressed to `localhost` or `127.0.0.1` (others get HTTP 403); open it as `http://localhost:8080`,
+not by a LAN address. Env vars in `.env` need to be loaded into the process environment (e.g. via
 your shell, an IDE run configuration, or a tool like `direnv`).
 Uploaded files are stored under `data/documents/` relative to the working directory (gitignored).
-The backend starts without Ollama; it is needed when a document is uploaded or a knowledge base is
+The backend starts without Ollama; it is needed (and given 60 seconds per call) when a document is uploaded or a knowledge base is
 searched.
 
 ### 4. Run the frontend
@@ -208,20 +224,24 @@ All JSON REST endpoints live under `/api` and return a consistent envelope:
 The HTTP status is always 200; errors set `code` and `data: null`, with an English `message`:
 `400` for invalid input (the message names the field), `404` for a missing resource, `409` for a
 conflict (such as a user message to a session whose agent was deleted), and a generic `500` for
-anything else.
+anything else. The one exception is a request whose `Host` is not `localhost` / `127.0.0.1`: it
+never reaches the API and gets HTTP 403 (with the same envelope, code `403`).
+
+Timestamps (`createdAt`, `updatedAt`) are UTC, written without an offset (`2026-10-17T03:15:00`).
 
 | Resource        | Endpoints                                                                 |
 |-----------------|---------------------------------------------------------------------------|
 | Agents          | `GET/POST /agents`, `PATCH/DELETE /agents/{agentId}` |
 | Chat sessions   | `GET/POST /chat-sessions`, `GET/PATCH/DELETE /chat-sessions/{chatSessionId}`, `GET /chat-sessions/agent/{agentId}` |
-| Chat messages   | `GET /chat-messages/session/{sessionId}`, `POST /chat-messages`, `PATCH/DELETE /chat-messages/{chatMessageId}` |
+| Chat messages   | `GET /chat-messages/session/{sessionId}`, `POST /chat-messages` (user messages only), `DELETE /chat-messages/{chatMessageId}` |
 | Knowledge bases | `GET/POST /knowledge-bases`, `PATCH/DELETE /knowledge-bases/{knowledgeBaseId}` |
 | Documents       | `GET/POST /documents`, `GET /documents/kb/{kbId}`, `POST /documents/upload`, `PATCH/DELETE /documents/{documentId}` |
 | Tools           | `GET /tools` (optional tools only) |
 
 `POST /documents/upload` takes a `multipart/form-data` form with `kbId` and one `file`: a UTF-8
-Markdown file (`.md` or `.markdown`, at most 1 MB) with at least one heading. Each heading starts
-a section; the section titles are embedded and the original Markdown below each heading is stored
+Markdown file (`.md` or `.markdown`, at most 1 MB, no NUL characters) with at least one and at most 500
+headings with text. Each heading starts a section; the section titles are embedded and the original
+Markdown below each heading is stored
 as the chunk. The upload either fully succeeds or leaves no document, chunk, or file behind.
 `GET /tools` returns the optional tools an agent can choose, as `{ name, description, type }`;
 fixed tools are given to every agent and are not listed. An agent's `allowedTools` may only name

@@ -15,10 +15,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class AgentConverterTest {
 
-    private final AgentConverter converter = new AgentConverter(new ObjectMapper());
+    private static final ObjectMapper JSON = new ObjectMapper();
+
+    private final AgentConverter converter = new AgentConverter(JSON);
 
     @Test
-    void jsonFieldsRoundTripBetweenDtoAndEntity() {
+    void jsonFieldsRoundTripBetweenDtoAndEntity() throws Exception {
         AgentDTO dto = AgentDTO.builder()
                 .id(UUID.randomUUID())
                 .name("Research Agent")
@@ -33,13 +35,38 @@ class AgentConverterTest {
                 .build();
 
         AgentEntity entity = converter.toEntity(dto);
-        assertThat(entity.getAllowedTools()).contains("dataBaseTool");
-        assertThat(entity.getChatOptions()).contains("0.3");
+        assertThat(JSON.readTree(entity.getAllowedTools())).isEqualTo(JSON.readTree("[\"dataBaseTool\"]"));
+        assertThat(JSON.readTree(entity.getChatOptions()))
+                .isEqualTo(JSON.readTree("{\"temperature\": 0.3, \"topP\": 0.9, \"messageLength\": 5}"));
 
         AgentDTO roundTripped = converter.toDTO(entity);
         assertThat(roundTripped.getAllowedTools()).isEqualTo(dto.getAllowedTools());
         assertThat(roundTripped.getAllowedKbs()).isEqualTo(dto.getAllowedKbs());
         assertThat(roundTripped.getChatOptions()).isEqualTo(dto.getChatOptions());
+    }
+
+    @Test
+    void absentJsonFieldsStayNullSoTheColumnDefaultsApply() {
+        // a JSON null would be stored instead of the column default (ADR 009) and read back as null
+        AgentEntity entity = converter.toEntity(AgentDTO.builder().name("a").model("deepseek-chat").build());
+
+        assertThat(entity.getAllowedTools()).isNull();
+        assertThat(entity.getAllowedKbs()).isNull();
+        assertThat(entity.getChatOptions()).isNull();
+    }
+
+    @Test
+    void storedChatOptionsFallBackToTheDefaultsWhenBlankOrMissingKeys() {
+        ChatOptions defaults = ChatOptions.builder().temperature(0.7).topP(1.0).messageLength(10).build();
+
+        assertThat(converter.toDTO(entityWithChatOptions(null)).getChatOptions()).isEqualTo(defaults);
+        assertThat(converter.toDTO(entityWithChatOptions(" ")).getChatOptions()).isEqualTo(defaults);
+        assertThat(converter.toDTO(entityWithChatOptions("{\"messageLength\": 30}")).getChatOptions())
+                .isEqualTo(ChatOptions.builder().temperature(0.7).topP(1.0).messageLength(30).build());
+    }
+
+    private static AgentEntity entityWithChatOptions(String json) {
+        return AgentEntity.builder().name("a").model("deepseek-chat").allowedTools("[]").allowedKbs("[]").chatOptions(json).build();
     }
 
     @Test

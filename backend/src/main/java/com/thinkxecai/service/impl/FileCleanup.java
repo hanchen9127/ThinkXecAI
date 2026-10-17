@@ -25,13 +25,19 @@ final class FileCleanup {
         });
     }
 
-    /** Runs {@code deletion} if the current transaction ends without committing. */
+    /**
+     * Runs {@code deletion} if the current transaction rolled back. When the outcome is unknown (the
+     * commit may have gone through) the files are kept: deleting them could leave stored rows pointing
+     * at missing files, while keeping them at worst leaves an orphaned directory.
+     */
     static void unlessCommitted(String what, Runnable deletion) {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCompletion(int status) {
-                if (status != STATUS_COMMITTED) {
+                if (status == STATUS_ROLLED_BACK) {
                     runLogged(what, deletion);
+                } else if (status == STATUS_UNKNOWN) {
+                    log.warn("Outcome of the transaction for {} is unknown; its files are kept", what);
                 }
             }
         });

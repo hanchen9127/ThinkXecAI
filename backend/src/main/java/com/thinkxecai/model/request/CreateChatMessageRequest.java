@@ -1,24 +1,23 @@
 package com.thinkxecai.model.request;
 
-import com.thinkxecai.model.ChatMessageMetadata;
-import com.thinkxecai.model.ChatMessageRole;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.util.UUID;
 
 /**
- * There is no agentId: the agent is resolved from the session. A user message must have non-blank
- * content (checked by the service, since the rule depends on the role).
+ * Always a user message (ADR 031): there is no role, metadata, or agentId. Assistant, tool, and system
+ * messages are written only by the agent runtime; the agent is resolved from the session.
  */
 @Data
 public class CreateChatMessageRequest {
 
     @NotNull
     private UUID sessionId;
-    @NotNull
-    private ChatMessageRole role;
+    @NotBlank
+    @Size(max = RequestLimits.TEXT)
     private String content;
-    private ChatMessageMetadata metadata;
 
 }

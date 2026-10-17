@@ -45,20 +45,55 @@ class DocumentUploadSizeLimitTest {
         assertThat(response.get("message").asText()).isEqualTo("file: too large (maximum 1 MB)");
     }
 
-    private JsonNode upload(int size) {
-        byte[] content = new byte[size];
-        content[0] = '#';
+    @Test
+    void aRequestOverTheRequestLimitNamesThatLimit() {
+        // eleven parts under the file limit, together over the 10 MB request limit
         MultiValueMap<String, Object> form = new LinkedMultiValueMap<>();
         form.add("kbId", UUID.randomUUID().toString());
-        form.add("file", new ByteArrayResource(content) {
+        for (int i = 0; i < 11; i++) {
+            form.add("file", file(1_000_000));
+        }
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+
+        JsonNode response = restTemplate.postForObject("/api/documents/upload", new HttpEntity<>(form, headers), JsonNode.class);
+
+        assertThat(response.get("code").asInt()).isEqualTo(400);
+        assertThat(response.get("message").asText()).isEqualTo("request: too large (maximum 10 MB)");
+    }
+
+    @Test
+    void aMalformedMultipartBodyIsAClientError() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType("multipart/form-data; boundary=b"));
+        // a part that starts but never ends: the container cannot read the body
+        String truncated = "--b\r\nContent-Disposition: form-data; name=\"kbId\"\r\n\r\nabc";
+
+        JsonNode response = restTemplate.postForObject("/api/documents/upload",
+                new HttpEntity<>(truncated, headers), JsonNode.class);
+
+        assertThat(response.get("code").asInt()).isEqualTo(400);
+        assertThat(response.get("message").asText()).isEqualTo("Malformed multipart request");
+    }
+
+    private JsonNode upload(int size) {
+        MultiValueMap<String, Object> form = new LinkedMultiValueMap<>();
+        form.add("kbId", UUID.randomUUID().toString());
+        form.add("file", file(size));
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+        return restTemplate.postForObject("/api/documents/upload", new HttpEntity<>(form, headers), JsonNode.class);
+    }
+
+    private static ByteArrayResource file(int size) {
+        byte[] content = new byte[size];
+        content[0] = '#';
+        return new ByteArrayResource(content) {
             @Override
             public String getFilename() {
                 return "big.md";
             }
-        });
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
-        return restTemplate.postForObject("/api/documents/upload", new HttpEntity<>(form, headers), JsonNode.class);
+        };
     }
 
 }

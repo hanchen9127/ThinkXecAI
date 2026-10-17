@@ -20,6 +20,12 @@ public interface AgentMapper {
 
     AgentEntity selectById(@Param("id") UUID id);
 
+    /** Locks the row against deletion and changes until the transaction ends (a reference check, ADR 037). */
+    AgentEntity selectByIdForShare(@Param("id") UUID id);
+
+    /** Locks the row for a read-merge-write update; a concurrent update waits (ADR 037). */
+    AgentEntity selectByIdForUpdate(@Param("id") UUID id);
+
     /** Ordered by created_at DESC. */
     List<AgentEntity> listAll();
 

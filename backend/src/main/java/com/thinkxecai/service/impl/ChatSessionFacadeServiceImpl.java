@@ -46,7 +46,8 @@ public class ChatSessionFacadeServiceImpl implements ChatSessionFacadeService {
     @Override
     @Transactional
     public ChatSessionVO createChatSession(CreateChatSessionRequest request) {
-        if (request.getAgentId() != null && agentMapper.selectById(request.getAgentId()) == null) {
+        // FOR SHARE: the agent cannot be deleted before this session is saved (ADR 037).
+        if (request.getAgentId() != null && agentMapper.selectByIdForShare(request.getAgentId()) == null) {
             throw new BizException(400, "agentId: unknown agent " + request.getAgentId());
         }
         ChatSessionDTO dto = chatSessionConverter.fromCreateRequest(request);

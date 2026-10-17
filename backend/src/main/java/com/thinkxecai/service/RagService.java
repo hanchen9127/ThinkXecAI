@@ -11,7 +11,8 @@ public interface RagService {
 
     /**
      * Contents of the 3 chunks of the knowledge base whose titles are nearest to the query, nearest
-     * first. Fewer only when the knowledge base has fewer chunks; empty for an unknown knowledge base.
+     * first; empty for an unknown knowledge base. Fewer when the knowledge base has fewer chunks, or,
+     * on a very large table, when the index scan stops at {@code hnsw.max_scan_tuples} first (ADR 024).
      */
     List<String> search(UUID kbId, String query);
 

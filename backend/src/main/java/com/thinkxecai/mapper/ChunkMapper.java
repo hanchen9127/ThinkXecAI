@@ -19,12 +19,6 @@ public interface ChunkMapper {
     /** Includes the embedding. */
     ChunkEntity selectById(@Param("id") UUID id);
 
-    /** Chunks of one document, without embeddings. */
-    List<ChunkEntity> listByDocId(@Param("docId") UUID docId);
-
-    /** Removes a document's chunks before it is re-ingested; returns the number deleted. */
-    int deleteByDocId(@Param("docId") UUID docId);
-
     /**
      * Makes filtered HNSW searches in the current transaction keep scanning until {@code limit} rows
      * pass the {@code kb_id} filter. Without it the index returns about {@code hnsw.ef_search} (40)

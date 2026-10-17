@@ -46,8 +46,12 @@ public class KnowledgeBaseFacadeServiceImpl implements KnowledgeBaseFacadeServic
     @Override
     @Transactional
     public KnowledgeBaseVO updateKnowledgeBase(UUID knowledgeBaseId, UpdateKnowledgeBaseRequest request) {
-        KnowledgeBaseDTO existing = knowledgeBaseConverter.toDTO(findExisting(knowledgeBaseId));
-        KnowledgeBaseDTO updated = knowledgeBaseConverter.applyUpdateRequest(existing, request);
+        // FOR UPDATE: a concurrent update waits instead of writing back the fields this one changes (ADR 037).
+        KnowledgeBaseEntity locked = knowledgeBaseMapper.selectByIdForUpdate(knowledgeBaseId);
+        if (locked == null) {
+            throw notFound();
+        }
+        KnowledgeBaseDTO updated = knowledgeBaseConverter.applyUpdateRequest(knowledgeBaseConverter.toDTO(locked), request);
         knowledgeBaseMapper.update(knowledgeBaseConverter.toEntity(updated));
         return toVO(findExisting(knowledgeBaseId));
     }

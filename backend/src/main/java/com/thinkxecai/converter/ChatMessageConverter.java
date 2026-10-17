@@ -8,11 +8,11 @@ import com.thinkxecai.model.ChatMessageRole;
 import com.thinkxecai.model.dto.ChatMessageDTO;
 import com.thinkxecai.model.entity.ChatMessageEntity;
 import com.thinkxecai.model.request.CreateChatMessageRequest;
-import com.thinkxecai.model.request.UpdateChatMessageRequest;
 import com.thinkxecai.model.vo.ChatMessageVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.Locale;
 
 @Component
 @RequiredArgsConstructor
@@ -27,7 +27,7 @@ public class ChatMessageConverter {
         return ChatMessageDTO.builder()
                 .id(entity.getId())
                 .sessionId(entity.getSessionId())
-                .role(ChatMessageRole.valueOf(entity.getRole().toUpperCase()))
+                .role(ChatMessageRole.valueOf(entity.getRole().toUpperCase(Locale.ROOT)))
                 .content(entity.getContent())
                 .metadata(readMetadata(entity.getMetadata()))
                 .createdAt(entity.getCreatedAt())
@@ -65,20 +65,13 @@ public class ChatMessageConverter {
                 .build();
     }
 
+    /** The API creates only user messages, without metadata (ADR 031). */
     public ChatMessageDTO fromCreateRequest(CreateChatMessageRequest request) {
         return ChatMessageDTO.builder()
                 .sessionId(request.getSessionId())
-                .role(request.getRole())
+                .role(ChatMessageRole.USER)
                 .content(request.getContent())
-                .metadata(request.getMetadata())
                 .build();
-    }
-
-    /** Merges non-null fields from an UpdateChatMessageRequest onto the existing DTO (PATCH semantics). */
-    public ChatMessageDTO applyUpdateRequest(ChatMessageDTO existing, UpdateChatMessageRequest request) {
-        if (request.getContent() != null) existing.setContent(request.getContent());
-        if (request.getMetadata() != null) existing.setMetadata(request.getMetadata());
-        return existing;
     }
 
     private ChatMessageMetadata readMetadata(String json) {

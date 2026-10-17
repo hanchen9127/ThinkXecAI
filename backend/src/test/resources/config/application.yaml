@@ -1,0 +1,9 @@
+# Test-only overrides, merged over src/main/resources/application.yaml (classpath:/config/ wins).
+# Each cached test context keeps its own connection pool; Hikari's default of 10 idle connections per
+# pool came close to PostgreSQL's 100-connection limit and once failed a test with "Failed to obtain
+# JDBC Connection". A small pool that shrinks when idle leaves room for the SQL tool's own connections.
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1

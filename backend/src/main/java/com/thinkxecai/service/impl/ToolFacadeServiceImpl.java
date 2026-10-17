@@ -2,6 +2,7 @@ package com.thinkxecai.service.impl;
 
 import com.thinkxecai.agent.tool.Tool;
 import com.thinkxecai.agent.tool.ToolType;
+import com.thinkxecai.common.LogText;
 import com.thinkxecai.model.vo.ToolVO;
 import com.thinkxecai.service.ToolFacadeService;
 import lombok.extern.slf4j.Slf4j;
@@ -72,7 +73,7 @@ public class ToolFacadeServiceImpl implements ToolFacadeService {
                 .sorted()
                 .toList();
         if (!skipped.isEmpty()) {
-            log.warn("Skipping allowedTools entries that are not optional tools: {}", skipped);
+            log.warn("Skipping allowedTools entries that are not optional tools: {}", LogText.safe(skipped));
         }
         Object[] selected = tools.stream()
                 .filter(tool -> tool.getType() == ToolType.FIXED || requested.contains(tool.getName()))

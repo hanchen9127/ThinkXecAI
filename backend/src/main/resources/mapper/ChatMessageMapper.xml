@@ -40,16 +40,6 @@
         ORDER BY created_at ASC
     </select>
 
-    <update id="update">
-        UPDATE chat_message
-        <set>
-            <if test="content != null">content = #{content},</if>
-            <if test="metadata != null">metadata = #{metadata}::jsonb,</if>
-            updated_at = now()
-        </set>
-        WHERE id = #{id}
-    </update>
-
     <delete id="deleteById">
         DELETE FROM chat_message
         WHERE id = #{id}

@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * Section content is cut from the source text by node offsets, so tables, code blocks, links and
@@ -21,6 +22,8 @@ import java.util.List;
 public class MarkdownParserServiceImpl implements MarkdownParserService {
 
     private static final char BYTE_ORDER_MARK = '﻿';
+    /** Whole lines that are empty or hold only spaces and tabs, at the start of the content. */
+    private static final Pattern LEADING_BLANK_LINES = Pattern.compile("\\A(?:[ \\t]*\\n)+");
 
     private final Parser parser = Parser.builder(new MutableDataSet()).build();
 
@@ -42,7 +45,9 @@ public class MarkdownParserServiceImpl implements MarkdownParserService {
                 continue;
             }
             int contentEnd = i + 1 < headings.size() ? headings.get(i + 1).getStartOffset() : text.length();
-            String content = text.substring(heading.getEndOffset(), contentEnd).strip();
+            // Not strip(): the first line's indentation is part of the Markdown (an indented code block, ADR 035).
+            String content = LEADING_BLANK_LINES.matcher(text.substring(heading.getEndOffset(), contentEnd))
+                    .replaceFirst("").stripTrailing();
             sections.add(new MarkdownSection(title, content));
         }
         return sections;

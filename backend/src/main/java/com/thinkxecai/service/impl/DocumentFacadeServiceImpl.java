@@ -10,6 +10,7 @@ import com.thinkxecai.model.dto.DocumentDTO;
 import com.thinkxecai.model.entity.ChunkEntity;
 import com.thinkxecai.model.entity.DocumentEntity;
 import com.thinkxecai.model.request.CreateDocumentRequest;
+import com.thinkxecai.model.request.RequestLimits;
 import com.thinkxecai.model.request.UpdateDocumentRequest;
 import com.thinkxecai.model.vo.DocumentVO;
 import com.thinkxecai.service.DocumentFacadeService;
@@ -37,6 +38,8 @@ public class DocumentFacadeServiceImpl implements DocumentFacadeService {
 
     /** The stored file's extension always comes from this list, never from the client's file name. */
     private static final Set<String> MARKDOWN_EXTENSIONS = Set.of("md", "markdown");
+    /** Sections per upload (ADR 036): one embedding request carries every title. */
+    private static final int MAX_SECTIONS = 500;
 
     private final DocumentMapper documentMapper;
     private final KnowledgeBaseMapper knowledgeBaseMapper;
@@ -63,7 +66,8 @@ public class DocumentFacadeServiceImpl implements DocumentFacadeService {
     @Override
     @Transactional
     public DocumentVO createDocument(CreateDocumentRequest request) {
-        if (knowledgeBaseMapper.selectById(request.getKbId()) == null) {
+        // FOR SHARE: the knowledge base cannot be deleted before this document is saved (ADR 037).
+        if (knowledgeBaseMapper.selectByIdForShare(request.getKbId()) == null) {
             throw new BizException(400, "kbId: unknown knowledge base " + request.getKbId());
         }
         DocumentDTO dto = documentConverter.fromCreateRequest(request);
@@ -82,13 +86,29 @@ public class DocumentFacadeServiceImpl implements DocumentFacadeService {
             throw new BizException(400, "kbId: unknown knowledge base " + kbId);
         }
         String name = baseName(fileName);
+        if (name.indexOf('\u0000') >= 0) {
+            // A percent-encoded filename*= can carry one; the name is stored as text, which cannot hold it.
+            throw new BizException(400, "file: name must not contain NUL characters");
+        }
+        if (name.length() > RequestLimits.NAME) {
+            throw new BizException(400, "file: name is longer than " + RequestLimits.NAME + " characters");
+        }
         String extension = markdownExtension(name);
         if (content.length == 0) {
             throw new BizException(400, "file: is empty");
         }
-        List<MarkdownSection> sections = markdownParserService.parse(decodeUtf8(content));
+        String text = decodeUtf8(content);
+        if (text.indexOf('\u0000') >= 0) {
+            // Valid UTF-8, but PostgreSQL text cannot hold it: the chunk insert would fail after the embedding call.
+            throw new BizException(400, "file: must not contain NUL characters");
+        }
+        List<MarkdownSection> sections = parse(text);
         if (sections.isEmpty()) {
             throw new BizException(400, "file: has no heading with text; at least one is needed to create searchable sections");
+        }
+        if (sections.size() > MAX_SECTIONS) {
+            // All titles go to Ollama in one request and every section becomes a row (ADR 036).
+            throw new BizException(400, "file: has more than " + MAX_SECTIONS + " sections (headings with text)");
         }
         List<float[]> embeddings = ragService.embed(sections.stream().map(MarkdownSection::title).toList());
         if (embeddings.size() != sections.size()) {
@@ -96,6 +116,11 @@ public class DocumentFacadeServiceImpl implements DocumentFacadeService {
         }
 
         DocumentEntity stored = transactionTemplate.execute(status -> {
+            // Checked again with a lock: the knowledge base may have been deleted during the embedding call,
+            // and now it cannot be until this upload is saved (ADR 037).
+            if (knowledgeBaseMapper.selectByIdForShare(kbId) == null) {
+                throw new BizException(400, "kbId: unknown knowledge base " + kbId);
+            }
             DocumentEntity document = DocumentEntity.builder().kbId(kbId).name(name).build();
             documentMapper.insert(document);
             UUID documentId = document.getId();
@@ -151,6 +176,15 @@ public class DocumentFacadeServiceImpl implements DocumentFacadeService {
             throw new BizException(400, "file: only Markdown files (.md, .markdown) are accepted");
         }
         return extension;
+    }
+
+    /** flexmark parses nested blocks recursively: about 10,000 nested list markers (20 KB) overflow the stack. */
+    private List<MarkdownSection> parse(String text) {
+        try {
+            return markdownParserService.parse(text);
+        } catch (StackOverflowError e) {
+            throw new BizException(400, "file: is nested too deeply to read");
+        }
     }
 
     private static String decodeUtf8(byte[] content) {

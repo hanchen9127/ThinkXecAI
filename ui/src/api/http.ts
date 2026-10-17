@@ -28,8 +28,29 @@ function buildUrl(path: string, params?: QueryParams): string {
   return url.toString()
 }
 
+/**
+ * Builds a path whose interpolated values are encoded, so an id cannot add path segments or a query
+ * (`path\`/agents/${id}\``). "." and ".." are refused: URL parsing would resolve them even encoded.
+ */
+export function path(strings: TemplateStringsArray, ...values: string[]): string {
+  return strings.reduce((result, part, i) => {
+    if (i === 0) return part
+    const value = values[i - 1]
+    if (value === '.' || value === '..') throw new Error(`Invalid path value: ${value}`)
+    return result + encodeURIComponent(value) + part
+  }, '')
+}
+
+/** Anything that is not the backend's JSON envelope (a proxy page, an empty body) keeps its HTTP status. */
 async function unwrap<T>(response: Response): Promise<T> {
-  const body = (await response.json()) as ApiResponse<T>
+  const isJson = response.headers.get('Content-Type')?.includes('application/json') ?? false
+  const body = isJson ? ((await response.json().catch(() => null)) as ApiResponse<T> | null) : null
+  if (body === null || typeof body !== 'object') {
+    throw new ApiError(
+      response.status,
+      response.statusText || 'Unexpected response from the server',
+    )
+  }
   if (!response.ok || body.code !== 200) {
     throw new ApiError(body.code ?? response.status, body.message ?? response.statusText)
   }

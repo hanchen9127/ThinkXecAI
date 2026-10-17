@@ -7,6 +7,7 @@ import type {
   ChatMessageMetadata,
   ChatOptionsInput,
   CreateAgentRequest,
+  CreateChatMessageRequest,
   Document,
   ToolType,
   ToolVO,
@@ -37,7 +38,9 @@ export type ApiTypeChecks = [
   Expect<Equal<Agent['id'], string>>,
   Expect<Equal<Agent['description'], string | null>>,
   Expect<Equal<ChatMessage['metadata'], ChatMessageMetadata | null>>,
+  Expect<Equal<keyof ChatMessageMetadata, 'toolCalls' | 'toolResponse'>>,
   Expect<Equal<CreateAgentRequest['chatOptions'], ChatOptionsInput | undefined>>,
   Expect<Equal<ChatOptionsInput['temperature'], number | undefined>>,
   Expect<Equal<keyof UpdateChatSessionRequest, 'title'>>,
+  Expect<Equal<CreateChatMessageRequest, { sessionId: string; content: string }>>,
 ]

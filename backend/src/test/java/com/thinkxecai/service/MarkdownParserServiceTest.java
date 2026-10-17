@@ -37,6 +37,16 @@ class MarkdownParserServiceTest {
     }
 
     @Test
+    void anIndentedCodeBlockThatOpensASectionKeepsItsIndentation() {
+        String body = "    mvn test\n    mvn package\n\nThen run it.";
+
+        // blank lines (also ones holding only spaces) before the content and whitespace after it are dropped
+        assertThat(parser.parse("# Build\n\n  \n" + body + "  \n\n# Next\ntext")).containsExactly(
+                new MarkdownSection("Build", body),
+                new MarkdownSection("Next", "text"));
+    }
+
+    @Test
     void everyHeadingLevelStartsASectionThatEndsAtTheNextHeading() {
         List<MarkdownSection> sections = parser.parse("""
                 # A
@@ -99,6 +109,15 @@ class MarkdownParserServiceTest {
     @Test
     void headingSyntaxInsideCodeBlocksAndQuotesIsContentNotABoundary() {
         String body = "```\n# not a heading\n```\n\n> # quoted heading";
+
+        assertThat(parser.parse("# A\n" + body + "\n# B\nb")).containsExactly(
+                new MarkdownSection("A", body),
+                new MarkdownSection("B", "b"));
+    }
+
+    @Test
+    void headingsInsideListItemsAreContentNotABoundary() {
+        String body = "- step one\n  # inside the list item\n- step two";
 
         assertThat(parser.parse("# A\n" + body + "\n# B\nb")).containsExactly(
                 new MarkdownSection("A", body),

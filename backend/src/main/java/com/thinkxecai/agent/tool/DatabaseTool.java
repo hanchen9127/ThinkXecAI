@@ -111,6 +111,8 @@ public class DatabaseTool implements Tool {
                 statement.setEscapeProcessing(false);
                 statement.execute("SET TRANSACTION READ ONLY");
                 statement.execute("SET LOCAL statement_timeout = '" + TIMEOUT_SECONDS + "s'");
+                // Same zone as the application's connections, so now() and stored timestamps agree.
+                statement.execute("SET LOCAL TIME ZONE 'UTC'");
                 // One row more than returned, so a full result can be told apart from a truncated one.
                 statement.setMaxRows(MAX_ROWS + 1);
                 statement.setQueryTimeout(TIMEOUT_SECONDS);

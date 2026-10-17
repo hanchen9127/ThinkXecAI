@@ -90,6 +90,17 @@ class ChatSessionMapperTest extends MapperTestSupport {
     }
 
     @Test
+    void updateNeverChangesTheAgent() {
+        // the agent is fixed at creation (ADR 016), also when a caller passes one
+        UUID agent = insertAgent("agent");
+        ChatSessionEntity session = insert(agent, "Trip planning");
+
+        mapper.update(ChatSessionEntity.builder().id(session.getId()).agentId(insertAgent("other")).title("Renamed").build());
+
+        assertThat(mapper.selectById(session.getId()).getAgentId()).isEqualTo(agent);
+    }
+
+    @Test
     void touchRefreshesOnlyUpdatedAt() {
         UUID agent = insertAgent("agent");
         ChatSessionEntity session = insert(agent, "Trip planning");

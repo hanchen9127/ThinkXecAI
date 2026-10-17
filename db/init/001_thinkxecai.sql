@@ -32,7 +32,7 @@ CREATE TABLE chat_message (
     session_id  UUID NOT NULL REFERENCES chat_session(id) ON DELETE CASCADE,      -- deleting a session deletes its messages
     role        TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system', 'tool')),
     content     TEXT,
-    metadata    JSONB,                                                            -- extra structured data, e.g. tool_call_id/tool name for role='tool' messages
+    metadata    JSONB,                                                            -- written only by the agent runtime: {"toolCalls": [{id, type, name, arguments}]} on assistant messages, {"toolResponse": {id, name, responseData}} on tool messages, else NULL
     created_at  TIMESTAMP NOT NULL DEFAULT clock_timestamp(),                     -- clock_timestamp(), not now(): now() is frozen per transaction, so messages saved together would tie and ORDER BY created_at would lose their order
     updated_at  TIMESTAMP NOT NULL DEFAULT now()
 );
@@ -71,6 +71,8 @@ CREATE TABLE chunk_bge_m3 (
 -- HNSW, not ivfflat: ivfflat trains its list centroids on the rows present at build time, and this
 -- script runs on an empty table, so small knowledge bases could get fewer than 3 (or zero) results.
 -- HNSW builds incrementally and needs no training data. vector_l2_ops matches the <-> operator.
+-- HNSW alone still filters by kb_id after collecting ~40 neighbours from all knowledge bases, so the
+-- search also sets hnsw.iterative_scan = strict_order for its transaction (ADR 024).
 CREATE INDEX chunk_bge_m3_embedding_idx ON chunk_bge_m3
     USING hnsw (embedding vector_l2_ops);
 

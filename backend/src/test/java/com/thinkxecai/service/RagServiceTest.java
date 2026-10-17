@@ -6,16 +6,21 @@ import org.junit.jupiter.api.Test;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -28,7 +33,7 @@ class RagServiceTest extends ServiceTestSupport {
     @Autowired
     private RagService ragService;
 
-    @Autowired
+    @MockitoSpyBean
     private ChunkMapper chunkMapper;
 
     @MockitoBean
@@ -62,6 +67,38 @@ class RagServiceTest extends ServiceTestSupport {
 
         assertThat(ragService.search(UUID.randomUUID(), QUERY)).isEmpty();
         assertThat(transactionDuringEmbedding).isFalse();
+    }
+
+    /**
+     * Without the test's own transaction: the search must open a read-only one, or its SET LOCAL is
+     * lost (outside a transaction PostgreSQL only warns) and the strict-order scan silently does not apply.
+     */
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void theSearchRunsInItsOwnReadOnlyTransactionWithStrictOrdering() {
+        when(embeddingModel.embed(QUERY)).thenReturn(queryVector());
+        List<String> duringSearch = new ArrayList<>();
+        doAnswer(invocation -> {
+            duringSearch.add("read-only " + TransactionSynchronizationManager.isCurrentTransactionReadOnly());
+            duringSearch.add(jdbcTemplate.queryForObject("SELECT current_setting('hnsw.iterative_scan', true)", String.class));
+            return List.of();
+        }).when(chunkMapper).searchSimilar(any(), any(), anyInt());
+
+        ragService.search(UUID.randomUUID(), QUERY);
+
+        assertThat(duringSearch).containsExactly("read-only true", "strict_order");
+    }
+
+    @Test
+    void searchReturnsTheThreeNearestOfMoreChunks() {
+        when(embeddingModel.embed(QUERY)).thenReturn(queryVector());
+        UUID kb = insertKnowledgeBase("kb");
+        UUID doc = insertDocument(kb, "doc.md");
+        for (int i = 5; i >= 1; i--) {
+            insertChunk(kb, doc, "chunk " + i, vector(0, 1f, 3, i / 10f));
+        }
+
+        assertThat(ragService.search(kb, QUERY)).containsExactly("chunk 1", "chunk 2", "chunk 3");
     }
 
     @Test

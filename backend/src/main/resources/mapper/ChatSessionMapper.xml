@@ -17,6 +17,18 @@
         WHERE id = #{id}
     </select>
 
+    <!--
+        Before adding a message: the same lock the touch that follows takes, so the session cannot be
+        deleted or lose its agent meanwhile, and two messages to one session take turns instead of
+        deadlocking on the touch (ADR 037).
+    -->
+    <select id="selectByIdForNoKeyUpdate" resultType="com.thinkxecai.model.entity.ChatSessionEntity">
+        SELECT <include refid="columns"/>
+        FROM chat_session
+        WHERE id = #{id}
+        FOR NO KEY UPDATE
+    </select>
+
     <select id="listAll" resultType="com.thinkxecai.model.entity.ChatSessionEntity">
         SELECT <include refid="columns"/>
         FROM chat_session
@@ -33,7 +45,6 @@
     <update id="update">
         UPDATE chat_session
         <set>
-            <if test="agentId != null">agent_id = #{agentId},</if>
             <if test="title != null">title = #{title},</if>
             updated_at = now()
         </set>
