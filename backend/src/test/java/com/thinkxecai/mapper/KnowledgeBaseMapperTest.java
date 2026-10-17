@@ -74,6 +74,8 @@ class KnowledgeBaseMapperTest extends MapperTestSupport {
         UUID[] ids = Stream.concat(Stream.of(a), Stream.generate(UUID::randomUUID).limit(70_000)).toArray(UUID[]::new);
 
         assertThat(mapper.selectByIds(ids)).extracting(KnowledgeBaseEntity::getId).containsExactly(a);
+        // the locking variant the agent check uses binds the same way
+        assertThat(mapper.selectByIdsForShare(ids)).extracting(KnowledgeBaseEntity::getId).containsExactly(a);
     }
 
     @Test

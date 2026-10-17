@@ -38,6 +38,10 @@ import static org.mockito.Mockito.when;
  * Two requests at the same time (ADR 037). The first runs inside a transaction that stays open; the
  * second starts meanwhile on another thread and must wait for the first's row lock. Only then does the
  * first commit, and the second's outcome is checked. Rows are committed, so they are removed afterwards.
+ * <p>
+ * Not covered: deadlocks. The first request finishes all its statements before the second starts, so
+ * the interleaving that would deadlock under a wrong lock order (an agent update locking the agent before
+ * its knowledge bases while a knowledge-base delete runs) never happens here; the order is kept by review.
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class ConcurrentWritesTest extends ServiceTestSupport {
@@ -147,6 +151,22 @@ class ConcurrentWritesTest extends ServiceTestSupport {
                 () -> chatMessageService.createChatMessage(message));
 
         assertCode(second, 404);
+    }
+
+    @Test
+    void aMessageWhileTheSessionsAgentIsBeingDeletedIsAConflict() throws Exception {
+        // the agent delete clears the session's agent (ON DELETE SET NULL), an update of the session row:
+        // the message must wait for it, so its lock has to conflict with that update (a key-share lock would not)
+        UUID agent = insertMarkedAgent();
+        UUID session = insertChatSession(agent, MARKER);
+        CreateChatMessageRequest message = new CreateChatMessageRequest();
+        message.setSessionId(session);
+        message.setContent("hello");
+
+        Throwable second = race(() -> agentService.deleteAgent(agent), () -> chatMessageService.createChatMessage(message));
+
+        assertCode(second, 409);
+        assertThat(countRows("chat_message", "session_id = ?", session)).isZero();
     }
 
     @Test
