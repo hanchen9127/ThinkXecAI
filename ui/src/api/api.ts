@@ -1,4 +1,4 @@
-import { BASE_URL, http } from './http'
+import { BASE_URL, http, path } from './http'
 import type { components, paths } from './schema'
 
 // Request and response types are derived from schema.d.ts, which is generated from the backend's
@@ -63,12 +63,15 @@ export function createAgent(request: CreateAgentRequest) {
 }
 
 export function updateAgent(agentId: string, request: UpdateAgentRequest) {
-  return http.patch<ResponseData<'/api/agents/{agentId}', 'patch'>>(`/agents/${agentId}`, request)
+  return http.patch<ResponseData<'/api/agents/{agentId}', 'patch'>>(
+    path`/agents/${agentId}`,
+    request,
+  )
 }
 
 // Delete endpoints always return data: null; the document can only say "no content type" (unknown).
 export function deleteAgent(agentId: string) {
-  return http.delete<null>(`/agents/${agentId}`)
+  return http.delete<null>(path`/agents/${agentId}`)
 }
 
 // ---------------------------------------------------------------------------
@@ -86,13 +89,13 @@ export function listChatSessions() {
 
 export function getChatSession(chatSessionId: string) {
   return http.get<ResponseData<'/api/chat-sessions/{chatSessionId}', 'get'>>(
-    `/chat-sessions/${chatSessionId}`,
+    path`/chat-sessions/${chatSessionId}`,
   )
 }
 
 export function listChatSessionsByAgent(agentId: string) {
   return http.get<ResponseData<'/api/chat-sessions/agent/{agentId}', 'get'>>(
-    `/chat-sessions/agent/${agentId}`,
+    path`/chat-sessions/agent/${agentId}`,
   )
 }
 
@@ -102,13 +105,13 @@ export function createChatSession(request: CreateChatSessionRequest) {
 
 export function updateChatSession(chatSessionId: string, request: UpdateChatSessionRequest) {
   return http.patch<ResponseData<'/api/chat-sessions/{chatSessionId}', 'patch'>>(
-    `/chat-sessions/${chatSessionId}`,
+    path`/chat-sessions/${chatSessionId}`,
     request,
   )
 }
 
 export function deleteChatSession(chatSessionId: string) {
-  return http.delete<null>(`/chat-sessions/${chatSessionId}`)
+  return http.delete<null>(path`/chat-sessions/${chatSessionId}`)
 }
 
 // ---------------------------------------------------------------------------
@@ -125,7 +128,7 @@ export type CreateChatMessageRequest = RequestBody<'/api/chat-messages', 'post'>
 
 export function listChatMessagesBySession(sessionId: string) {
   return http.get<ResponseData<'/api/chat-messages/session/{sessionId}', 'get'>>(
-    `/chat-messages/session/${sessionId}`,
+    path`/chat-messages/session/${sessionId}`,
   )
 }
 
@@ -134,7 +137,7 @@ export function createChatMessage(request: CreateChatMessageRequest) {
 }
 
 export function deleteChatMessage(chatMessageId: string) {
-  return http.delete<null>(`/chat-messages/${chatMessageId}`)
+  return http.delete<null>(path`/chat-messages/${chatMessageId}`)
 }
 
 // ---------------------------------------------------------------------------
@@ -158,13 +161,13 @@ export function createKnowledgeBase(request: CreateKnowledgeBaseRequest) {
 
 export function updateKnowledgeBase(knowledgeBaseId: string, request: UpdateKnowledgeBaseRequest) {
   return http.patch<ResponseData<'/api/knowledge-bases/{knowledgeBaseId}', 'patch'>>(
-    `/knowledge-bases/${knowledgeBaseId}`,
+    path`/knowledge-bases/${knowledgeBaseId}`,
     request,
   )
 }
 
 export function deleteKnowledgeBase(knowledgeBaseId: string) {
-  return http.delete<null>(`/knowledge-bases/${knowledgeBaseId}`)
+  return http.delete<null>(path`/knowledge-bases/${knowledgeBaseId}`)
 }
 
 // ---------------------------------------------------------------------------
@@ -181,7 +184,7 @@ export function listDocuments() {
 }
 
 export function listDocumentsByKb(kbId: string) {
-  return http.get<ResponseData<'/api/documents/kb/{kbId}', 'get'>>(`/documents/kb/${kbId}`)
+  return http.get<ResponseData<'/api/documents/kb/{kbId}', 'get'>>(path`/documents/kb/${kbId}`)
 }
 
 export function createDocument(request: CreateDocumentRequest) {
@@ -198,13 +201,13 @@ export function uploadDocument(kbId: string, file: File) {
 
 export function updateDocument(documentId: string, request: UpdateDocumentRequest) {
   return http.patch<ResponseData<'/api/documents/{documentId}', 'patch'>>(
-    `/documents/${documentId}`,
+    path`/documents/${documentId}`,
     request,
   )
 }
 
 export function deleteDocument(documentId: string) {
-  return http.delete<null>(`/documents/${documentId}`)
+  return http.delete<null>(path`/documents/${documentId}`)
 }
 
 // ---------------------------------------------------------------------------
@@ -242,5 +245,5 @@ export interface SseMessageEvent {
 }
 
 export function getSseUrl(chatSessionId: string): string {
-  return `${BASE_URL.replace(/\/api$/, '')}/sse/connect/${chatSessionId}`
+  return BASE_URL.replace(/\/api$/, '') + path`/sse/connect/${chatSessionId}`
 }

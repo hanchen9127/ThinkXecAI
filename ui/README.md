@@ -1,32 +1,29 @@
-# React + TypeScript + Vite
+# ThinkXecAI frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React 19 + TypeScript + Vite (`rolldown-vite`) + Ant Design. The pages arrive in Phase 13; for now
+this package holds the typed API client the pages will use. See the repository README for running
+the whole system.
 
-Currently, two official plugins are available:
+## Scripts
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+| Script                            | What it does                                                                       |
+| --------------------------------- | ---------------------------------------------------------------------------------- |
+| `npm run dev`                     | Vite dev server; the backend must run on `http://localhost:8080`                   |
+| `npm run build`                   | Type-check and build into `dist/`                                                  |
+| `npm run typecheck`               | `tsc -b`, including the compile-time API type checks in `src/api/api.type-test.ts` |
+| `npm run lint`                    | ESLint; any warning fails                                                          |
+| `npm run format` / `format:check` | Prettier                                                                           |
+| `npm run gen:api`                 | Regenerate `src/api/schema.d.ts` from `../backend/target/openapi.json`             |
 
-## React Compiler
+## API client
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- `src/api/http.ts`: `fetch` wrapper that unwraps the backend's `{ code, message, data }` envelope and
+  throws `ApiError` otherwise (also for a non-JSON reply, with its HTTP status). Path ids go through
+  the `path` tag, which encodes them.
+- `src/api/schema.d.ts`: generated from the backend's OpenAPI description; never edit it by hand. CI
+  regenerates it and fails when the committed copy differs.
+- `src/api/api.ts`: one typed function per endpoint, with request and response types derived from the
+  generated schema by endpoint path.
 
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
-```
-
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+After changing a backend request or response, run the backend tests (they export
+`backend/target/openapi.json`), then `npm run gen:api`, and commit the regenerated file.
