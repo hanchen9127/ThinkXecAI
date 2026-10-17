@@ -5,8 +5,10 @@ import com.thinkxecai.controller.KnowledgeBaseController;
 import com.thinkxecai.service.KnowledgeBaseFacadeService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.http.HttpMessageConverters;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -28,6 +30,9 @@ class NulFreeRequestTextTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private HttpMessageConverters httpMessageConverters;
+
     @MockitoBean
     private KnowledgeBaseFacadeService service;
 
@@ -44,6 +49,17 @@ class NulFreeRequestTextTest {
     @Test
     void theSharedObjectMapperStillReadsNulCharacters() throws Exception {
         assertThat(objectMapper.readValue("\"a\\u0000b\"", String.class)).isEqualTo("a\u0000b");
+    }
+
+    /** RestClient.Builder (the chat models, Ollama) gets the converters of this bean: they must not be the MVC copy. */
+    @Test
+    void theSharedJsonConverterOfHttpClientsStillReadsNulCharacters() throws Exception {
+        MappingJackson2HttpMessageConverter shared = httpMessageConverters.getConverters().stream()
+                .filter(MappingJackson2HttpMessageConverter.class::isInstance)
+                .map(MappingJackson2HttpMessageConverter.class::cast)
+                .findFirst().orElseThrow();
+
+        assertThat(shared.getObjectMapper().readValue("\"a\\u0000b\"", String.class)).isEqualTo("a\u0000b");
     }
 
 }

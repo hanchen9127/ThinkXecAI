@@ -19,12 +19,14 @@ public class RequestBodyJsonConfig implements WebMvcConfigurer {
 
     @Override
     public void extendMessageConverters(List<HttpMessageConverter<?>> converters) {
-        for (HttpMessageConverter<?> converter : converters) {
-            if (converter instanceof MappingJackson2HttpMessageConverter jackson) {
+        // The listed converters are the same instances RestClient.Builder receives, so the element is
+        // replaced with a new converter; changing its ObjectMapper would reach the HTTP clients too.
+        for (int i = 0; i < converters.size(); i++) {
+            if (converters.get(i) instanceof MappingJackson2HttpMessageConverter jackson) {
                 ObjectMapper requestMapper = jackson.getObjectMapper().copy()
                         .registerModule(new SimpleModule("NulFreeRequestText")
                                 .addDeserializer(String.class, new NulFreeStringDeserializer()));
-                jackson.setObjectMapper(requestMapper);
+                converters.set(i, new MappingJackson2HttpMessageConverter(requestMapper));
             }
         }
     }
