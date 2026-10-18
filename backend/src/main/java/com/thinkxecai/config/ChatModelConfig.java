@@ -41,9 +41,14 @@ import java.time.Duration;
  * <p>
  * DeepSeek: a JDK request factory with {@code thinkxecai.chat.connect-timeout} and
  * {@code thinkxecai.chat.read-timeout} per attempt; retries come from Spring AI's {@code RetryTemplate}
- * ({@code spring.ai.retry.*}). Gemini: the google-genai SDK only offers a timeout for the whole call
- * (retries included), and Spring AI's Gemini model wraps every SDK error so its {@code RetryTemplate}
- * never retries; the SDK's own retry gets the same {@code spring.ai.retry.*} values instead.
+ * ({@code spring.ai.retry.*}). Gemini: the google-genai SDK only offers a timeout for the whole call,
+ * which cancels the request but not the SDK's wait between attempts, so a hanging Gemini call ends
+ * within the read timeout plus one retry interval. Spring AI's Gemini model wraps every SDK error so
+ * its {@code RetryTemplate} never retries; the SDK's own retry gets the same {@code spring.ai.retry.*}
+ * values instead, without the SDK's random jitter, so both models wait the same intervals.
+ * <p>
+ * A timeout of zero would mean "no timeout" to the Gemini SDK and "fail at once" to DeepSeek's
+ * client, so both settings must be positive; startup fails otherwise.
  * <p>
  * The two {@link ChatClient} beans are named after {@link ChatModelNames}; {@code ChatClientRegistry}
  * looks them up by an agent's {@code model}.
@@ -51,17 +56,22 @@ import java.time.Duration;
 @Configuration
 public class ChatModelConfig {
 
+    private static final String CONNECT_TIMEOUT = "thinkxecai.chat.connect-timeout";
+    private static final String READ_TIMEOUT = "thinkxecai.chat.read-timeout";
+
     @Bean
     public Client googleGenAiClient(GoogleGenAiConnectionProperties connectionProperties,
                                     SpringAiRetryProperties retryProperties,
                                     @Value("${thinkxecai.chat.gemini-base-url}") String baseUrl,
                                     @Value("${thinkxecai.chat.read-timeout}") Duration readTimeout) {
+        requirePositive(READ_TIMEOUT, readTimeout);
         SpringAiRetryProperties.Backoff backoff = retryProperties.getBackoff();
         HttpRetryOptions retryOptions = HttpRetryOptions.builder()
                 .attempts(retryProperties.getMaxAttempts())
                 .initialDelay(seconds(backoff.getInitialInterval()))
                 .expBase((double) backoff.getMultiplier())
                 .maxDelay(seconds(backoff.getMaxInterval()))
+                .jitter(0.0)
                 .build();
         return Client.builder()
                 .apiKey(connectionProperties.getApiKey())
@@ -97,6 +107,8 @@ public class ChatModelConfig {
             ObjectProvider<ToolExecutionEligibilityPredicate> toolExecutionEligibilityPredicate,
             @Value("${thinkxecai.chat.connect-timeout}") Duration connectTimeout,
             @Value("${thinkxecai.chat.read-timeout}") Duration readTimeout) {
+        requirePositive(CONNECT_TIMEOUT, connectTimeout);
+        requirePositive(READ_TIMEOUT, readTimeout);
         JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(
                 HttpClient.newBuilder().connectTimeout(connectTimeout).build());
         requestFactory.setReadTimeout(readTimeout);
@@ -142,6 +154,12 @@ public class ChatModelConfig {
         return ChatClient.builder(chatModel)
                 .defaultOptions(ToolCallingChatOptions.builder().internalToolExecutionEnabled(false).build())
                 .build();
+    }
+
+    private static void requirePositive(String property, Duration value) {
+        if (value == null || value.isZero() || value.isNegative()) {
+            throw new IllegalStateException(property + " must be positive, but is " + value);
+        }
     }
 
     private static double seconds(Duration duration) {
