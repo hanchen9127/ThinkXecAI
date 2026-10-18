@@ -41,6 +41,15 @@ spring:
       connection-init-sql: SET TIME ZONE 'UTC'
 
   ai:
+    # A failing chat model call is tried at most 3 times, 2 s then 6 s apart (Spring AI's default is 10
+    # attempts up to 3 minutes apart). DeepSeek retries through Spring AI; ChatModelConfig gives the same
+    # values to the Gemini SDK's own retry. Embeddings are never retried.
+    retry:
+      max-attempts: 3
+      backoff:
+        initial-interval: 2s
+        multiplier: 3
+        max-interval: 10s
     model:
       embedding:
         # The Gemini starter also registers a text embedding model, under this key (Ollama's is
@@ -90,6 +99,14 @@ thinkxecai:
   # How long an Ollama call (embedding an upload's titles or a search query) may wait for an answer.
   ollama:
     read-timeout: 60s
+  # Chat model HTTP clients (ChatModelConfig); both timeouts must be positive. DeepSeek: per attempt. Gemini:
+  # the SDK has no connect timeout and only a timeout for the whole call, which does not cut short its wait
+  # before a retry, so a hanging call ends within read-timeout plus one retry interval (at most 10 s).
+  # The Gemini base URL is a setting so tests can use a fake server.
+  chat:
+    connect-timeout: 10s
+    read-timeout: 120s
+    gemini-base-url: https://generativelanguage.googleapis.com
   # The email tool sends through the Gmail API. Everything here is optional: startup never checks it, and
   # a send with any Gmail value missing tells the model which variables are missing (values never shown).
   mail:

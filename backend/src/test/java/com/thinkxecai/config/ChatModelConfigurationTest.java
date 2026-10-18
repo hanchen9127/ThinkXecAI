@@ -1,9 +1,9 @@
 package com.thinkxecai.config;
 
+import com.thinkxecai.agent.model.ThinkXecGoogleGenAiChatModel;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.deepseek.DeepSeekChatModel;
-import org.springframework.ai.google.genai.GoogleGenAiChatModel;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
@@ -26,13 +26,13 @@ class ChatModelConfigurationTest {
     private DeepSeekChatModel deepSeekChatModel;
 
     @Autowired
-    private GoogleGenAiChatModel geminiChatModel;
+    private ThinkXecGoogleGenAiChatModel geminiChatModel;
 
     @Test
-    void exactlyDeepSeekAndGeminiAreConfigured() {
+    void exactlyDeepSeekAndTheApplicationsGeminiModelAreConfigured() {
         assertThat(chatModels.values())
-                .hasSize(2)
-                .hasExactlyElementsOfTypes(DeepSeekChatModel.class, GoogleGenAiChatModel.class);
+                .extracting(Object::getClass)
+                .containsExactlyInAnyOrder(DeepSeekChatModel.class, ThinkXecGoogleGenAiChatModel.class);
     }
 
     @Test

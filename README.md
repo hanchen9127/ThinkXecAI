@@ -192,6 +192,10 @@ your shell, an IDE run configuration, or a tool like `direnv`).
 Uploaded files are stored under `data/documents/` relative to the working directory (gitignored).
 The backend starts without Ollama; it is needed (and given 60 seconds per call) when a document is uploaded or a knowledge base is
 searched.
+Chat model calls get 120 seconds to answer (`thinkxecai.chat.read-timeout`), and a failing call is tried
+at most 3 times, 2 and then 6 seconds apart (`spring.ai.retry.*`). DeepSeek also gets 10 seconds to connect
+(`thinkxecai.chat.connect-timeout`) and the 120 seconds per attempt; for Gemini, whose client has no
+separate connect timeout, the 120 seconds cover the whole call plus at most one wait before a retry.
 
 ### 4. Run the frontend
 
