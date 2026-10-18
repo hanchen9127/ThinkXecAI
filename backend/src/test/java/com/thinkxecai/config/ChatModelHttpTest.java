@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import com.thinkxecai.agent.model.ChatClientRegistry;
 import com.thinkxecai.agent.model.ThinkXecGoogleGenAiChatModel;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,6 +15,8 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.deepseek.DeepSeekChatModel;
+import org.springframework.ai.tool.ToolCallback;
+import org.springframework.ai.tool.definition.ToolDefinition;
 import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -29,6 +32,7 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.Executors;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -38,7 +42,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * Drives both chat model beans against a local fake server, so the application's own HTTP clients are
  * what is tested (ADR 039): a model that does not answer fails after the read timeout (1 s here)
  * instead of waiting, a server error is tried exactly 3 times, a client error once. The Gemini cases
- * also run a text + function-call response through the real bean and send it back (ADR 038).
+ * also run a text + function-call response through the real bean and send it back (ADR 038). The
+ * registry's clients reach their own model and hand tool calls back without running them (ADR 040).
  */
 @SpringBootTest
 class ChatModelHttpTest {
@@ -60,6 +65,9 @@ class ChatModelHttpTest {
 
     @Autowired
     private DeepSeekChatModel deepSeekChatModel;
+
+    @Autowired
+    private ChatClientRegistry chatClientRegistry;
 
     @DynamicPropertySource
     static void pointModelsAtFakeServer(DynamicPropertyRegistry registry) {
@@ -187,6 +195,56 @@ class ChatModelHttpTest {
         assertThat(requests).hasSize(1);
     }
 
+    @Test
+    void eachRegisteredClientCallsItsOwnModel() throws IOException {
+        String deepSeekAnswer = chatClientRegistry.get("deepseek-chat").prompt("hi").call().content();
+        chatClientRegistry.get("gemini-3.8-flash").prompt("hi").call().content();
+
+        assertThat(deepSeekAnswer).isEqualTo("Hello.");
+        assertThat(requests).extracting(RecordedRequest::path)
+                .containsExactly("/chat/completions", "/v1beta/models/gemini-3.8-flash:generateContent");
+        assertThat(JSON.readTree(requests.get(0).body()).get("model").asText()).isEqualTo("deepseek-chat");
+    }
+
+    @Test
+    void registeredClientsHandToolCallsBackWithoutRunningTheTool() {
+        AtomicInteger toolRuns = new AtomicInteger();
+        ToolCallback getDate = recordingTool(toolRuns);
+
+        for (String model : List.of("deepseek-chat", "gemini-3.8-flash")) {
+            ChatResponse response = chatClientRegistry.get(model).prompt("What is the date?")
+                    .toolCallbacks(getDate)
+                    .call()
+                    .chatResponse();
+
+            assertThat(response.getResult().getOutput().getToolCalls())
+                    .extracting(AssistantMessage.ToolCall::name)
+                    .as(model)
+                    .containsExactly("getDate");
+        }
+        assertThat(toolRuns).hasValue(0);
+        assertThat(requests).hasSize(2);
+    }
+
+    private static ToolCallback recordingTool(AtomicInteger runs) {
+        return new ToolCallback() {
+            @Override
+            public ToolDefinition getToolDefinition() {
+                return ToolDefinition.builder()
+                        .name("getDate")
+                        .description("Returns today's date.")
+                        .inputSchema("{\"type\":\"object\",\"properties\":{}}")
+                        .build();
+            }
+
+            @Override
+            public String call(String toolInput) {
+                runs.incrementAndGet();
+                return "2026-10-19";
+            }
+        };
+    }
+
     private static HttpServer startFakeServer() {
         try {
             HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
@@ -214,7 +272,8 @@ class ChatModelHttpTest {
             }
             case SERVER_ERROR -> respond(exchange, 503, "{\"error\":{\"code\":503,\"message\":\"overloaded\"}}");
             case CLIENT_ERROR -> respond(exchange, 400, "{\"error\":{\"code\":400,\"message\":\"bad request\"}}");
-            case OK -> respond(exchange, 200, gemini ? geminiAnswer() : deepSeekAnswer());
+            case OK -> respond(exchange, 200, gemini ? geminiAnswer()
+                    : body.contains("\"tools\"") ? deepSeekToolCallAnswer() : deepSeekAnswer());
         }
     }
 
@@ -233,6 +292,16 @@ class ChatModelHttpTest {
         return """
                 {"id":"chat-1","object":"chat.completion","created":1760745600,"model":"deepseek-chat",
                  "choices":[{"index":0,"message":{"role":"assistant","content":"Hello."},"finish_reason":"stop"}],
+                 "usage":{"prompt_tokens":5,"completion_tokens":2,"total_tokens":7}}
+                """;
+    }
+
+    /** DeepSeek's answer when the request offers tools: a call to {@code getDate}. */
+    private static String deepSeekToolCallAnswer() {
+        return """
+                {"id":"chat-2","object":"chat.completion","created":1760745600,"model":"deepseek-chat",
+                 "choices":[{"index":0,"finish_reason":"tool_calls","message":{"role":"assistant","content":"",
+                   "tool_calls":[{"id":"call_1","type":"function","function":{"name":"getDate","arguments":"{}"}}]}}],
                  "usage":{"prompt_tokens":5,"completion_tokens":2,"total_tokens":7}}
                 """;
     }

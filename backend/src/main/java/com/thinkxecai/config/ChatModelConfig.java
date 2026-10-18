@@ -4,7 +4,10 @@ import com.google.genai.Client;
 import com.google.genai.types.HttpOptions;
 import com.google.genai.types.HttpRetryOptions;
 import com.thinkxecai.agent.model.ThinkXecGoogleGenAiChatModel;
+import com.thinkxecai.model.ChatModelNames;
 import io.micrometer.observation.ObservationRegistry;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.observation.ChatModelObservationConvention;
 import org.springframework.ai.deepseek.DeepSeekChatModel;
 import org.springframework.ai.deepseek.api.DeepSeekApi;
@@ -13,6 +16,7 @@ import org.springframework.ai.model.deepseek.autoconfigure.DeepSeekConnectionPro
 import org.springframework.ai.model.google.genai.autoconfigure.chat.GoogleGenAiChatProperties;
 import org.springframework.ai.model.google.genai.autoconfigure.chat.GoogleGenAiConnectionProperties;
 import org.springframework.ai.model.tool.DefaultToolExecutionEligibilityPredicate;
+import org.springframework.ai.model.tool.ToolCallingChatOptions;
 import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.ai.model.tool.ToolExecutionEligibilityPredicate;
 import org.springframework.ai.retry.autoconfigure.SpringAiRetryProperties;
@@ -40,6 +44,9 @@ import java.time.Duration;
  * ({@code spring.ai.retry.*}). Gemini: the google-genai SDK only offers a timeout for the whole call
  * (retries included), and Spring AI's Gemini model wraps every SDK error so its {@code RetryTemplate}
  * never retries; the SDK's own retry gets the same {@code spring.ai.retry.*} values instead.
+ * <p>
+ * The two {@link ChatClient} beans are named after {@link ChatModelNames}; {@code ChatClientRegistry}
+ * looks them up by an agent's {@code model}.
  */
 @Configuration
 public class ChatModelConfig {
@@ -113,6 +120,28 @@ public class ChatModelConfig {
                 .build();
         observationConvention.ifAvailable(chatModel::setObservationConvention);
         return chatModel;
+    }
+
+    @Bean(ChatModelNames.DEEPSEEK_CHAT)
+    public ChatClient deepSeekChatClient(DeepSeekChatModel deepSeekChatModel) {
+        return chatClient(deepSeekChatModel);
+    }
+
+    @Bean(ChatModelNames.GEMINI_FLASH)
+    public ChatClient geminiChatClient(ThinkXecGoogleGenAiChatModel googleGenAiChatModel) {
+        return chatClient(googleGenAiChatModel);
+    }
+
+    /**
+     * A client that never executes tools itself: the agent runtime runs them, so it can persist each
+     * call and pass the tool context (ADR 040). Options set per request replace these defaults, so a
+     * request that sets options must set this again. Nothing else is set here: an agent's temperature
+     * and topP are stored but not applied.
+     */
+    static ChatClient chatClient(ChatModel chatModel) {
+        return ChatClient.builder(chatModel)
+                .defaultOptions(ToolCallingChatOptions.builder().internalToolExecutionEnabled(false).build())
+                .build();
     }
 
     private static double seconds(Duration duration) {
