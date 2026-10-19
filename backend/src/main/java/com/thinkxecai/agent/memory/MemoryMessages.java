@@ -1,5 +1,6 @@
 package com.thinkxecai.agent.memory;
 
+import com.thinkxecai.agent.ToolJson;
 import com.thinkxecai.model.ChatMessageRole;
 import com.thinkxecai.model.ToolCallMetadata;
 import com.thinkxecai.model.ToolResponseMetadata;
@@ -17,7 +18,8 @@ import java.util.List;
  * assistant message's tool calls are stored as one row each and become one {@link ToolResponseMessage}
  * again, as {@code ToolCallingManager} produced them: Gemini expects the answers to parallel calls in
  * one turn. Stored {@code system} rows are skipped (the runtime never writes them; the system message
- * is built for each run).
+ * is built for each run). Tool results and call arguments go through {@link ToolJson}, so a stored
+ * plain text or a malformed argument string cannot break a Gemini request.
  */
 public final class MemoryMessages {
 
@@ -65,13 +67,13 @@ public final class MemoryMessages {
 
     private static AssistantMessage.ToolCall toolCall(ToolCallMetadata call) {
         return new AssistantMessage.ToolCall(call.id(), call.type() == null ? "function" : call.type(),
-                call.name(), call.arguments() == null ? "{}" : call.arguments());
+                call.name(), ToolJson.arguments(call.arguments()));
     }
 
     private static ToolResponseMessage.ToolResponse toolResult(ChatMessageDTO message) {
         ToolResponseMetadata response = message.getMetadata().toolResponse();
         String data = response.responseData() != null ? response.responseData() : text(message);
-        return new ToolResponseMessage.ToolResponse(response.id(), response.name(), data);
+        return new ToolResponseMessage.ToolResponse(response.id(), response.name(), ToolJson.result(data));
     }
 
     private static ToolResponseMessage toolResults(List<ToolResponseMessage.ToolResponse> results) {

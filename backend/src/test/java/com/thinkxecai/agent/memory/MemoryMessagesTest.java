@@ -32,7 +32,7 @@ class MemoryMessagesTest {
                 List.of(new ToolCallMetadata("call_1", "function", "weather", "{\"city\":\"Sydney\"}")), null));
 
         List<Message> messages = MemoryMessages.toSpringAi(List.of(
-                row(ChatMessageRole.USER, "weather?", null), call, result("call_1", "weather", "sunny"),
+                row(ChatMessageRole.USER, "weather?", null), call, result("call_1", "weather", "\"sunny\""),
                 row(ChatMessageRole.ASSISTANT, "It is sunny.", null)));
 
         assertThat(messages).hasSize(4);
@@ -44,7 +44,7 @@ class MemoryMessagesTest {
         });
         assertThat(messages.get(2)).isInstanceOfSatisfying(ToolResponseMessage.class, tool ->
                 assertThat(tool.getResponses()).containsExactly(
-                        new ToolResponseMessage.ToolResponse("call_1", "weather", "sunny")));
+                        new ToolResponseMessage.ToolResponse("call_1", "weather", "\"sunny\"")));
         assertThat(messages.get(3)).isInstanceOfSatisfying(AssistantMessage.class, assistant ->
                 assertThat(assistant.hasToolCalls()).isFalse());
     }
@@ -71,6 +71,26 @@ class MemoryMessagesTest {
                 row(ChatMessageRole.SYSTEM, "prompt", null), row(ChatMessageRole.USER, "q", null)));
 
         assertThat(messages).singleElement().isInstanceOf(UserMessage.class);
+    }
+
+    @Test
+    void storedToolDataThatIsNotJsonIsSentAsJson() {
+        // Spring AI's Gemini model parses every result and every call's arguments as JSON (ToolJson)
+        ChatMessageDTO calls = row(ChatMessageRole.ASSISTANT, "", new ChatMessageMetadata(List.of(
+                new ToolCallMetadata("a", "function", "weather", ""),
+                new ToolCallMetadata("b", "function", "weather", "{\"city\": Sydney"),
+                new ToolCallMetadata("c", "function", "weather", "{\"city\":\"Sydney\"}")), null));
+
+        List<Message> messages = MemoryMessages.toSpringAi(List.of(row(ChatMessageRole.USER, "q", null), calls,
+                result("a", "weather", "Unknown tool: weather."), result("b", "weather", ""),
+                result("c", "weather", "{\"sky\":\"sunny\"}")));
+
+        assertThat(messages.get(1)).isInstanceOfSatisfying(AssistantMessage.class, assistant ->
+                assertThat(assistant.getToolCalls()).extracting(AssistantMessage.ToolCall::arguments)
+                        .containsExactly("{}", "{}", "{\"city\":\"Sydney\"}"));
+        assertThat(messages.get(2)).isInstanceOfSatisfying(ToolResponseMessage.class, tool ->
+                assertThat(tool.getResponses()).extracting(ToolResponseMessage.ToolResponse::responseData)
+                        .containsExactly("\"Unknown tool: weather.\"", "\"\"", "{\"sky\":\"sunny\"}"));
     }
 
     @Test

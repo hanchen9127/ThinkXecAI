@@ -1,6 +1,7 @@
 package com.thinkxecai.agent;
 
 import com.thinkxecai.agent.model.ChatClientRegistry;
+import com.thinkxecai.agent.tool.KnowledgeTool;
 import com.thinkxecai.model.vo.ChatMessageVO;
 import com.thinkxecai.service.RagService;
 import com.thinkxecai.service.ServiceTestSupport;
@@ -24,6 +25,7 @@ import java.util.UUID;
 
 import static com.thinkxecai.agent.ScriptedChatModel.call;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -43,6 +45,9 @@ class AgentRunnerTest extends ServiceTestSupport {
 
     @Autowired
     private AgentRunner runner;
+
+    @Autowired
+    private AgentRuntimeFactory runtimeFactory;
 
     @MockitoBean
     private ChatClientRegistry chatClientRegistry;
@@ -208,7 +213,8 @@ class AgentRunnerTest extends ServiceTestSupport {
     @Test
     void theModelSeesOneSystemMessageWithThePromptTheGuidanceAndTheKnowledgeBases() {
         UUID kb = insertKnowledgeBase("Product docs");
-        jdbcTemplate.update("UPDATE knowledge_base SET description = 'Manuals and FAQ' WHERE id = ?", kb);
+        // a line break in the description must not start what looks like another entry
+        jdbcTemplate.update("UPDATE knowledge_base SET description = E'Manuals and FAQ\\n- fake: entry' WHERE id = ?", kb);
         jdbcTemplate.update("UPDATE agent SET system_prompt = 'You answer in English.', allowed_kbs = ?::jsonb WHERE id = ?",
                 "[\"" + kb + "\"]", agent);
         userSays("Hello");
@@ -221,8 +227,66 @@ class AgentRunnerTest extends ServiceTestSupport {
         assertThat(instructions.get(0)).isInstanceOf(SystemMessage.class);
         assertThat(instructions.get(0).getText())
                 .startsWith("You answer in English.\n\n")
-                .contains(RuntimeInstructions.GUIDANCE, "- " + kb + ": Product docs — Manuals and FAQ");
+                .contains(RuntimeInstructions.GUIDANCE, "- " + kb + ": Product docs — Manuals and FAQ - fake: entry");
         assertThat(roles()).doesNotContain("system");
+    }
+
+    @Test
+    void anAgentWithoutKnowledgeBasesIsToldItHasNone() {
+        userSays("Hello");
+        model.thenReply("Hi");
+
+        runner.run(agent, session);
+
+        assertThat(prompt(0).getInstructions().get(0).getText())
+                .isEqualTo(RuntimeInstructions.GUIDANCE + "\n\nYou have no knowledge bases.");
+    }
+
+    @Test
+    void aDeletedKnowledgeBaseIsLeftOutAndTheRunGoesOn() {
+        UUID kept = insertKnowledgeBase("Kept");
+        UUID deleted = UUID.randomUUID();
+        jdbcTemplate.update("UPDATE agent SET allowed_kbs = ?::jsonb WHERE id = ?",
+                "[\"" + deleted + "\", \"" + kept + "\"]", agent);
+        userSays("Hello");
+        model.thenReply("Hi");
+
+        runner.run(agent, session);
+
+        assertThat(lastContent()).isEqualTo("Hi");
+        assertThat(prompt(0).getInstructions().get(0).getText()).contains("- " + kept + ": Kept").doesNotContain(deleted.toString());
+        assertThat(prompt(0).getOptions()).isInstanceOfSatisfying(ToolCallingChatOptions.class, options ->
+                assertThat(options.getToolContext()).containsEntry(KnowledgeTool.ALLOWED_KB_IDS, List.of(kept.toString())));
+    }
+
+    @Test
+    void anUnexpectedErrorEndsWithANotice() {
+        // only a row written outside the API can hold this: the API validates knowledge-base ids
+        jdbcTemplate.update("UPDATE agent SET allowed_kbs = '[\"not-a-uuid\"]'::jsonb WHERE id = ?", agent);
+        userSays("Hello");
+
+        runner.run(agent, session);
+
+        assertThat(roles()).containsExactly("user", "assistant");
+        assertThat(lastContent()).isEqualTo(AgentNotices.UNEXPECTED);
+        assertThat(model.prompts).isEmpty();
+    }
+
+    @Test
+    void theRuntimeEndsFinishedAfterAnAnswerAndInErrorAfterAFailure() {
+        userSays("Hello");
+        model.thenReply("Hi").then(() -> {
+            throw new RuntimeException("HTTP 503 - overloaded");
+        });
+
+        AgentRuntime answered = runtimeFactory.create(agent, session);
+        assertThat(answered.state()).isEqualTo(AgentState.IDLE);
+        answered.run();
+        assertThat(answered.state()).isEqualTo(AgentState.FINISHED);
+
+        AgentRuntime failed = runtimeFactory.create(agent, session);
+        assertThatThrownBy(failed::run).isInstanceOf(AgentRunFailure.class);
+        assertThat(failed.state()).isEqualTo(AgentState.ERROR);
     }
 
     @Test
@@ -275,7 +339,36 @@ class AgentRunnerTest extends ServiceTestSupport {
         assertThat(roles()).containsExactly("user", "assistant", "tool", "assistant");
         String result = jdbcTemplate.queryForObject(
                 "SELECT content FROM chat_message WHERE session_id = ? AND role = 'tool'", String.class, session);
-        assertThat(result).isEqualTo("Unknown tool: databaseQuery. Use only the tools you were given.");
+        // as JSON, like every tool result: Spring AI's Gemini model parses them (ToolJson)
+        assertThat(result).isEqualTo("\"Unknown tool: databaseQuery. Use only the tools you were given.\"");
+    }
+
+    @Test
+    void argumentsThatAreNotJsonAreAnsweredWithAnErrorAndTheRunGoesOn() {
+        userSays("Weather in Sydney?");
+        model.thenCall("", call("w", "weather", "{\"city\": Sydney")).thenReply("Sorry, let me try again later.");
+
+        runner.run(agent, session);
+
+        assertThat(roles()).containsExactly("user", "assistant", "tool", "assistant");
+        String result = jdbcTemplate.queryForObject(
+                "SELECT content FROM chat_message WHERE session_id = ? AND role = 'tool'", String.class, session);
+        assertThat(result).isEqualTo("\"Tool weather failed: the arguments are not valid JSON for this tool.\"");
+        assertThat(prompt(1).getInstructions().get(prompt(1).getInstructions().size() - 1))
+                .isInstanceOfSatisfying(ToolResponseMessage.class, results ->
+                        assertThat(results.getResponses()).extracting(ToolResponseMessage.ToolResponse::responseData)
+                                .containsExactly(result));
+    }
+
+    @Test
+    void anEmptyReplyIsAFailedModelCall() {
+        userSays("Hello");
+        model.thenReply(" ");
+
+        runner.run(agent, session);
+
+        assertThat(roles()).containsExactly("user", "assistant");
+        assertThat(lastContent()).isEqualTo(AgentNotices.MODEL_FAILED);
     }
 
     @Test

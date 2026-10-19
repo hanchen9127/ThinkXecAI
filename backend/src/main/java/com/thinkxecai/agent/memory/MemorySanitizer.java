@@ -26,7 +26,8 @@ import java.util.Set;
  *   <li>a {@code tool} row is kept only if it answers a not yet answered call of the assistant message
  *       it directly follows (only other results of that message in between);</li>
  *   <li>an assistant message keeps only the calls that got a result; with none left it stays as plain
- *       text when it has text, and is dropped otherwise.</li>
+ *       text when it has text, and is dropped otherwise;</li>
+ *   <li>an assistant message without calls and without text is dropped.</li>
  * </ul>
  */
 public final class MemorySanitizer {
@@ -59,6 +60,9 @@ public final class MemorySanitizer {
             }
             if (role == ChatMessageRole.ASSISTANT && !toolCalls(message).isEmpty()) {
                 step = new ToolStep(message);
+            } else if (role == ChatMessageRole.ASSISTANT && isBlank(message)) {
+                // answers nothing, and Gemini refuses a message without parts
+                continue;
             } else {
                 kept.add(message);
             }
@@ -67,6 +71,10 @@ public final class MemorySanitizer {
             step.closeInto(kept);
         }
         return kept;
+    }
+
+    private static boolean isBlank(ChatMessageDTO message) {
+        return message.getContent() == null || message.getContent().isBlank();
     }
 
     private static List<ToolCallMetadata> toolCalls(ChatMessageDTO message) {

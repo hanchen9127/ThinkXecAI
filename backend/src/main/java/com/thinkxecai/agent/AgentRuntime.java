@@ -103,7 +103,12 @@ public class AgentRuntime {
         if (response == null || response.getResult() == null) {
             throw new AgentRunFailure(AgentNotices.MODEL_FAILED, "Model returned no reply", null);
         }
-        AssistantMessage reply = ToolCallIds.fill(response.getResult().getOutput());
+        AssistantMessage output = response.getResult().getOutput();
+        // Saved, an empty reply would answer nothing and become a message Gemini refuses (no parts).
+        if (!output.hasToolCalls() && (output.getText() == null || output.getText().isBlank())) {
+            throw new AgentRunFailure(AgentNotices.MODEL_FAILED, "Model returned an empty reply", null);
+        }
+        AssistantMessage reply = ToolCallIds.fill(output);
         save(List.of(GeneratedMessages.assistant(reply)));
         memory.add(conversationId(), reply);
         return reply;
@@ -115,10 +120,21 @@ public class AgentRuntime {
         Prompt prompt = new Prompt(conversation(), options);
         ChatResponse calls = new ChatResponse(List.of(new Generation(reply)));
         List<Message> history = toolCallingManager.executeToolCalls(prompt, calls).conversationHistory();
-        ToolResponseMessage results = (ToolResponseMessage) history.get(history.size() - 1);
+        ToolResponseMessage results = asJson((ToolResponseMessage) history.get(history.size() - 1));
         save(GeneratedMessages.toolResults(results));
         memory.add(conversationId(), results);
         return results.getResponses().stream().anyMatch(response -> TerminateTool.NAME.equals(response.name()));
+    }
+
+    /** Error texts and empty results become JSON strings, as the models need them (see {@link ToolJson}). */
+    private static ToolResponseMessage asJson(ToolResponseMessage results) {
+        return ToolResponseMessage.builder()
+                .responses(results.getResponses().stream()
+                        .map(response -> new ToolResponseMessage.ToolResponse(
+                                response.id(), response.name(), ToolJson.result(response.responseData())))
+                        .toList())
+                .metadata(results.getMetadata())
+                .build();
     }
 
     private List<Message> conversation() {

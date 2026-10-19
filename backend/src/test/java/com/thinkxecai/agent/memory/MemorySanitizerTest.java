@@ -128,6 +128,14 @@ class MemorySanitizerTest {
     }
 
     @Test
+    void anAssistantMessageWithoutCallsAndWithoutTextIsDropped() {
+        List<ChatMessageDTO> sanitized = MemorySanitizer.sanitize(List.of(
+                user("q"), assistant(""), user("again"), assistant(" "), assistant(null), assistant("answer")));
+
+        assertThat(describe(sanitized)).containsExactly("USER:q", "USER:again", "ASSISTANT:answer");
+    }
+
+    @Test
     void aCallWithABlankIdCannotBeAnswered() {
         List<ChatMessageDTO> sanitized = MemorySanitizer.sanitize(List.of(
                 user("q"), calling("text", " "), result(" "), assistant("answer")));

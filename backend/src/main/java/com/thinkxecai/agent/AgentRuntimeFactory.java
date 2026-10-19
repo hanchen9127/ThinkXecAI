@@ -1,5 +1,6 @@
 package com.thinkxecai.agent;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.thinkxecai.agent.memory.AgentMemoryWindow;
 import com.thinkxecai.agent.memory.MemoryMessages;
 import com.thinkxecai.agent.memory.MemorySanitizer;
@@ -17,6 +18,7 @@ import com.thinkxecai.model.dto.KnowledgeBaseDTO;
 import com.thinkxecai.model.entity.AgentEntity;
 import com.thinkxecai.service.GeneratedMessageService;
 import com.thinkxecai.service.ToolFacadeService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.messages.SystemMessage;
@@ -24,6 +26,7 @@ import org.springframework.ai.model.tool.ToolCallingChatOptions;
 import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.definition.ToolDefinition;
+import org.springframework.ai.tool.execution.ToolExecutionException;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -37,6 +40,7 @@ import java.util.stream.Collectors;
  * (it may have been deleted after the message was saved), its model's client, the knowledge bases that
  * still exist, its tools, the one system message, and the session's sanitized recent memory.
  */
+@Slf4j
 @Component
 public class AgentRuntimeFactory {
 
@@ -71,6 +75,9 @@ public class AgentRuntimeFactory {
         // in the application context and fail the run when it is missing; here the model is told instead.
         this.toolCallingManager = ToolCallingManager.builder()
                 .toolCallbackResolver(AgentRuntimeFactory::unknownTool)
+                // Spring AI's default rethrows a failure without a runtime cause, such as arguments that are not
+                // JSON, and that ends the run; here every tool failure is told to the model instead (ADR 041).
+                .toolExecutionExceptionProcessor(AgentRuntimeFactory::toolFailed)
                 .build();
     }
 
@@ -120,6 +127,19 @@ public class AgentRuntimeFactory {
                 .map(knowledgeBaseConverter::toDTO)
                 .collect(Collectors.toMap(KnowledgeBaseDTO::getId, Function.identity()));
         return ids.stream().filter(found::containsKey).map(found::get).toList();
+    }
+
+    /** A failed tool call: the model gets the reason and can correct itself. */
+    private static String toolFailed(ToolExecutionException exception) {
+        String name = exception.getToolDefinition().name();
+        Throwable cause = exception.getCause() != null ? exception.getCause() : exception;
+        // The message can quote the model's arguments: only the type at warn level.
+        log.warn("Tool {} failed: {}", name, cause.getClass().getSimpleName());
+        log.debug("Tool {} failure", name, exception);
+        String reason = cause instanceof JsonProcessingException
+                ? "the arguments are not valid JSON for this tool"
+                : cause.getClass().getSimpleName();
+        return "Tool " + name + " failed: " + reason + ".";
     }
 
     /** A tool the agent does not have: the model gets an error text and can correct itself. */
