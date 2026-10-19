@@ -129,10 +129,13 @@ public class AgentRuntimeFactory {
         return ids.stream().filter(found::containsKey).map(found::get).toList();
     }
 
-    /** A failed tool call: the model gets the reason and can correct itself. */
-    private static String toolFailed(ToolExecutionException exception) {
+    /** A failed tool call: the model gets the reason and can correct itself. An {@link Error} still ends the run. */
+    static String toolFailed(ToolExecutionException exception) {
         String name = exception.getToolDefinition().name();
         Throwable cause = exception.getCause() != null ? exception.getCause() : exception;
+        if (cause instanceof Error error) {
+            throw error;
+        }
         // The message can quote the model's arguments: only the type at warn level.
         log.warn("Tool {} failed: {}", name, cause.getClass().getSimpleName());
         log.debug("Tool {} failure", name, exception);
