@@ -6,21 +6,22 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
 
-import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Deque;
 import java.util.List;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Supplier;
 
 /**
  * A chat model that answers from a script and records every prompt it gets, so runtime tests need no
  * real model. A script step either returns a reply or throws; running out of steps is a test error.
+ * Safe to call from executor threads (runs started through the scheduler).
  */
 class ScriptedChatModel implements ChatModel {
 
-    private final Deque<Supplier<ChatResponse>> script = new ArrayDeque<>();
-    final List<Prompt> prompts = new ArrayList<>();
+    private final Deque<Supplier<ChatResponse>> script = new ConcurrentLinkedDeque<>();
+    final List<Prompt> prompts = new CopyOnWriteArrayList<>();
 
     ScriptedChatModel then(Supplier<ChatResponse> step) {
         script.add(step);
