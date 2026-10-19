@@ -2,6 +2,7 @@ package com.thinkxecai.agent;
 
 import com.thinkxecai.agent.model.ChatClientRegistry;
 import com.thinkxecai.agent.tool.KnowledgeTool;
+import com.thinkxecai.agent.tool.TerminateTool;
 import com.thinkxecai.model.vo.ChatMessageVO;
 import com.thinkxecai.service.RagService;
 import com.thinkxecai.service.ServiceTestSupport;
@@ -147,6 +148,24 @@ class AgentRunnerTest extends ServiceTestSupport {
 
         assertThat(roles()).containsExactly("user", "assistant", "tool");
         assertThat(model.prompts).hasSize(1);
+    }
+
+    @Test
+    void terminateWithoutAnAnswerDoesNotEndTheRun() {
+        // seen with Gemini: the tool results are there, but the user would get no text at all
+        userSays("What is the date?");
+        model.thenCall("", call("d", "getDate", "{}"))
+                .thenCall("", call("t", "terminate", "{}"))
+                .thenReply("Today is 2026-10-20.");
+
+        runner.run(agent, session);
+
+        assertThat(roles()).containsExactly("user", "assistant", "tool", "assistant", "tool", "assistant");
+        String result = jdbcTemplate.queryForObject("SELECT content FROM chat_message WHERE session_id = ? "
+                + "AND metadata->'toolResponse'->>'name' = 'terminate'", String.class, session);
+        assertThat(result).isEqualTo(ToolJson.result(TerminateTool.NOT_ENDED));
+        assertThat(lastContent()).isEqualTo("Today is 2026-10-20.");
+        assertThat(model.prompts).hasSize(3);
     }
 
     @Test

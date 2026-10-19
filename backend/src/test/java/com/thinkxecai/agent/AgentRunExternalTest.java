@@ -152,11 +152,15 @@ class AgentRunExternalTest extends ServiceTestSupport {
         return names;
     }
 
+    /** The run ended with text for the user: the last assistant row has some, followed at most by terminate's result. */
     private static void assertEndsWithAnAnswer(List<Map<String, Object>> rows) {
-        Map<String, Object> last = rows.get(rows.size() - 1);
-        assertThat(last.get("role")).isEqualTo("assistant");
-        assertThat(last.get("metadata")).isNull();
-        assertThat((String) last.get("content")).isNotBlank().isNotIn(NOTICES);
+        int last = rows.size() - 1;
+        while (last >= 0 && "tool".equals(rows.get(last).get("role")) && "terminate".equals(rows.get(last).get("response_name"))) {
+            last--;
+        }
+        assertThat(last).isNotNegative();
+        assertThat(rows.get(last).get("role")).isEqualTo("assistant");
+        assertThat((String) rows.get(last).get("content")).isNotBlank().isNotIn(NOTICES);
     }
 
 }

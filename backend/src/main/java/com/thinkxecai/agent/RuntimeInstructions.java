@@ -21,6 +21,8 @@ public final class RuntimeInstructions {
             1. Read the user's original request carefully and make sure every part of it gets done.
             2. Give your final answer only when the whole request is complete.
             3. When information is missing, get it with the available tools before asking the user.
+            4. The user sees only your text, never tool results: write your final answer as text, and call
+               terminate only in the message that contains it.
 
             Decide the next action from the conversation so far. If a tool is needed, call it.""";
 

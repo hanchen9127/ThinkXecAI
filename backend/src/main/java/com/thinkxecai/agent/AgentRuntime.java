@@ -114,24 +114,34 @@ public class AgentRuntime {
         return reply;
     }
 
-    /** Runs the reply's tool calls and saves their results; true if {@code terminate} was called. */
+    /**
+     * Runs the reply's tool calls and saves their results; true if {@code terminate} ends the run. It does only
+     * in a reply with text: the user sees no tool results, so a run ended without text would answer nothing.
+     * Called alone, it is answered with {@link TerminateTool#NOT_ENDED} and the loop goes on.
+     */
     private boolean execute(AssistantMessage reply) {
         // The prompt carries the tool callbacks and the tool context (the agent's knowledge bases).
         Prompt prompt = new Prompt(conversation(), options);
         ChatResponse calls = new ChatResponse(List.of(new Generation(reply)));
         List<Message> history = toolCallingManager.executeToolCalls(prompt, calls).conversationHistory();
-        ToolResponseMessage results = asJson((ToolResponseMessage) history.get(history.size() - 1));
+        boolean answered = reply.getText() != null && !reply.getText().isBlank();
+        ToolResponseMessage results = asJson((ToolResponseMessage) history.get(history.size() - 1), answered);
         save(GeneratedMessages.toolResults(results));
         memory.add(conversationId(), results);
-        return results.getResponses().stream().anyMatch(response -> TerminateTool.NAME.equals(response.name()));
+        return answered && results.getResponses().stream().anyMatch(response -> TerminateTool.NAME.equals(response.name()));
     }
 
-    /** Error texts and empty results become JSON strings, as the models need them (see {@link ToolJson}). */
-    private static ToolResponseMessage asJson(ToolResponseMessage results) {
+    /**
+     * Error texts and empty results become JSON strings, as the models need them (see {@link ToolJson});
+     * {@code terminate} in a reply without text gets {@link TerminateTool#NOT_ENDED}.
+     */
+    private static ToolResponseMessage asJson(ToolResponseMessage results, boolean answered) {
         return ToolResponseMessage.builder()
                 .responses(results.getResponses().stream()
                         .map(response -> new ToolResponseMessage.ToolResponse(
-                                response.id(), response.name(), ToolJson.result(response.responseData())))
+                                response.id(), response.name(), ToolJson.result(
+                                        !answered && TerminateTool.NAME.equals(response.name())
+                                                ? TerminateTool.NOT_ENDED : response.responseData())))
                         .toList())
                 .metadata(results.getMetadata())
                 .build();
