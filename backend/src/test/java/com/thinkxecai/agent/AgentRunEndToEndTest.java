@@ -5,11 +5,14 @@ import com.thinkxecai.service.ServiceTestSupport;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.MessageType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.core.task.TaskRejectedException;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -155,6 +158,28 @@ class AgentRunEndToEndTest extends ServiceTestSupport {
         assertThat(committedOnReturn).hasValue(1);
         assertThat(contents()).containsExactly("user: Hello", "assistant: " + AgentNotices.BUSY);
         assertThat(model.prompts).isEmpty();
+    }
+
+    @Test
+    @ExtendWith(OutputCaptureExtension.class)
+    void aRejectedRunOfADeletedSessionSavesNothingAndIsNoError(CapturedOutput output) {
+        AgentRunScheduler full = new AgentRunScheduler(runner, task -> {
+            throw new TaskRejectedException("queue full");
+        }, transactionManager);
+
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            jdbcTemplate.update("DELETE FROM chat_session WHERE id = ?", session);
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCompletion(int completion) {
+                    full.submit(agent, session);
+                }
+            });
+        });
+
+        // a save joined to a transaction would mark it rollback-only, and its commit would fail
+        assertThat(output).contains("Notice not saved: session " + session + " was deleted")
+                .doesNotContain("Notice not saved for session");
     }
 
 }

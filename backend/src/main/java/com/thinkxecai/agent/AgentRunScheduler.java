@@ -29,15 +29,15 @@ public class AgentRunScheduler {
 
     private final AgentRunner runner;
     private final Executor executor;
-    private final TransactionTemplate newTransaction;
+    private final TransactionTemplate withoutTransaction;
     private final ConcurrentMap<UUID, CompletableFuture<Void>> tails = new ConcurrentHashMap<>();
 
     public AgentRunScheduler(AgentRunner runner, @Qualifier("asyncEventExecutor") Executor executor,
                              PlatformTransactionManager transactionManager) {
         this.runner = runner;
         this.executor = executor;
-        this.newTransaction = new TransactionTemplate(transactionManager);
-        this.newTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        this.withoutTransaction = new TransactionTemplate(transactionManager);
+        this.withoutTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_NOT_SUPPORTED);
     }
 
     /** Queues a run behind the session's earlier runs. Never throws: the caller is a commit callback. */
@@ -68,9 +68,11 @@ public class AgentRunScheduler {
         }
         log.warn("Agent {} not run for session {}: the executor is full", agentId, sessionId);
         // A rejection seen on the request thread arrives in the commit callback, while the committed
-        // transaction is still bound: the notice needs a transaction of its own.
+        // transaction is still bound to the thread. Suspended, the save runs in a transaction of its own
+        // that it commits or rolls back by itself (a joined one would turn an expected failure, such as a
+        // deleted session, into an UnexpectedRollbackException).
         try {
-            newTransaction.executeWithoutResult(status -> runner.notify(sessionId, AgentNotices.BUSY));
+            withoutTransaction.executeWithoutResult(status -> runner.notify(sessionId, AgentNotices.BUSY));
         } catch (RuntimeException e) {
             log.error("Notice not saved for session {}", sessionId, e);
         }
