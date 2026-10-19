@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Whole agent runs against the real DeepSeek and Gemini APIs (needs real {@code THINKXECAI_DEEPSEEK_API_KEY}
- * and {@code THINKXECAI_GEMINI_API_KEY}; costs about 15 requests). Each run uses the fixed sample tools,
+ * and {@code THINKXECAI_GEMINI_API_KEY}; costs about 20 requests). Each run uses the fixed sample tools,
  * so the answers are checked only for their shape: tool calls with ids answered by tool rows, and a final
  * plain answer. The session that switches models checks that one model accepts a history the other wrote:
  * stored tool calls carry no Gemini thought signatures. Rows are logged, since only a real run shows how
@@ -77,6 +77,27 @@ class AgentRunExternalTest extends ServiceTestSupport {
                 assertEndsWithAnAnswer(rows.subList(0, i));
             }
         }
+        assertEndsWithAnAnswer(rows);
+    }
+
+    @Test
+    void aQueuedGeminiRunReadsThePreviousRunsToolCalls() {
+        // ADR 042: a message sent during a run is stored before that run's rows, so the next run's current
+        // turn (since the last user message) holds the previous run's calls, rebuilt without thought signatures
+        UUID agent = agentOn("gemini-3.8-flash");
+        UUID session = insertChatSession(agent, "external");
+
+        say(session, "What is today's date? Use the getDate tool.");
+        say(session, "And which city do I have? Use the getCity tool.");
+        runner.run(agent, session);
+        int firstRun = rows(session).size();
+        runner.run(agent, session);
+
+        List<Map<String, Object>> rows = rows(session);
+        log("queued gemini", rows);
+        assertToolRowsAnswerEarlierCalls(rows);
+        assertEndsWithAnAnswer(rows.subList(0, firstRun));
+        assertThat(rows).hasSizeGreaterThan(firstRun);
         assertEndsWithAnAnswer(rows);
     }
 
