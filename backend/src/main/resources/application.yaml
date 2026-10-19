@@ -100,8 +100,8 @@ thinkxecai:
   ollama:
     read-timeout: 60s
   # Chat model HTTP clients (ChatModelConfig); both timeouts must be positive. DeepSeek: per attempt. Gemini:
-  # the SDK has no connect timeout and only a timeout for the whole call, which does not cut short its wait
-  # before a retry, so a hanging call ends within read-timeout plus one retry interval (at most 10 s).
+  # the SDK has no connect timeout and only a timeout for the whole call, which does not cut short its waits
+  # between attempts, so a hanging call ends after read-timeout plus all remaining waits (8 s with 3 attempts).
   # The Gemini base URL is a setting so tests can use a fake server.
   chat:
     connect-timeout: 10s
