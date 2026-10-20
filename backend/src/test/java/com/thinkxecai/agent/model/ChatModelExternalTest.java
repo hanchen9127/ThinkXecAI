@@ -86,6 +86,30 @@ class ChatModelExternalTest {
         assertThat(toolRuns).hasValue(0);
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"deepseek-chat", "gemini-3.8-flash"})
+    void aConversationWithToolCallsCanBeAnsweredWithoutTools(String model) {
+        // ADR 045: after a terminate without text the runtime asks once more, offering no tools
+        ChatClient chatClient = chatClientRegistry.get(model);
+        AtomicInteger toolRuns = new AtomicInteger();
+        List<Message> conversation = List.of(
+                new SystemMessage("Answer briefly."),
+                new UserMessage("What is today's date? Use the getDate tool."));
+        AssistantMessage call = chatClient.prompt().messages(conversation).toolCallbacks(dateTool(toolRuns))
+                .call().chatResponse().getResult().getOutput();
+        assertThat(call.getToolCalls()).extracting(AssistantMessage.ToolCall::name).containsExactly("getDate");
+        AssistantMessage.ToolCall toolCall = call.getToolCalls().get(0);
+        ToolResponseMessage result = ToolResponseMessage.builder()
+                .responses(List.of(new ToolResponseMessage.ToolResponse(toolCall.id(), toolCall.name(), "\"" + DATE + "\"")))
+                .build();
+
+        String answer = chatClient.prompt().messages(List.of(conversation.get(0), conversation.get(1), call, result))
+                .call().content();
+
+        log.info("{} answered without tools: {}", model, answer);
+        assertThat(answer).containsAnyOf(DATE, "19");
+    }
+
     private static ToolCallback dateTool(AtomicInteger runs) {
         return new ToolCallback() {
             @Override

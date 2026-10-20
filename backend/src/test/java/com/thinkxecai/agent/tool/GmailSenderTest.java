@@ -132,6 +132,18 @@ class GmailSenderTest {
     }
 
     @Test
+    void theMessageIdNamesTheSendersDomainNotThisMachine() throws Exception {
+        sender.send(new InternetAddress("alice@example.com"), "S", "B");
+
+        String raw = JSON.readTree(requests.get(1).body()).get("raw").asText();
+        MimeMessage message = new MimeMessage(Session.getInstance(new Properties()),
+                new ByteArrayInputStream(Base64.getUrlDecoder().decode(raw)));
+        // Without a configured address Jakarta Mail looks up this machine's host name for the Message-ID:
+        // a reverse DNS lookup that took 5 s here, and the name would be sent to the recipient.
+        assertThat(message.getMessageID()).endsWith("@example.com>");
+    }
+
+    @Test
     void theAccessTokenIsReusedUntilShortlyBeforeItExpires() throws Exception {
         sender.send(new InternetAddress("alice@example.com"), "One", "1");
         sender.send(new InternetAddress("alice@example.com"), "Two", "2");

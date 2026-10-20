@@ -118,6 +118,35 @@ class ChatMessageMapperTest extends MapperTestSupport {
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
+    @Test
+    void selectTurnTakesTheLatestUpToTheTriggerAndTheNewestRunOutputAfterIt() {
+        UUID session = insertChatSession(null, "s");
+        insert(session, "user", "old 1");
+        insert(session, "assistant", "old 2");
+        insert(session, "user", "q1");
+        UUID trigger = insert(session, "user", "q2").getId();
+        for (int i = 1; i <= 5; i++) {
+            insert(session, "assistant", "run1 " + i);
+        }
+        insert(session, "user", "q3");
+
+        // limit 3 counts only up to the trigger; the earlier run's rows come on top, newest 4 of them;
+        // q3 is left to its own run
+        assertThat(contents(mapper.selectTurnBySessionId(session, trigger, 3, 4))).containsExactly(
+                "old 2", "q1", "q2", "run1 2", "run1 3", "run1 4", "run1 5");
+    }
+
+    @Test
+    void selectTurnOfAMissingOrForeignTriggerIsEmpty() {
+        UUID session = insertChatSession(null, "s");
+        UUID other = insertChatSession(null, "other");
+        insert(session, "user", "mine");
+        UUID foreign = insert(other, "user", "theirs").getId();
+
+        assertThat(mapper.selectTurnBySessionId(session, UUID.randomUUID(), 10, 10)).isEmpty();
+        assertThat(mapper.selectTurnBySessionId(session, foreign, 10, 10)).isEmpty();
+    }
+
     private ChatMessageEntity insert(UUID sessionId, String role, String content) {
         return insert(sessionId, role, content, null);
     }

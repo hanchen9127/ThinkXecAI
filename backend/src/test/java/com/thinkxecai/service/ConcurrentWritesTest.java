@@ -1,5 +1,6 @@
 package com.thinkxecai.service;
 
+import com.thinkxecai.agent.AgentRunScheduler;
 import com.thinkxecai.exception.BizException;
 import com.thinkxecai.model.request.CreateChatMessageRequest;
 import com.thinkxecai.model.request.CreateChatSessionRequest;
@@ -68,6 +69,10 @@ class ConcurrentWritesTest extends ServiceTestSupport {
 
     @MockitoBean
     private EmbeddingModel embeddingModel;
+
+    // committed messages would start agent runs against the real models
+    @MockitoBean
+    private AgentRunScheduler agentRunScheduler;
 
     @DynamicPropertySource
     static void useTemporaryStorage(DynamicPropertyRegistry registry) {

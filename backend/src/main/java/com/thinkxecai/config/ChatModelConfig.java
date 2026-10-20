@@ -42,10 +42,12 @@ import java.time.Duration;
  * DeepSeek: a JDK request factory with {@code thinkxecai.chat.connect-timeout} and
  * {@code thinkxecai.chat.read-timeout} per attempt; retries come from Spring AI's {@code RetryTemplate}
  * ({@code spring.ai.retry.*}). Gemini: the google-genai SDK only offers a timeout for the whole call,
- * which cancels the request but not the SDK's wait between attempts, so a hanging Gemini call ends
- * within the read timeout plus one retry interval. Spring AI's Gemini model wraps every SDK error so
- * its {@code RetryTemplate} never retries; the SDK's own retry gets the same {@code spring.ai.retry.*}
- * values instead, without the SDK's random jitter, so both models wait the same intervals.
+ * which cancels the request but not the SDK's waits between attempts: after the cancel each remaining
+ * attempt fails at once, but the SDK still waits before it, so a hanging Gemini call ends after the
+ * read timeout plus all remaining waits (2 s + 6 s with 3 attempts). Spring AI's Gemini model wraps
+ * every SDK error so its {@code RetryTemplate} never retries; the SDK's own retry gets the same
+ * {@code spring.ai.retry.*} values instead, without the SDK's random jitter, so both models wait the
+ * same intervals.
  * <p>
  * A timeout of zero would mean "no timeout" to the Gemini SDK and "fail at once" to DeepSeek's
  * client, so both settings must be positive; startup fails otherwise.

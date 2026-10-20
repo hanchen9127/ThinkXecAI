@@ -200,7 +200,12 @@ public class GmailSender {
 
     private MimeMessage mimeMessage(InternetAddress to, String subject, String body) {
         try {
-            MimeMessage message = new MimeMessage(Session.getInstance(new Properties()));
+            // With mail.from set, the Message-ID uses the sender's domain. Without it Jakarta Mail looks up
+            // this machine's host name: a reverse DNS lookup that can take seconds of the send's deadline,
+            // and the name would reach the recipient.
+            Properties properties = new Properties();
+            properties.setProperty("mail.from", settings.get("THINKXECAI_GMAIL_SENDER"));
+            MimeMessage message = new MimeMessage(Session.getInstance(properties));
             message.setFrom(new InternetAddress(settings.get("THINKXECAI_GMAIL_SENDER"), true));
             message.setRecipient(MimeMessage.RecipientType.TO, to);
             message.setSubject(subject, "UTF-8");
