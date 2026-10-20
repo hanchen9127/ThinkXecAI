@@ -36,6 +36,7 @@ class AgentRunSchedulerTest {
     private final ExecutorService pool = Executors.newFixedThreadPool(4);
     private final List<String> events = new CopyOnWriteArrayList<>();
     private final UUID session = UUID.randomUUID();
+    private final UUID message = UUID.randomUUID();
 
     @AfterEach
     void stopPool() {
@@ -54,7 +55,7 @@ class AgentRunSchedulerTest {
             assertThat(release.await(WAIT.toSeconds(), TimeUnit.SECONDS)).isTrue();
             events.add("end " + name);
             return null;
-        }).when(runner).run(agent, session);
+        }).when(runner).run(agent, session, message);
         return release;
     }
 
@@ -62,7 +63,7 @@ class AgentRunSchedulerTest {
         doAnswer(invocation -> {
             events.add("run " + name);
             return null;
-        }).when(runner).run(agent, sessionId);
+        }).when(runner).run(agent, sessionId, message);
     }
 
     @Test
@@ -75,14 +76,14 @@ class AgentRunSchedulerTest {
         recording(third, session, "third");
         AgentRunScheduler scheduler = scheduler(pool);
 
-        scheduler.submit(first, session);
+        scheduler.submit(first, session, message);
         await().atMost(WAIT).until(() -> events.contains("start first"));
-        scheduler.submit(second, session);
-        scheduler.submit(third, session);
+        scheduler.submit(second, session, message);
+        scheduler.submit(third, session, message);
 
-        verify(runner, after(300).never()).run(second, session);
+        verify(runner, after(300).never()).run(second, session, message);
         release.countDown();
-        verify(runner, timeout(WAIT.toMillis())).run(third, session);
+        verify(runner, timeout(WAIT.toMillis())).run(third, session, message);
         assertThat(events).containsExactly("start first", "end first", "run second", "run third");
     }
 
@@ -95,9 +96,9 @@ class AgentRunSchedulerTest {
         recording(second, other, "other");
         AgentRunScheduler scheduler = scheduler(pool);
 
-        scheduler.submit(first, session);
+        scheduler.submit(first, session, message);
         await().atMost(WAIT).until(() -> events.contains("start first"));
-        scheduler.submit(second, other);
+        scheduler.submit(second, other, message);
 
         await().atMost(WAIT).until(() -> events.contains("run other"));
         assertThat(events).doesNotContain("end first");
@@ -110,10 +111,10 @@ class AgentRunSchedulerTest {
             throw new TaskRejectedException("queue full");
         });
 
-        scheduler.submit(UUID.randomUUID(), session);
+        scheduler.submit(UUID.randomUUID(), session, message);
 
         verify(runner).notify(session, AgentNotices.BUSY);
-        verify(runner, never()).run(any(), any());
+        verify(runner, never()).run(any(), any(), any());
         assertThat(scheduler.activeSessions()).isZero();
     }
 
@@ -135,13 +136,13 @@ class AgentRunSchedulerTest {
             pool.execute(task);
         });
 
-        scheduler.submit(first, session);
+        scheduler.submit(first, session, message);
         await().atMost(WAIT).until(() -> events.contains("start first"));
-        scheduler.submit(UUID.randomUUID(), session);
-        scheduler.submit(third, session);
+        scheduler.submit(UUID.randomUUID(), session, message);
+        scheduler.submit(third, session, message);
         release.countDown();
 
-        verify(runner, timeout(WAIT.toMillis())).run(third, session);
+        verify(runner, timeout(WAIT.toMillis())).run(third, session, message);
         assertThat(events).containsExactly("start first", "end first", "notice", "run third");
     }
 
@@ -149,13 +150,13 @@ class AgentRunSchedulerTest {
     void aRunThatThrowsDoesNotHoldUpTheSession() {
         UUID first = UUID.randomUUID();
         UUID second = UUID.randomUUID();
-        doThrow(new Error("boom")).when(runner).run(first, session);
+        doThrow(new Error("boom")).when(runner).run(first, session, message);
         AgentRunScheduler scheduler = scheduler(pool);
 
-        scheduler.submit(first, session);
-        scheduler.submit(second, session);
+        scheduler.submit(first, session, message);
+        scheduler.submit(second, session, message);
 
-        verify(runner, timeout(WAIT.toMillis())).run(second, session);
+        verify(runner, timeout(WAIT.toMillis())).run(second, session, message);
         verify(runner, never()).notify(any(), any());
     }
 
@@ -163,12 +164,12 @@ class AgentRunSchedulerTest {
     void theSessionIsForgottenOnceItsRunsAreDone() {
         AgentRunScheduler scheduler = scheduler(pool);
 
-        scheduler.submit(UUID.randomUUID(), session);
-        scheduler.submit(UUID.randomUUID(), session);
-        scheduler.submit(UUID.randomUUID(), UUID.randomUUID());
+        scheduler.submit(UUID.randomUUID(), session, message);
+        scheduler.submit(UUID.randomUUID(), session, message);
+        scheduler.submit(UUID.randomUUID(), UUID.randomUUID(), message);
 
         await().atMost(WAIT).until(() -> scheduler.activeSessions() == 0);
-        verify(runner, timeout(WAIT.toMillis()).times(3)).run(any(), any());
+        verify(runner, timeout(WAIT.toMillis()).times(3)).run(any(), any(), any());
     }
 
 }

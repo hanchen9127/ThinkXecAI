@@ -23,10 +23,11 @@ public class AgentRunner {
     private final GeneratedMessageService generatedMessageService;
     private final GeneratedMessagePublisher publisher;
 
-    public void run(UUID agentId, UUID sessionId) {
+    /** @param messageId the user message the run answers (ADR 046) */
+    public void run(UUID agentId, UUID sessionId, UUID messageId) {
         log.info("Agent {} runs for session {}", agentId, sessionId);
         try {
-            AgentRuntime.Outcome outcome = agentRuntimeFactory.create(agentId, sessionId).run();
+            AgentRuntime.Outcome outcome = agentRuntimeFactory.create(agentId, sessionId, messageId).run();
             log.info("Agent {} in session {} ended: {}", agentId, sessionId, outcome);
             if (outcome == AgentRuntime.Outcome.MAX_STEPS) {
                 notify(sessionId, AgentNotices.MAX_STEPS);

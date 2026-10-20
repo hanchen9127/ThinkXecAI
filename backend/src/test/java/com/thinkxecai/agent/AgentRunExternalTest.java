@@ -41,9 +41,9 @@ class AgentRunExternalTest extends ServiceTestSupport {
         UUID agent = agentOn(model);
         UUID session = insertChatSession(agent, "external");
 
-        say(session, "What is the weather in my city today? Find my city and today's date with the tools, "
+        UUID question = say(session, "What is the weather in my city today? Find my city and today's date with the tools, "
                 + "then get the weather and tell me.");
-        runner.run(agent, session);
+        runner.run(agent, session, question);
 
         List<Map<String, Object>> rows = rows(session);
         log(model, rows);
@@ -57,14 +57,11 @@ class AgentRunExternalTest extends ServiceTestSupport {
         UUID agent = agentOn("gemini-3.8-flash");
         UUID session = insertChatSession(agent, "external");
 
-        say(session, "What is today's date? Use the getDate tool.");
-        runner.run(agent, session);
+        runner.run(agent, session, say(session, "What is today's date? Use the getDate tool."));
         useModel(agent, "deepseek-chat");
-        say(session, "Which city do I have? Use the getCity tool.");
-        runner.run(agent, session);
+        runner.run(agent, session, say(session, "Which city do I have? Use the getCity tool."));
         useModel(agent, "gemini-3.8-flash");
-        say(session, "What is the weather there on that date? Use the weather tool.");
-        runner.run(agent, session);
+        runner.run(agent, session, say(session, "What is the weather there on that date? Use the weather tool."));
 
         List<Map<String, Object>> rows = rows(session);
         log("gemini → deepseek → gemini", rows);
@@ -82,16 +79,16 @@ class AgentRunExternalTest extends ServiceTestSupport {
 
     @Test
     void aQueuedGeminiRunReadsThePreviousRunsToolCalls() {
-        // ADR 042: a message sent during a run is stored before that run's rows, so the next run's current
-        // turn (since the last user message) holds the previous run's calls, rebuilt without thought signatures
+        // ADR 042: a message sent during a run is stored before that run's rows; the queued run gets it last
+        // (ADR 046), after the previous run's calls, which are rebuilt without thought signatures
         UUID agent = agentOn("gemini-3.8-flash");
         UUID session = insertChatSession(agent, "external");
 
-        say(session, "What is today's date? Use the getDate tool.");
-        say(session, "And which city do I have? Use the getCity tool.");
-        runner.run(agent, session);
+        UUID first = say(session, "What is today's date? Use the getDate tool.");
+        UUID second = say(session, "And which city do I have? Use the getCity tool.");
+        runner.run(agent, session, first);
         int firstRun = rows(session).size();
-        runner.run(agent, session);
+        runner.run(agent, session, second);
 
         List<Map<String, Object>> rows = rows(session);
         log("queued gemini", rows);
@@ -110,8 +107,9 @@ class AgentRunExternalTest extends ServiceTestSupport {
         jdbcTemplate.update("UPDATE agent SET model = ? WHERE id = ?", model, agent);
     }
 
-    private void say(UUID session, String text) {
-        jdbcTemplate.update("INSERT INTO chat_message (session_id, role, content) VALUES (?, 'user', ?)", session, text);
+    private UUID say(UUID session, String text) {
+        return jdbcTemplate.queryForObject("INSERT INTO chat_message (session_id, role, content) VALUES (?, 'user', ?) "
+                + "RETURNING id", UUID.class, session, text);
     }
 
     private List<Map<String, Object>> rows(UUID session) {
@@ -152,12 +150,18 @@ class AgentRunExternalTest extends ServiceTestSupport {
         return names;
     }
 
-    /** The run ended with text for the user: the last assistant row has some, followed at most by terminate's result. */
+    /**
+     * The run ended with text for the user: the last assistant row has some. Results may follow it only if it
+     * called {@code terminate} (with other tools in the same message, their results come first).
+     */
     private static void assertEndsWithAnAnswer(List<Map<String, Object>> rows) {
         int last = rows.size() - 1;
-        while (last >= 0 && "tool".equals(rows.get(last).get("role")) && "terminate".equals(rows.get(last).get("response_name"))) {
+        boolean terminated = false;
+        while (last >= 0 && "tool".equals(rows.get(last).get("role"))) {
+            terminated |= "terminate".equals(rows.get(last).get("response_name"));
             last--;
         }
+        assertThat(terminated || last == rows.size() - 1).as("results after the answer only with terminate").isTrue();
         assertThat(last).isNotNegative();
         assertThat(rows.get(last).get("role")).isEqualTo("assistant");
         assertThat((String) rows.get(last).get("content")).isNotBlank().isNotIn(NOTICES);

@@ -40,6 +40,26 @@
         ORDER BY created_at ASC
     </select>
 
+    <!-- A run's memory (ADR 046): the latest N up to and including the run's own message, then everything after it. -->
+    <select id="selectTurnBySessionId" resultType="com.thinkxecai.model.entity.ChatMessageEntity">
+        WITH run_trigger AS (
+            SELECT created_at FROM chat_message WHERE id = #{triggerId} AND session_id = #{sessionId}
+        )
+        SELECT <include refid="columns"/>
+        FROM (
+            SELECT <include refid="columns"/>
+            FROM chat_message
+            WHERE session_id = #{sessionId} AND created_at &lt;= (SELECT created_at FROM run_trigger)
+            ORDER BY created_at DESC
+            LIMIT #{limit}
+        ) older
+        UNION ALL
+        SELECT <include refid="columns"/>
+        FROM chat_message
+        WHERE session_id = #{sessionId} AND created_at &gt; (SELECT created_at FROM run_trigger)
+        ORDER BY created_at ASC
+    </select>
+
     <delete id="deleteById">
         DELETE FROM chat_message
         WHERE id = #{id}

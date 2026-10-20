@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.thinkxecai.agent.memory.AgentMemoryWindow;
 import com.thinkxecai.agent.memory.MemoryMessages;
 import com.thinkxecai.agent.memory.MemorySanitizer;
+import com.thinkxecai.agent.memory.RunTurn;
 import com.thinkxecai.agent.model.ChatClientRegistry;
 import com.thinkxecai.agent.tool.KnowledgeTool;
 import com.thinkxecai.converter.AgentConverter;
@@ -12,10 +13,12 @@ import com.thinkxecai.converter.KnowledgeBaseConverter;
 import com.thinkxecai.mapper.AgentMapper;
 import com.thinkxecai.mapper.ChatMessageMapper;
 import com.thinkxecai.mapper.KnowledgeBaseMapper;
+import com.thinkxecai.model.ChatMessageRole;
 import com.thinkxecai.model.dto.AgentDTO;
 import com.thinkxecai.model.dto.ChatMessageDTO;
 import com.thinkxecai.model.dto.KnowledgeBaseDTO;
 import com.thinkxecai.model.entity.AgentEntity;
+import com.thinkxecai.model.entity.ChatMessageEntity;
 import com.thinkxecai.service.GeneratedMessageService;
 import com.thinkxecai.service.ToolFacadeService;
 import lombok.extern.slf4j.Slf4j;
@@ -81,8 +84,11 @@ public class AgentRuntimeFactory {
                 .build();
     }
 
-    /** @throws AgentRunFailure if the agent no longer exists or its model is not registered */
-    public AgentRuntime create(UUID agentId, UUID sessionId) {
+    /**
+     * @param triggerId the user message this run answers (ADR 046); null keeps the stored order
+     * @throws AgentRunFailure if the agent no longer exists or its model is not registered
+     */
+    public AgentRuntime create(UUID agentId, UUID sessionId, UUID triggerId) {
         AgentEntity entity = agentMapper.selectById(agentId);
         if (entity == null) {
             throw new AgentRunFailure(AgentNotices.AGENT_GONE, "Agent not found: " + agentId, null);
@@ -106,15 +112,35 @@ public class AgentRuntimeFactory {
                 .build();
 
         int messageLength = agent.getChatOptions().getMessageLength();
-        List<ChatMessageDTO> stored = chatMessageMapper.selectRecentBySessionId(sessionId, messageLength).stream()
-                .map(chatMessageConverter::toDTO)
-                .toList();
         SystemMessage systemMessage = RuntimeInstructions.systemMessage(agent.getSystemPrompt(), knowledgeBases);
         ChatMemory memory = AgentMemoryWindow.create(sessionId.toString(), systemMessage,
-                MemoryMessages.toSpringAi(MemorySanitizer.sanitize(stored)), messageLength);
+                MemoryMessages.toSpringAi(MemorySanitizer.sanitize(storedTurn(sessionId, triggerId, messageLength))),
+                messageLength);
 
         return new AgentRuntime(agentId, sessionId, chatClient, memory, options, toolCallingManager,
                 generatedMessageService, publisher);
+    }
+
+    /**
+     * The stored rows the run remembers, its own message last (ADR 046). A trigger that is gone (deleted
+     * meanwhile) or is not a user message of this session leaves the latest rows in their stored order.
+     */
+    private List<ChatMessageDTO> storedTurn(UUID sessionId, UUID triggerId, int messageLength) {
+        if (triggerId != null) {
+            List<ChatMessageDTO> turn = toDTOs(chatMessageMapper.selectTurnBySessionId(sessionId, triggerId, messageLength));
+            ChatMessageDTO trigger = turn.stream()
+                    .filter(message -> triggerId.equals(message.getId()) && message.getRole() == ChatMessageRole.USER)
+                    .findFirst()
+                    .orElse(null);
+            if (trigger != null) {
+                return RunTurn.endWith(turn, trigger);
+            }
+        }
+        return toDTOs(chatMessageMapper.selectRecentBySessionId(sessionId, messageLength));
+    }
+
+    private List<ChatMessageDTO> toDTOs(List<ChatMessageEntity> entities) {
+        return entities.stream().map(chatMessageConverter::toDTO).toList();
     }
 
     /** The agent's knowledge bases that still exist, in the agent's order. */

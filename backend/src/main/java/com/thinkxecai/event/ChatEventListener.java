@@ -20,7 +20,7 @@ public class ChatEventListener {
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onChatEvent(ChatEvent event) {
-        scheduler.submit(event.agentId(), event.sessionId());
+        scheduler.submit(event.agentId(), event.sessionId(), event.messageId());
     }
 
 }

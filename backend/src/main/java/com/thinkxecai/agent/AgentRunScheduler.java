@@ -40,13 +40,16 @@ public class AgentRunScheduler {
         this.withoutTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_NOT_SUPPORTED);
     }
 
-    /** Queues a run behind the session's earlier runs. Never throws: the caller is a commit callback. */
-    public void submit(UUID agentId, UUID sessionId) {
+    /**
+     * Queues the run that answers {@code messageId} behind the session's earlier runs. Never throws: the
+     * caller is a commit callback.
+     */
+    public void submit(UUID agentId, UUID sessionId, UUID messageId) {
         // The session's turn ends only after a rejected run's notice is saved, so the next run sees it.
         CompletableFuture<Void> turn = new CompletableFuture<>();
         CompletableFuture<Void> previous = tails.put(sessionId, turn);
         (previous == null ? IDLE : previous)
-                .thenRunAsync(() -> runner.run(agentId, sessionId), executor)
+                .thenRunAsync(() -> runner.run(agentId, sessionId, messageId), executor)
                 .whenComplete((ignored, failure) -> {
                     try {
                         if (failure != null) {

@@ -53,7 +53,7 @@ public class ChatMessageFacadeServiceImpl implements ChatMessageFacadeService {
         ChatMessageEntity entity = chatMessageConverter.toEntity(dto);
         chatMessageMapper.insert(entity);
         chatSessionMapper.touch(session.getId());
-        eventPublisher.publishEvent(new ChatEvent(session.getAgentId(), session.getId()));
+        eventPublisher.publishEvent(new ChatEvent(session.getAgentId(), session.getId(), entity.getId()));
         return toVO(findExisting(entity.getId()));
     }
 

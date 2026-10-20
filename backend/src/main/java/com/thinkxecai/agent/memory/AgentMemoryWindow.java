@@ -28,7 +28,10 @@ public final class AgentMemoryWindow {
     /** A memory holding the system message first, then the loaded messages, under {@code conversationId}. */
     public static ChatMemory create(String conversationId, SystemMessage systemMessage, List<Message> loaded,
                                     int messageLength) {
-        ChatMemory memory = MessageWindowChatMemory.builder().maxMessages(size(messageLength)).build();
+        // A queued run loads more than messageLength (the earlier run's output, ADR 046): room for all of it.
+        ChatMemory memory = MessageWindowChatMemory.builder()
+                .maxMessages(size(Math.max(messageLength, loaded.size())))
+                .build();
         List<Message> initial = new ArrayList<>(loaded.size() + 1);
         initial.add(systemMessage);
         initial.addAll(loaded);

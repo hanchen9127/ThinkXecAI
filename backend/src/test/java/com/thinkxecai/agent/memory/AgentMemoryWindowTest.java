@@ -83,4 +83,23 @@ class AgentMemoryWindowTest {
         assertThat(messages.subList(1, 1 + MESSAGE_LENGTH)).containsExactlyElementsOf(loadedHistory());
     }
 
+    @Test
+    void aQueuedRunThatLoadedMoreThanMessageLengthStillEvictsNothing() {
+        // ADR 046: the earlier run's output comes on top of messageLength
+        List<Message> loaded = new ArrayList<>(loadedHistory().subList(0, MESSAGE_LENGTH - 1));
+        for (int i = 0; i < 15; i++) {
+            loaded.add(AssistantMessage.builder().content("earlier run " + i).build());
+        }
+        loaded.add(QUESTION);
+        ChatMemory memory = AgentMemoryWindow.create(SESSION, SYSTEM, loaded, MESSAGE_LENGTH);
+
+        for (int step = 1; step <= AgentLimits.MAX_STEPS; step++) {
+            addToolStep(memory, step);
+        }
+
+        List<Message> messages = memory.get(SESSION);
+        assertThat(messages).hasSize(1 + loaded.size() + 2 * AgentLimits.MAX_STEPS);
+        assertThat(messages.subList(1, 1 + loaded.size())).containsExactlyElementsOf(loaded);
+    }
+
 }

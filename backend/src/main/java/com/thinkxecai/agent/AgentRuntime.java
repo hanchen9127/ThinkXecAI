@@ -34,6 +34,11 @@ public class AgentRuntime {
     /** How a run that did not fail ended. */
     public enum Outcome { ANSWERED, TERMINATED, MAX_STEPS }
 
+    /** No tools: both models then answer a history with tool calls in text (checked against the real APIs). */
+    private static final ToolCallingChatOptions ANSWER_ONLY = ToolCallingChatOptions.builder()
+            .internalToolExecutionEnabled(false)
+            .build();
+
     private final UUID agentId;
     private final UUID sessionId;
     private final ChatClient chatClient;
@@ -43,6 +48,8 @@ public class AgentRuntime {
     private final GeneratedMessageService generatedMessageService;
     private final GeneratedMessagePublisher publisher;
     private AgentState state = AgentState.IDLE;
+    /** Set when {@code terminate} came without text: the next call offers no tools, so its reply is text (ADR 045). */
+    private boolean answerOnly;
 
     AgentRuntime(UUID agentId, UUID sessionId, ChatClient chatClient, ChatMemory memory,
                  ToolCallingChatOptions options, ToolCallingManager toolCallingManager,
@@ -93,7 +100,7 @@ public class AgentRuntime {
 
     /** Calls the model and saves its reply, with every tool call given an id first. */
     private AssistantMessage think() {
-        Prompt prompt = new Prompt(conversation(), options);
+        Prompt prompt = new Prompt(conversation(), answerOnly ? ANSWER_ONLY : options);
         ChatResponse response;
         try {
             response = chatClient.prompt(prompt).call().chatResponse();
@@ -117,7 +124,8 @@ public class AgentRuntime {
     /**
      * Runs the reply's tool calls and saves their results; true if {@code terminate} ends the run. It does only
      * in a reply with text: the user sees no tool results, so a run ended without text would answer nothing.
-     * Called alone, it is answered with {@link TerminateTool#NOT_ENDED} and the loop goes on.
+     * Called alone, it is answered with {@link TerminateTool#NOT_ENDED} and the next call offers no tools: Gemini
+     * was seen calling it without text again after that result.
      */
     private boolean execute(AssistantMessage reply) {
         // The prompt carries the tool callbacks and the tool context (the agent's knowledge bases).
@@ -128,7 +136,9 @@ public class AgentRuntime {
         ToolResponseMessage results = asJson((ToolResponseMessage) history.get(history.size() - 1), answered);
         save(GeneratedMessages.toolResults(results));
         memory.add(conversationId(), results);
-        return answered && results.getResponses().stream().anyMatch(response -> TerminateTool.NAME.equals(response.name()));
+        boolean terminate = results.getResponses().stream().anyMatch(response -> TerminateTool.NAME.equals(response.name()));
+        answerOnly = terminate && !answered;
+        return terminate && answered;
     }
 
     /**

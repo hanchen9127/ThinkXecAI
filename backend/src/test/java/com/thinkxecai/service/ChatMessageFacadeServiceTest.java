@@ -42,7 +42,7 @@ class ChatMessageFacadeServiceTest extends ServiceTestSupport {
         assertThat(created.getMetadata()).isNull();
         assertThat(created.getCreatedAt()).isNotNull();
         assertThat(countRows("chat_message", "session_id = ? AND role = 'user' AND metadata IS NULL", session)).isEqualTo(1);
-        assertThat(events.stream(ChatEvent.class)).containsExactly(new ChatEvent(agent, session));
+        assertThat(events.stream(ChatEvent.class)).containsExactly(new ChatEvent(agent, session, UUID.fromString(created.getId())));
     }
 
     @Test

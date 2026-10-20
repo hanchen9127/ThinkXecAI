@@ -21,7 +21,7 @@ import static org.mockito.Mockito.verify;
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class ChatEventListenerTest extends ServiceTestSupport {
 
-    private final ChatEvent event = new ChatEvent(UUID.randomUUID(), UUID.randomUUID());
+    private final ChatEvent event = new ChatEvent(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
 
     @Autowired
     private ApplicationEventPublisher eventPublisher;
@@ -39,24 +39,24 @@ class ChatEventListenerTest extends ServiceTestSupport {
             status.setRollbackOnly();
         });
 
-        verify(scheduler, never()).submit(any(), any());
+        verify(scheduler, never()).submit(any(), any(), any());
     }
 
     @Test
     void anEventStartsARunOnlyOnceItsTransactionCommits() {
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
             eventPublisher.publishEvent(event);
-            verify(scheduler, never()).submit(any(), any());
+            verify(scheduler, never()).submit(any(), any(), any());
         });
 
-        verify(scheduler).submit(event.agentId(), event.sessionId());
+        verify(scheduler).submit(event.agentId(), event.sessionId(), event.messageId());
     }
 
     @Test
     void anEventOutsideATransactionStartsARunAtOnce() {
         eventPublisher.publishEvent(event);
 
-        verify(scheduler).submit(event.agentId(), event.sessionId());
+        verify(scheduler).submit(event.agentId(), event.sessionId(), event.messageId());
     }
 
 }

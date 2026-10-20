@@ -124,11 +124,11 @@ class AgentRunEndToEndTest extends ServiceTestSupport {
         awaitRows(4);
         assertThat(contents()).containsExactly(
                 "user: first", "user: second", "assistant: First answer.", "assistant: Second answer.");
-        // The second run started after the first had saved its answer.
+        // The second run started after the first had saved its answer, and gets its own question last (ADR 046).
         assertThat(model.prompts.get(1).getInstructions().stream()
                 .filter(message -> message.getMessageType() != MessageType.SYSTEM)
                 .map(Message::getText))
-                .containsExactly("first", "second", "First answer.");
+                .containsExactly("first", "First answer.", "second");
     }
 
     @Test
@@ -142,11 +142,12 @@ class AgentRunEndToEndTest extends ServiceTestSupport {
         AtomicInteger committedOnReturn = new AtomicInteger(-1);
 
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
-            jdbcTemplate.update("INSERT INTO chat_message (session_id, role, content) VALUES (?, 'user', 'Hello')", session);
+            UUID hello = jdbcTemplate.queryForObject(
+                    "INSERT INTO chat_message (session_id, role, content) VALUES (?, 'user', 'Hello') RETURNING id", UUID.class, session);
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCompletion(int completion) {
-                    full.submit(agent, session);
+                    full.submit(agent, session, hello);
                     // Another thread reads through another connection: it sees only committed rows. Joining the
                     // finished transaction would leave the notice to whatever happens to that connection next.
                     committedOnReturn.set(CompletableFuture.supplyAsync(() -> countRows(
@@ -172,7 +173,7 @@ class AgentRunEndToEndTest extends ServiceTestSupport {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCompletion(int completion) {
-                    full.submit(agent, session);
+                    full.submit(agent, session, UUID.randomUUID());
                 }
             });
         });
