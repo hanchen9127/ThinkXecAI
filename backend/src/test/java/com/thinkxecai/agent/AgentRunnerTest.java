@@ -268,6 +268,19 @@ class AgentRunnerTest extends ServiceTestSupport {
     }
 
     @Test
+    void aTriggerThatIsNotAUserMessageLeavesTheStoredOrder() {
+        // the API never sends one; moving a model row last would make the model answer itself
+        userSays("first");
+        UUID answer = insert("assistant", "First answer.", null);
+        userSays("second");
+        model.thenReply("Second answer.");
+
+        runner.run(agent, session, answer);
+
+        assertThat(textsOf(prompt(0))).containsExactly("user:first", "assistant:First answer.", "user:second");
+    }
+
+    @Test
     void twentyStepsWithoutAnAnswerEndWithANotice() {
         userSays("Keep checking the date.");
         for (int step = 0; step < AgentLimits.MAX_STEPS; step++) {

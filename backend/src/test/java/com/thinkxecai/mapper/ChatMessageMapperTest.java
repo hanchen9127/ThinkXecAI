@@ -119,7 +119,7 @@ class ChatMessageMapperTest extends MapperTestSupport {
     }
 
     @Test
-    void selectTurnTakesTheLatestUpToTheTriggerAndEverythingAfterIt() {
+    void selectTurnTakesTheLatestUpToTheTriggerAndTheNewestRunOutputAfterIt() {
         UUID session = insertChatSession(null, "s");
         insert(session, "user", "old 1");
         insert(session, "assistant", "old 2");
@@ -130,9 +130,10 @@ class ChatMessageMapperTest extends MapperTestSupport {
         }
         insert(session, "user", "q3");
 
-        // limit 3 counts only up to the trigger; the earlier run's 5 rows and q3 come on top
-        assertThat(contents(mapper.selectTurnBySessionId(session, trigger, 3))).containsExactly(
-                "old 2", "q1", "q2", "run1 1", "run1 2", "run1 3", "run1 4", "run1 5", "q3");
+        // limit 3 counts only up to the trigger; the earlier run's rows come on top, newest 4 of them;
+        // q3 is left to its own run
+        assertThat(contents(mapper.selectTurnBySessionId(session, trigger, 3, 4))).containsExactly(
+                "old 2", "q1", "q2", "run1 2", "run1 3", "run1 4", "run1 5");
     }
 
     @Test
@@ -142,8 +143,8 @@ class ChatMessageMapperTest extends MapperTestSupport {
         insert(session, "user", "mine");
         UUID foreign = insert(other, "user", "theirs").getId();
 
-        assertThat(mapper.selectTurnBySessionId(session, UUID.randomUUID(), 10)).isEmpty();
-        assertThat(mapper.selectTurnBySessionId(session, foreign, 10)).isEmpty();
+        assertThat(mapper.selectTurnBySessionId(session, UUID.randomUUID(), 10, 10)).isEmpty();
+        assertThat(mapper.selectTurnBySessionId(session, foreign, 10, 10)).isEmpty();
     }
 
     private ChatMessageEntity insert(UUID sessionId, String role, String content) {

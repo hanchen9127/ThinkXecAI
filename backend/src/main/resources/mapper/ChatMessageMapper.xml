@@ -40,7 +40,8 @@
         ORDER BY created_at ASC
     </select>
 
-    <!-- A run's memory (ADR 046): the latest N up to and including the run's own message, then everything after it. -->
+    <!-- A run's memory (ADR 046): the latest N up to and including the run's own message, then the newest
+         laterLimit rows after it that are not user messages (those belong to later runs). -->
     <select id="selectTurnBySessionId" resultType="com.thinkxecai.model.entity.ChatMessageEntity">
         WITH run_trigger AS (
             SELECT created_at FROM chat_message WHERE id = #{triggerId} AND session_id = #{sessionId}
@@ -55,8 +56,13 @@
         ) older
         UNION ALL
         SELECT <include refid="columns"/>
-        FROM chat_message
-        WHERE session_id = #{sessionId} AND created_at &gt; (SELECT created_at FROM run_trigger)
+        FROM (
+            SELECT <include refid="columns"/>
+            FROM chat_message
+            WHERE session_id = #{sessionId} AND role &lt;&gt; 'user' AND created_at &gt; (SELECT created_at FROM run_trigger)
+            ORDER BY created_at DESC
+            LIMIT #{laterLimit}
+        ) later
         ORDER BY created_at ASC
     </select>
 

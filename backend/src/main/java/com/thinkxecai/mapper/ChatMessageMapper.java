@@ -29,12 +29,13 @@ public interface ChatMessageMapper {
 
     /**
      * The memory of the run that answers {@code triggerId} (ADR 046), oldest first: the latest {@code limit}
-     * messages up to and including the trigger, then every message after it (the earlier run's output and
-     * newer questions), so a long earlier run cannot push the trigger out. Empty when the trigger is not a
-     * message of this session (deleted meanwhile).
+     * messages up to and including the trigger, then the newest {@code laterLimit} messages after it that are
+     * not user messages (the earlier runs' output; newer questions belong to their own runs), so a long
+     * earlier run cannot push the trigger out. Empty when the trigger is not a message of this session
+     * (deleted meanwhile).
      */
     List<ChatMessageEntity> selectTurnBySessionId(@Param("sessionId") UUID sessionId, @Param("triggerId") UUID triggerId,
-                                                  @Param("limit") int limit);
+                                                  @Param("limit") int limit, @Param("laterLimit") int laterLimit);
 
     int deleteById(@Param("id") UUID id);
 

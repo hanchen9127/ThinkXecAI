@@ -127,7 +127,10 @@ public class AgentRuntimeFactory {
      */
     private List<ChatMessageDTO> storedTurn(UUID sessionId, UUID triggerId, int messageLength) {
         if (triggerId != null) {
-            List<ChatMessageDTO> turn = toDTOs(chatMessageMapper.selectTurnBySessionId(sessionId, triggerId, messageLength));
+            // after the trigger: about one earlier run's full output, so queued runs cannot grow memory without bound
+            int laterLimit = messageLength + 2 * AgentLimits.MAX_STEPS + 1;
+            List<ChatMessageDTO> turn = toDTOs(
+                    chatMessageMapper.selectTurnBySessionId(sessionId, triggerId, messageLength, laterLimit));
             ChatMessageDTO trigger = turn.stream()
                     .filter(message -> triggerId.equals(message.getId()) && message.getRole() == ChatMessageRole.USER)
                     .findFirst()
