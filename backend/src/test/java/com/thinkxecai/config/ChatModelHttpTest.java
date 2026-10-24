@@ -9,14 +9,18 @@ import com.thinkxecai.agent.model.ThinkXecGoogleGenAiChatModel;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.deepseek.DeepSeekChatModel;
 import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
+import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.definition.ToolDefinition;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,9 +44,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Drives both chat model beans against a local fake server, so the application's own HTTP clients are
+ * Drives every chat model bean against a local fake server, so the application's own HTTP clients are
  * what is tested (ADR 039): a model that does not answer fails after the read timeout (1 s here)
- * instead of waiting, a server error is tried exactly 3 times, a client error once. The Gemini cases
+ * instead of waiting, a server error is tried exactly 3 times, a client error once. DeepSeek and Qwen
+ * (OpenAI-compatible, ADR 050) share those cases; Qwen's requests carry its key and model. The Gemini cases
  * also run a text + function-call response through the real bean and send it back (ADR 038). The
  * registry's clients reach their own model and hand tool calls back without running them (ADR 040).
  */
@@ -51,6 +56,8 @@ class ChatModelHttpTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String GEMINI_KEY = "test-gemini-key";
+    private static final String QWEN_KEY = "test-qwen-key";
+    private static final String QWEN_PATH = "/compatible-mode/v1/chat/completions";
     private static final byte[] SIGNATURE = "signature-1".getBytes(StandardCharsets.UTF_8);
     private static final Duration SLOW_ANSWER = Duration.ofSeconds(5);
     private static final List<RecordedRequest> requests = new CopyOnWriteArrayList<>();
@@ -68,6 +75,9 @@ class ChatModelHttpTest {
     private DeepSeekChatModel deepSeekChatModel;
 
     @Autowired
+    private OpenAiChatModel qwenChatModel;
+
+    @Autowired
     private ChatClientRegistry chatClientRegistry;
 
     @DynamicPropertySource
@@ -76,6 +86,8 @@ class ChatModelHttpTest {
         registry.add("thinkxecai.chat.gemini-base-url", () -> url);
         registry.add("spring.ai.google.genai.api-key", () -> GEMINI_KEY);
         registry.add("spring.ai.deepseek.base-url", () -> url);
+        registry.add("spring.ai.openai.base-url", () -> url + "/compatible-mode");
+        registry.add("spring.ai.openai.api-key", () -> QWEN_KEY);
         registry.add("thinkxecai.chat.read-timeout", () -> "1s");
         registry.add("spring.ai.retry.backoff.initial-interval", () -> "10ms");
         registry.add("spring.ai.retry.backoff.max-interval", () -> "50ms");
@@ -169,42 +181,64 @@ class ChatModelHttpTest {
     }
 
     @Test
-    void deepSeekThatDoesNotAnswerTimesOutOnEveryAttempt() {
+    void qwenAnswersThroughItsConfiguredClient() throws IOException {
+        ChatResponse response = qwenChatModel.call(new Prompt("hi"));
+
+        assertThat(response.getResult().getOutput().getText()).isEqualTo("Hello.");
+        assertThat(requests).hasSize(1);
+        RecordedRequest request = requests.get(0);
+        assertThat(request.path()).isEqualTo(QWEN_PATH);
+        assertThat(request.authorization()).isEqualTo("Bearer " + QWEN_KEY);
+        assertThat(JSON.readTree(request.body()).get("model").asText()).isEqualTo("qwen3.8-flash");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"deepseek-chat", "qwen3.8-flash"})
+    void anOpenAiCompatibleModelThatDoesNotAnswerTimesOutOnEveryAttempt(String model) {
         mode = Mode.SLOW;
 
-        assertThatThrownBy(() -> deepSeekChatModel.call(new Prompt("hi"))).isInstanceOf(RuntimeException.class);
+        assertThatThrownBy(() -> openAiCompatible(model).call(new Prompt("hi"))).isInstanceOf(RuntimeException.class);
 
         // Each attempt gives up after 1 s instead of taking the answer that arrives after 5 s.
         assertThat(requests).hasSize(3);
     }
 
-    @Test
-    void deepSeekServerErrorsAreTriedThreeTimes() {
+    @ParameterizedTest
+    @ValueSource(strings = {"deepseek-chat", "qwen3.8-flash"})
+    void anOpenAiCompatibleModelTriesServerErrorsThreeTimes(String model) {
         mode = Mode.SERVER_ERROR;
 
-        assertThatThrownBy(() -> deepSeekChatModel.call(new Prompt("hi"))).isInstanceOf(RuntimeException.class);
+        assertThatThrownBy(() -> openAiCompatible(model).call(new Prompt("hi"))).isInstanceOf(RuntimeException.class);
 
         assertThat(requests).hasSize(3);
     }
 
-    @Test
-    void deepSeekClientErrorsAreNotRetried() {
+    @ParameterizedTest
+    @ValueSource(strings = {"deepseek-chat", "qwen3.8-flash"})
+    void anOpenAiCompatibleModelDoesNotRetryClientErrors(String model) {
         mode = Mode.CLIENT_ERROR;
 
-        assertThatThrownBy(() -> deepSeekChatModel.call(new Prompt("hi"))).isInstanceOf(RuntimeException.class);
+        assertThatThrownBy(() -> openAiCompatible(model).call(new Prompt("hi"))).isInstanceOf(RuntimeException.class);
 
         assertThat(requests).hasSize(1);
+    }
+
+    private ChatModel openAiCompatible(String model) {
+        return "deepseek-chat".equals(model) ? deepSeekChatModel : qwenChatModel;
     }
 
     @Test
     void eachRegisteredClientCallsItsOwnModel() throws IOException {
         String deepSeekAnswer = chatClientRegistry.get("deepseek-chat").prompt("hi").call().content();
         chatClientRegistry.get("gemini-3.8-flash").prompt("hi").call().content();
+        String qwenAnswer = chatClientRegistry.get("qwen3.8-flash").prompt("hi").call().content();
 
         assertThat(deepSeekAnswer).isEqualTo("Hello.");
+        assertThat(qwenAnswer).isEqualTo("Hello.");
         assertThat(requests).extracting(RecordedRequest::path)
-                .containsExactly("/chat/completions", "/v1beta/models/gemini-3.8-flash:generateContent");
+                .containsExactly("/chat/completions", "/v1beta/models/gemini-3.8-flash:generateContent", QWEN_PATH);
         assertThat(JSON.readTree(requests.get(0).body()).get("model").asText()).isEqualTo("deepseek-chat");
+        assertThat(JSON.readTree(requests.get(2).body()).get("model").asText()).isEqualTo("qwen3.8-flash");
     }
 
     @Test
@@ -212,7 +246,7 @@ class ChatModelHttpTest {
         AtomicInteger toolRuns = new AtomicInteger();
         ToolCallback getDate = recordingTool(toolRuns);
 
-        for (String model : List.of("deepseek-chat", "gemini-3.8-flash")) {
+        for (String model : List.of("deepseek-chat", "gemini-3.8-flash", "qwen3.8-flash")) {
             ChatResponse response = chatClientRegistry.get(model).prompt("What is the date?")
                     .toolCallbacks(getDate)
                     .call()
@@ -224,7 +258,7 @@ class ChatModelHttpTest {
                     .containsExactly("getDate");
         }
         assertThat(toolRuns).hasValue(0);
-        assertThat(requests).hasSize(2);
+        assertThat(requests).hasSize(3);
     }
 
     private static ToolCallback recordingTool(AtomicInteger runs) {
@@ -259,11 +293,12 @@ class ChatModelHttpTest {
         }
     }
 
-    /** Answers like Gemini's generateContent or DeepSeek's chat completions, depending on the path. */
+    /** Answers like Gemini's generateContent or an OpenAI-style chat completion (DeepSeek, Qwen), by path. */
     private static void answer(HttpExchange exchange) throws IOException {
         String path = exchange.getRequestURI().getPath();
         String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
-        requests.add(new RecordedRequest(path, exchange.getRequestHeaders().getFirst("x-goog-api-key"), body));
+        requests.add(new RecordedRequest(path, exchange.getRequestHeaders().getFirst("x-goog-api-key"),
+                exchange.getRequestHeaders().getFirst("Authorization"), body));
 
         boolean gemini = path.startsWith("/v1beta/");
         switch (mode) {
@@ -297,7 +332,7 @@ class ChatModelHttpTest {
                 """;
     }
 
-    /** DeepSeek's answer when the request offers tools: a call to {@code getDate}. */
+    /** The OpenAI-style answer (DeepSeek, Qwen) when the request offers tools: a call to {@code getDate}. */
     private static String deepSeekToolCallAnswer() {
         return """
                 {"id":"chat-2","object":"chat.completion","created":1760745600,"model":"deepseek-chat",
@@ -326,7 +361,7 @@ class ChatModelHttpTest {
         }
     }
 
-    private record RecordedRequest(String path, String apiKey, String body) {
+    private record RecordedRequest(String path, String apiKey, String authorization, String body) {
     }
 
 }

@@ -22,11 +22,15 @@ public class RequiredSecretsValidator {
     @Value("${THINKXECAI_DEEPSEEK_API_KEY:}")
     private String deepSeekApiKey;
 
+    @Value("${THINKXECAI_QWEN_API_KEY:}")
+    private String qwenApiKey;
+
     @PostConstruct
     public void validate() {
         require("THINKXECAI_DB_PASSWORD", dbPassword);
         require("THINKXECAI_GEMINI_API_KEY", geminiApiKey);
         require("THINKXECAI_DEEPSEEK_API_KEY", deepSeekApiKey);
+        require("THINKXECAI_QWEN_API_KEY", qwenApiKey);
     }
 
     private void require(String variableName, String value) {

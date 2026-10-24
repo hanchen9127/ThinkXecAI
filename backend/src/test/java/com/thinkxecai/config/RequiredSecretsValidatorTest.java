@@ -11,7 +11,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class RequiredSecretsValidatorTest {
 
     private static final String[] REQUIRED = {
-            "THINKXECAI_DB_PASSWORD=db", "THINKXECAI_GEMINI_API_KEY=gemini", "THINKXECAI_DEEPSEEK_API_KEY=deepseek"};
+            "THINKXECAI_DB_PASSWORD=db", "THINKXECAI_GEMINI_API_KEY=gemini", "THINKXECAI_DEEPSEEK_API_KEY=deepseek",
+            "THINKXECAI_QWEN_API_KEY=qwen"};
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withUserConfiguration(RequiredSecretsValidator.class);
@@ -26,7 +27,8 @@ class RequiredSecretsValidatorTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"THINKXECAI_DB_PASSWORD", "THINKXECAI_GEMINI_API_KEY", "THINKXECAI_DEEPSEEK_API_KEY"})
+    @ValueSource(strings = {"THINKXECAI_DB_PASSWORD", "THINKXECAI_GEMINI_API_KEY", "THINKXECAI_DEEPSEEK_API_KEY",
+            "THINKXECAI_QWEN_API_KEY"})
     void aMissingOrBlankRequiredSecretStopsStartupAndIsNamed(String variable) {
         runner.withPropertyValues(REQUIRED)
                 .withPropertyValues(variable + "= ")

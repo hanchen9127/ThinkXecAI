@@ -21,6 +21,7 @@ class ChatModelNamesTest {
         assertThat(ChatModelNames.PATTERN).isEqualTo(expected);
         assertThat(ChatModelNames.ALL).allMatch(name -> name.matches(ChatModelNames.PATTERN));
         assertThat("gemini-3x8-flash").doesNotMatch(ChatModelNames.PATTERN);
+        assertThat("qwen3x8-flash").doesNotMatch(ChatModelNames.PATTERN);
     }
 
     @Test

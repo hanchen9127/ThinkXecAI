@@ -15,10 +15,14 @@ import org.springframework.ai.model.deepseek.autoconfigure.DeepSeekChatPropertie
 import org.springframework.ai.model.deepseek.autoconfigure.DeepSeekConnectionProperties;
 import org.springframework.ai.model.google.genai.autoconfigure.chat.GoogleGenAiChatProperties;
 import org.springframework.ai.model.google.genai.autoconfigure.chat.GoogleGenAiConnectionProperties;
+import org.springframework.ai.model.openai.autoconfigure.OpenAiChatProperties;
+import org.springframework.ai.model.openai.autoconfigure.OpenAiConnectionProperties;
 import org.springframework.ai.model.tool.DefaultToolExecutionEligibilityPredicate;
 import org.springframework.ai.model.tool.ToolCallingChatOptions;
 import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.ai.model.tool.ToolExecutionEligibilityPredicate;
+import org.springframework.ai.openai.OpenAiChatModel;
+import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.ai.retry.autoconfigure.SpringAiRetryProperties;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
@@ -34,25 +38,26 @@ import java.net.http.HttpClient;
 import java.time.Duration;
 
 /**
- * Builds both chat models' HTTP clients, replacing Spring AI's auto-configured beans (which back off
+ * Builds every chat model's HTTP client, replacing Spring AI's auto-configured beans (which back off
  * when these exist), so that a model call cannot hang or retry for minutes while it holds an agent
- * thread (ADR 039). Without this, neither client had a timeout, DeepSeek retried 5xx and network
+ * thread (ADR 039). Without this, no client had a timeout, DeepSeek retried 5xx and network
  * errors 10 times up to 3 minutes apart, and the Gemini SDK retried 5 times up to 60 seconds apart.
  * <p>
- * DeepSeek: a JDK request factory with {@code thinkxecai.chat.connect-timeout} and
+ * DeepSeek and Qwen: a JDK request factory with {@code thinkxecai.chat.connect-timeout} and
  * {@code thinkxecai.chat.read-timeout} per attempt; retries come from Spring AI's {@code RetryTemplate}
- * ({@code spring.ai.retry.*}). Gemini: the google-genai SDK only offers a timeout for the whole call,
+ * ({@code spring.ai.retry.*}). Qwen is called through its OpenAI-compatible endpoint with Spring AI's
+ * OpenAI client (ADR 050). Gemini: the google-genai SDK only offers a timeout for the whole call,
  * which cancels the request but not the SDK's waits between attempts: after the cancel each remaining
  * attempt fails at once, but the SDK still waits before it, so a hanging Gemini call ends after the
  * read timeout plus all remaining waits (2 s + 6 s with 3 attempts). Spring AI's Gemini model wraps
  * every SDK error so its {@code RetryTemplate} never retries; the SDK's own retry gets the same
- * {@code spring.ai.retry.*} values instead, without the SDK's random jitter, so both models wait the
+ * {@code spring.ai.retry.*} values instead, without the SDK's random jitter, so all models wait the
  * same intervals.
  * <p>
- * A timeout of zero would mean "no timeout" to the Gemini SDK and "fail at once" to DeepSeek's
- * client, so both settings must be positive; startup fails otherwise.
+ * A timeout of zero would mean "no timeout" to the Gemini SDK and "fail at once" to the JDK client,
+ * so both settings must be positive; startup fails otherwise.
  * <p>
- * The two {@link ChatClient} beans are named after {@link ChatModelNames}; {@code ChatClientRegistry}
+ * The {@link ChatClient} beans are named after {@link ChatModelNames}; {@code ChatClientRegistry}
  * looks them up by an agent's {@code model}.
  */
 @Configuration
@@ -109,11 +114,7 @@ public class ChatModelConfig {
             ObjectProvider<ToolExecutionEligibilityPredicate> toolExecutionEligibilityPredicate,
             @Value("${thinkxecai.chat.connect-timeout}") Duration connectTimeout,
             @Value("${thinkxecai.chat.read-timeout}") Duration readTimeout) {
-        requirePositive(CONNECT_TIMEOUT, connectTimeout);
-        requirePositive(READ_TIMEOUT, readTimeout);
-        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(
-                HttpClient.newBuilder().connectTimeout(connectTimeout).build());
-        requestFactory.setReadTimeout(readTimeout);
+        JdkClientHttpRequestFactory requestFactory = requestFactory(connectTimeout, readTimeout);
         // Same resolution as the auto-configuration: a chat-level setting wins over the shared one.
         DeepSeekApi deepSeekApi = DeepSeekApi.builder()
                 .baseUrl(firstSet(chatProperties.getBaseUrl(), connectionProperties.getBaseUrl()))
@@ -136,6 +137,43 @@ public class ChatModelConfig {
         return chatModel;
     }
 
+    /** Qwen's endpoint; as a bean, it also keeps the auto-configuration from building an unused one. */
+    @Bean
+    public OpenAiApi qwenOpenAiApi(
+            OpenAiConnectionProperties connectionProperties, OpenAiChatProperties chatProperties,
+            ObjectProvider<RestClient.Builder> restClientBuilder, ResponseErrorHandler responseErrorHandler,
+            @Value("${thinkxecai.chat.connect-timeout}") Duration connectTimeout,
+            @Value("${thinkxecai.chat.read-timeout}") Duration readTimeout) {
+        JdkClientHttpRequestFactory requestFactory = requestFactory(connectTimeout, readTimeout);
+        // Same resolution as the auto-configuration: a chat-level setting wins over the shared one.
+        return OpenAiApi.builder()
+                .baseUrl(firstSet(chatProperties.getBaseUrl(), connectionProperties.getBaseUrl()))
+                .apiKey(firstSet(chatProperties.getApiKey(), connectionProperties.getApiKey()))
+                .completionsPath(chatProperties.getCompletionsPath())
+                .restClientBuilder(restClientBuilder.getIfAvailable(RestClient::builder).requestFactory(requestFactory))
+                .responseErrorHandler(responseErrorHandler)
+                .build();
+    }
+
+    @Bean
+    public OpenAiChatModel qwenChatModel(
+            OpenAiApi qwenOpenAiApi, OpenAiChatProperties chatProperties, ToolCallingManager toolCallingManager,
+            RetryTemplate retryTemplate, ObjectProvider<ObservationRegistry> observationRegistry,
+            ObjectProvider<ChatModelObservationConvention> observationConvention,
+            ObjectProvider<ToolExecutionEligibilityPredicate> toolExecutionEligibilityPredicate) {
+        OpenAiChatModel chatModel = OpenAiChatModel.builder()
+                .openAiApi(qwenOpenAiApi)
+                .defaultOptions(chatProperties.getOptions())
+                .toolCallingManager(toolCallingManager)
+                .toolExecutionEligibilityPredicate(
+                        toolExecutionEligibilityPredicate.getIfUnique(DefaultToolExecutionEligibilityPredicate::new))
+                .retryTemplate(retryTemplate)
+                .observationRegistry(observationRegistry.getIfUnique(() -> ObservationRegistry.NOOP))
+                .build();
+        observationConvention.ifAvailable(chatModel::setObservationConvention);
+        return chatModel;
+    }
+
     @Bean(ChatModelNames.DEEPSEEK_CHAT)
     public ChatClient deepSeekChatClient(DeepSeekChatModel deepSeekChatModel) {
         return chatClient(deepSeekChatModel);
@@ -144,6 +182,11 @@ public class ChatModelConfig {
     @Bean(ChatModelNames.GEMINI_FLASH)
     public ChatClient geminiChatClient(ThinkXecGoogleGenAiChatModel googleGenAiChatModel) {
         return chatClient(googleGenAiChatModel);
+    }
+
+    @Bean(ChatModelNames.QWEN_FLASH)
+    public ChatClient qwenChatClient(OpenAiChatModel qwenChatModel) {
+        return chatClient(qwenChatModel);
     }
 
     /**
@@ -156,6 +199,16 @@ public class ChatModelConfig {
         return ChatClient.builder(chatModel)
                 .defaultOptions(ToolCallingChatOptions.builder().internalToolExecutionEnabled(false).build())
                 .build();
+    }
+
+    /** The JDK client used by DeepSeek and Qwen: both timeouts apply to every attempt. */
+    private static JdkClientHttpRequestFactory requestFactory(Duration connectTimeout, Duration readTimeout) {
+        requirePositive(CONNECT_TIMEOUT, connectTimeout);
+        requirePositive(READ_TIMEOUT, readTimeout);
+        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(
+                HttpClient.newBuilder().connectTimeout(connectTimeout).build());
+        requestFactory.setReadTimeout(readTimeout);
+        return requestFactory;
     }
 
     private static void requirePositive(String property, Duration value) {

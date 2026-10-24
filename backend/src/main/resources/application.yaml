@@ -10,10 +10,17 @@ spring:
   application:
     name: thinkxecai-backend
 
-  # The Ollama starter is only here for embeddings. Its chat model can't be switched off through
-  # spring.ai.model.chat without also switching off DeepSeek and Gemini, so its auto-configuration is excluded.
+  # The Ollama starter is only here for embeddings, and the OpenAI starter only as Qwen's chat client. Their
+  # other models can't be switched off through spring.ai.model.* without also switching off the ones in use
+  # (DeepSeek, Gemini, Qwen; Ollama's embeddings), so their auto-configurations are excluded.
   autoconfigure:
-    exclude: org.springframework.ai.model.ollama.autoconfigure.OllamaChatAutoConfiguration
+    exclude:
+      - org.springframework.ai.model.ollama.autoconfigure.OllamaChatAutoConfiguration
+      - org.springframework.ai.model.openai.autoconfigure.OpenAiEmbeddingAutoConfiguration
+      - org.springframework.ai.model.openai.autoconfigure.OpenAiImageAutoConfiguration
+      - org.springframework.ai.model.openai.autoconfigure.OpenAiAudioSpeechAutoConfiguration
+      - org.springframework.ai.model.openai.autoconfigure.OpenAiAudioTranscriptionAutoConfiguration
+      - org.springframework.ai.model.openai.autoconfigure.OpenAiModerationAutoConfiguration
 
   # API messages are always English: a fixed locale makes validation messages ignore the
   # browser's Accept-Language header (otherwise a zh-CN browser gets Chinese messages).
@@ -42,7 +49,7 @@ spring:
 
   ai:
     # A failing chat model call is tried at most 3 times, 2 s then 6 s apart (Spring AI's default is 10
-    # attempts up to 3 minutes apart). DeepSeek retries through Spring AI; ChatModelConfig gives the same
+    # attempts up to 3 minutes apart). DeepSeek and Qwen retry through Spring AI; ChatModelConfig gives the same
     # values to the Gemini SDK's own retry. Embeddings are never retried.
     retry:
       max-attempts: 3
@@ -77,6 +84,15 @@ spring:
         chat:
           options:
             model: gemini-3.8-flash
+    # Qwen through Alibaba Cloud Model Studio's OpenAI-compatible endpoint, international site (its keys are
+    # refused by the mainland and US endpoints); Spring AI appends /v1/chat/completions. ChatModelConfig builds
+    # the client, so only these settings are read.
+    openai:
+      api-key: ${THINKXECAI_QWEN_API_KEY:}
+      base-url: https://dashscope-intl.aliyuncs.com/compatible-mode
+      chat:
+        options:
+          model: qwen3.8-flash
 
 springdoc:
   # The API description (/v3/api-docs) is generated from the controllers; CI turns it into the frontend's types.
@@ -99,7 +115,7 @@ thinkxecai:
   # How long an Ollama call (embedding an upload's titles or a search query) may wait for an answer.
   ollama:
     read-timeout: 60s
-  # Chat model HTTP clients (ChatModelConfig); both timeouts must be positive. DeepSeek: per attempt. Gemini:
+  # Chat model HTTP clients (ChatModelConfig); both timeouts must be positive. DeepSeek and Qwen: per attempt. Gemini:
   # the SDK has no connect timeout and only a timeout for the whole call, which does not cut short its waits
   # between attempts, so a hanging call ends after read-timeout plus all remaining waits (8 s with 3 attempts).
   # The Gemini base URL is a setting so tests can use a fake server.

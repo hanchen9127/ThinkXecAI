@@ -40,7 +40,7 @@ token-by-token streaming, and document formats other than Markdown.
 | Layer     | Technology                                                                 |
 |-----------|-----------------------------------------------------------------------------|
 | Backend   | Java 21, Spring Boot 3.5.16, Spring AI 1.1.8, MyBatis, PostgreSQL JDBC      |
-| AI models | Spring AI `ChatClient` over DeepSeek (`deepseek-chat`) and Google Gemini (`gemini-3.8-flash`) |
+| AI models | Spring AI `ChatClient` over DeepSeek (`deepseek-chat`), Qwen (`qwen3.8-flash`, through its OpenAI-compatible API), and Google Gemini (`gemini-3.8-flash`) |
 | Database  | PostgreSQL (`pgvector/pgvector:pg18`) with the `vector` extension           |
 | Embeddings| Local Ollama, model `bge-m3`, 1024-dim vectors                              |
 | Frontend  | React 19, TypeScript, Vite (`rolldown-vite`), Tailwind CSS, Ant Design + `@ant-design/x` |
@@ -97,10 +97,15 @@ Required variables (the backend fails fast at startup if any is missing):
 | `THINKXECAI_DB_PASSWORD`      | PostgreSQL password                 |
 | `THINKXECAI_GEMINI_API_KEY`   | Gemini API key (`gemini-3.8-flash`) |
 | `THINKXECAI_DEEPSEEK_API_KEY` | DeepSeek API key (`deepseek-chat`)  |
+| `THINKXECAI_QWEN_API_KEY`     | Alibaba Cloud Model Studio API key (`qwen3.8-flash`), international site |
 
 Messages, documents found by the knowledge tool, and tool results are sent to the chosen model's
 provider. On Gemini's free tier Google may use submitted content to improve its products, so use a
-paid key (or DeepSeek) before working with private data.
+paid key (or DeepSeek or Qwen) before working with private data.
+
+The Qwen key must come from Model Studio's international site (Singapore): the backend calls
+`https://dashscope-intl.aliyuncs.com/compatible-mode`, and such keys are refused by the mainland and
+US endpoints.
 
 Optional variables, only for the email tool. Startup never checks them; until all four Gmail
 values are set, the tool answers that email is not configured and names what is missing.
@@ -193,7 +198,7 @@ Uploaded files are stored under `data/documents/` relative to the working direct
 The backend starts without Ollama; it is needed (and given 60 seconds per call) when a document is uploaded or a knowledge base is
 searched.
 Chat model calls get 120 seconds to answer (`thinkxecai.chat.read-timeout`), and a failing call is tried
-at most 3 times, 2 and then 6 seconds apart (`spring.ai.retry.*`). DeepSeek also gets 10 seconds to connect
+at most 3 times, 2 and then 6 seconds apart (`spring.ai.retry.*`). DeepSeek and Qwen also get 10 seconds to connect
 (`thinkxecai.chat.connect-timeout`) and the 120 seconds per attempt; for Gemini, whose client has no
 separate connect timeout, the 120 seconds cover the whole call, and a call that hangs ends 8 seconds later
 (the remaining waits between attempts).

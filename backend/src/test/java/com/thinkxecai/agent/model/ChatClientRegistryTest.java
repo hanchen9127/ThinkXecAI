@@ -14,20 +14,22 @@ class ChatClientRegistryTest {
 
     private final ChatClient deepSeek = mock(ChatClient.class);
     private final ChatClient gemini = mock(ChatClient.class);
+    private final ChatClient qwen = mock(ChatClient.class);
     private final ChatClientRegistry registry =
-            new ChatClientRegistry(Map.of("deepseek-chat", deepSeek, "gemini-3.8-flash", gemini));
+            new ChatClientRegistry(Map.of("deepseek-chat", deepSeek, "gemini-3.8-flash", gemini, "qwen3.8-flash", qwen));
 
     @Test
     void eachModelNameResolvesToItsClient() {
         assertThat(registry.get("deepseek-chat")).isSameAs(deepSeek);
         assertThat(registry.get("gemini-3.8-flash")).isSameAs(gemini);
+        assertThat(registry.get("qwen3.8-flash")).isSameAs(qwen);
     }
 
     @Test
     void anUnknownNameFailsNamingTheRegisteredOnes() {
         assertThatThrownBy(() -> registry.get("gpt-5.4-mini"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Unknown chat model: gpt-5.4-mini (registered: deepseek-chat, gemini-3.8-flash)");
+                .hasMessage("Unknown chat model: gpt-5.4-mini (registered: deepseek-chat, gemini-3.8-flash, qwen3.8-flash)");
     }
 
     @Test
@@ -45,15 +47,15 @@ class ChatClientRegistryTest {
 
     @Test
     void aMissingClientFailsAtStartup() {
-        assertThatThrownBy(() -> new ChatClientRegistry(Map.of("deepseek-chat", deepSeek)))
+        assertThatThrownBy(() -> new ChatClientRegistry(Map.of("deepseek-chat", deepSeek, "gemini-3.8-flash", gemini)))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("missing: [gemini-3.8-flash]");
+                .hasMessageContaining("missing: [qwen3.8-flash]");
     }
 
     @Test
     void anUnexpectedClientFailsAtStartup() {
-        Map<String, ChatClient> clients =
-                Map.of("deepseek-chat", deepSeek, "gemini-3.8-flash", gemini, "gpt-5.4-mini", mock(ChatClient.class));
+        Map<String, ChatClient> clients = Map.of("deepseek-chat", deepSeek, "gemini-3.8-flash", gemini,
+                "qwen3.8-flash", qwen, "gpt-5.4-mini", mock(ChatClient.class));
 
         assertThatThrownBy(() -> new ChatClientRegistry(clients))
                 .isInstanceOf(IllegalStateException.class)

@@ -9,7 +9,7 @@ CREATE TABLE agent (
     name           TEXT NOT NULL,
     description    TEXT,
     system_prompt  TEXT,                                                          -- prompt applied at runtime; never persisted as a chat_message row
-    model          TEXT NOT NULL,                                                 -- must match a registered ChatClient bean name, e.g. 'deepseek-chat' or 'gemini-3.8-flash'
+    model          TEXT NOT NULL,                                                 -- must match a registered ChatClient bean name, e.g. 'deepseek-chat' or 'qwen3.8-flash'
     allowed_tools  JSONB NOT NULL DEFAULT '[]'::jsonb,                            -- array of optional tool names selected for this agent (fixed tools are always available and are not listed here)
     allowed_kbs    JSONB NOT NULL DEFAULT '[]'::jsonb,                            -- array of knowledge_base.id values this agent may query; resolved via batch lookup, not a join table
     chat_options   JSONB NOT NULL DEFAULT '{"temperature": 0.7, "topP": 1.0, "messageLength": 10}'::jsonb, -- temperature/topP are stored only (not applied to runtime ChatOptions); messageLength caps how many recent messages are loaded into memory
