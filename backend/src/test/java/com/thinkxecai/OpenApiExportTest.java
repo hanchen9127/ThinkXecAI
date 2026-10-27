@@ -98,7 +98,7 @@ class OpenApiExportTest {
 
         assertThat(names(schema("ChatOptions").get("required"))).containsExactlyInAnyOrder("temperature", "topP", "messageLength");
 
-        assertThat(names(agent.at("/properties/model/enum"))).containsExactly("deepseek-chat", "gemini-3.8-flash");
+        assertThat(names(agent.at("/properties/model/enum"))).containsExactly("deepseek-chat", "gemini-3.8-flash", "qwen3.8-flash");
         assertThat(names(schema("ApiResponseVoid").get("required"))).containsExactlyInAnyOrder("code", "message", "data");
 
         JsonNode tool = schema("ToolVO");
@@ -112,7 +112,13 @@ class OpenApiExportTest {
         assertThat(schema("CreateAgentRequest").at("/properties/chatOptions/$ref").asText())
                 .isEqualTo("#/components/schemas/ChatOptionsInput");
         assertThat(schema("ChatOptionsInput").has("required")).isFalse();
-        assertThat(names(schema("CreateAgentRequest").at("/properties/model/enum"))).containsExactly("deepseek-chat", "gemini-3.8-flash");
+        assertThat(names(schema("CreateAgentRequest").at("/properties/model/enum"))).containsExactly("deepseek-chat", "gemini-3.8-flash", "qwen3.8-flash");
+        // An update sends only the fields it changes, so none is required; mixed swagger versions once made
+        // UpdateAgentRequest.model required and gave every model property an empty default.
+        assertThat(schema("UpdateAgentRequest").has("required")).isFalse();
+        for (String agentSchema : List.of("AgentVO", "CreateAgentRequest", "UpdateAgentRequest")) {
+            assertThat(schema(agentSchema).at("/properties/model").has("default")).as(agentSchema).isFalse();
+        }
         assertThat(schema("UpdateChatSessionRequest").get("properties").has("agentId")).isFalse();
         assertThat(schema("CreateDocumentRequest").get("properties").has("metadata")).isFalse();
         assertThat(schema("CreateAgentRequest").at("/properties/name/maxLength").asInt()).isEqualTo(200);

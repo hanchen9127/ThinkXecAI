@@ -8,7 +8,8 @@ import org.springframework.util.StringUtils;
 /**
  * Stops startup when a secret the application cannot work without is missing. The Gmail settings are
  * deliberately not checked here: email is optional, and the email tool reports missing settings at
- * its first send instead.
+ * its first send instead. So is the Gemini API key: without it the chat client registry reports
+ * Gemini as not configured (ADR 050).
  */
 @Component
 public class RequiredSecretsValidator {
@@ -16,17 +17,17 @@ public class RequiredSecretsValidator {
     @Value("${THINKXECAI_DB_PASSWORD:}")
     private String dbPassword;
 
-    @Value("${THINKXECAI_GEMINI_API_KEY:}")
-    private String geminiApiKey;
-
     @Value("${THINKXECAI_DEEPSEEK_API_KEY:}")
     private String deepSeekApiKey;
+
+    @Value("${THINKXECAI_QWEN_API_KEY:}")
+    private String qwenApiKey;
 
     @PostConstruct
     public void validate() {
         require("THINKXECAI_DB_PASSWORD", dbPassword);
-        require("THINKXECAI_GEMINI_API_KEY", geminiApiKey);
         require("THINKXECAI_DEEPSEEK_API_KEY", deepSeekApiKey);
+        require("THINKXECAI_QWEN_API_KEY", qwenApiKey);
     }
 
     private void require(String variableName, String value) {

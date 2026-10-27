@@ -97,7 +97,7 @@ class AgentControllerTest {
                 .andExpect(jsonPath("$.message").value("model: must not be null"));
         send(post("/api/agents"), "{\"name\": \"Research\", \"model\": \"gpt-4o\"}")
                 .andExpect(jsonPath("$.code").value(400))
-                .andExpect(jsonPath("$.message").value("model: must be deepseek-chat or gemini-3.8-flash"));
+                .andExpect(jsonPath("$.message").value("model: must be deepseek-chat, gemini-3.8-flash, or qwen3.8-flash"));
 
         verifyNoInteractions(service);
     }
@@ -189,7 +189,7 @@ class AgentControllerTest {
                 .andExpect(jsonPath("$.message").value("name: must not be blank"));
         send(patch("/api/agents/" + ID), "{\"model\": \"gpt-4o\"}")
                 .andExpect(jsonPath("$.code").value(400))
-                .andExpect(jsonPath("$.message").value("model: must be deepseek-chat or gemini-3.8-flash"));
+                .andExpect(jsonPath("$.message").value("model: must be deepseek-chat, gemini-3.8-flash, or qwen3.8-flash"));
 
         verifyNoInteractions(service);
     }

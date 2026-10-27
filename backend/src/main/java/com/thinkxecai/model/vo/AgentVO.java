@@ -24,7 +24,7 @@ public class AgentVO {
     private String description;
     @Nullable
     private String systemPrompt;
-    @Schema(allowableValues = {ChatModelNames.DEEPSEEK_CHAT, ChatModelNames.GEMINI_FLASH})
+    @Schema(allowableValues = {ChatModelNames.DEEPSEEK_CHAT, ChatModelNames.GEMINI_FLASH, ChatModelNames.QWEN_FLASH})
     private String model;
     private List<String> allowedTools;
     private List<String> allowedKbs;

@@ -21,8 +21,8 @@ jobs:
     env:
       # Throwaway values: CI uses a disposable database and never calls external services.
       THINKXECAI_DB_PASSWORD: ci-postgres
-      THINKXECAI_GEMINI_API_KEY: ci-dummy
       THINKXECAI_DEEPSEEK_API_KEY: ci-dummy
+      THINKXECAI_QWEN_API_KEY: ci-dummy
     steps:
       - uses: actions/checkout@v7
         with:

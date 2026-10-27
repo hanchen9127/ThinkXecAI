@@ -24,6 +24,8 @@
         <flexmark.version>0.64.8</flexmark.version>
         <lombok.version>1.18.32</lombok.version>
         <springdoc.version>2.8.17</springdoc.version>
+        <!-- The swagger-core version springdoc ${springdoc.version} is built on; change both together. -->
+        <swagger-core.version>2.2.47</swagger-core.version>
         <!-- Surefire skips tests tagged @Tag("external") (live Ollama / LLM calls) by default, so CI never
              reaches external services. Run them locally with: mvn test -DexcludedGroups= -Dgroups=external -->
         <excludedGroups>external</excludedGroups>
@@ -40,6 +42,14 @@
                 <version>${spring-ai.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+            <!-- spring-ai-model brings swagger-annotations 2.2.38, nearer than springdoc's own through the direct
+                 spring-ai-openai dependency; mixed with swagger-core 2.2.47 it changes the API description
+                 (UpdateAgentRequest.model became required). Pinned to springdoc's swagger-core version. -->
+            <dependency>
+                <groupId>io.swagger.core.v3</groupId>
+                <artifactId>swagger-annotations-jakarta</artifactId>
+                <version>${swagger-core.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -97,6 +107,12 @@
         <dependency>
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-starter-model-google-genai</artifactId>
+        </dependency>
+        <!-- Only as the client for Qwen's OpenAI-compatible endpoint; no OpenAI model is used. The module
+             without a starter: no auto-configuration reads spring.ai.openai.* (ADR 050). -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-openai</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.ai</groupId>

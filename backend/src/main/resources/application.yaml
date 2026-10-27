@@ -42,7 +42,7 @@ spring:
 
   ai:
     # A failing chat model call is tried at most 3 times, 2 s then 6 s apart (Spring AI's default is 10
-    # attempts up to 3 minutes apart). DeepSeek retries through Spring AI; ChatModelConfig gives the same
+    # attempts up to 3 minutes apart). DeepSeek and Qwen retry through Spring AI; ChatModelConfig gives the same
     # values to the Gemini SDK's own retry. Embeddings are never retried.
     retry:
       max-attempts: 3
@@ -99,7 +99,7 @@ thinkxecai:
   # How long an Ollama call (embedding an upload's titles or a search query) may wait for an answer.
   ollama:
     read-timeout: 60s
-  # Chat model HTTP clients (ChatModelConfig); both timeouts must be positive. DeepSeek: per attempt. Gemini:
+  # Chat model HTTP clients (ChatModelConfig); both timeouts must be positive. DeepSeek and Qwen: per attempt. Gemini:
   # the SDK has no connect timeout and only a timeout for the whole call, which does not cut short its waits
   # between attempts, so a hanging call ends after read-timeout plus all remaining waits (8 s with 3 attempts).
   # The Gemini base URL is a setting so tests can use a fake server.
@@ -107,6 +107,13 @@ thinkxecai:
     connect-timeout: 10s
     read-timeout: 120s
     gemini-base-url: https://generativelanguage.googleapis.com
+    # Qwen through Alibaba Cloud Model Studio's OpenAI-compatible endpoint, international site (its keys are
+    # refused by the mainland and US endpoints); Spring AI appends /v1/chat/completions. Not spring.ai.openai.*:
+    # an OpenAI key or URL in the environment (SPRING_AI_OPENAI_*) would replace these (ADR 050).
+    qwen:
+      api-key: ${THINKXECAI_QWEN_API_KEY:}
+      base-url: https://dashscope-intl.aliyuncs.com/compatible-mode
+      model: qwen3.8-flash
   # The email tool sends through the Gmail API. Everything here is optional: startup never checks it, and
   # a send with any Gmail value missing tells the model which variables are missing (values never shown).
   mail:

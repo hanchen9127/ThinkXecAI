@@ -18,11 +18,12 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Whole agent runs against the real DeepSeek and Gemini APIs (needs real {@code THINKXECAI_DEEPSEEK_API_KEY}
- * and {@code THINKXECAI_GEMINI_API_KEY}; costs about 20 requests). Each run uses the fixed sample tools,
+ * Whole agent runs against the real DeepSeek and Qwen APIs (needs real {@code THINKXECAI_DEEPSEEK_API_KEY}
+ * and {@code THINKXECAI_QWEN_API_KEY}; costs about 20 requests). Each run uses the fixed sample tools,
  * so the answers are checked only for their shape: tool calls with ids answered by tool rows, and a final
  * plain answer. The session that switches models checks that one model accepts a history the other wrote:
- * stored tool calls carry no Gemini thought signatures. Rows are logged, since only a real run shows how
+ * each model's tool-call ids and history are rebuilt from the database. Gemini is no longer run here: its
+ * free tier answered too slowly to test (ADR 050). Rows are logged, since only a real run shows how
  * each model splits the work.
  */
 @Tag("external")
@@ -36,7 +37,7 @@ class AgentRunExternalTest extends ServiceTestSupport {
     private AgentRunner runner;
 
     @ParameterizedTest
-    @ValueSource(strings = {"deepseek-chat", "gemini-3.8-flash"})
+    @ValueSource(strings = {"deepseek-chat", "qwen3.8-flash"})
     void aMultiStepToolRunEndsWithAnAnswer(String model) {
         UUID agent = agentOn(model);
         UUID session = insertChatSession(agent, "external");
@@ -54,17 +55,17 @@ class AgentRunExternalTest extends ServiceTestSupport {
 
     @Test
     void oneSessionCanSwitchModelsBetweenRuns() {
-        UUID agent = agentOn("gemini-3.8-flash");
+        UUID agent = agentOn("qwen3.8-flash");
         UUID session = insertChatSession(agent, "external");
 
         runner.run(agent, session, say(session, "What is today's date? Use the getDate tool."));
         useModel(agent, "deepseek-chat");
         runner.run(agent, session, say(session, "Which city do I have? Use the getCity tool."));
-        useModel(agent, "gemini-3.8-flash");
+        useModel(agent, "qwen3.8-flash");
         runner.run(agent, session, say(session, "What is the weather there on that date? Use the weather tool."));
 
         List<Map<String, Object>> rows = rows(session);
-        log("gemini → deepseek → gemini", rows);
+        log("qwen → deepseek → qwen", rows);
         assertToolRowsAnswerEarlierCalls(rows);
         assertThat(toolNames(rows)).contains("getDate", "getCity", "weather");
         assertThat(rows).extracting(row -> row.get("role")).filteredOn("user"::equals).hasSize(3);
@@ -78,10 +79,10 @@ class AgentRunExternalTest extends ServiceTestSupport {
     }
 
     @Test
-    void aQueuedGeminiRunReadsThePreviousRunsToolCalls() {
+    void aQueuedRunReadsThePreviousRunsToolCalls() {
         // ADR 042: a message sent during a run is stored before that run's rows; the queued run gets it last
-        // (ADR 046), after the previous run's calls, which are rebuilt without thought signatures
-        UUID agent = agentOn("gemini-3.8-flash");
+        // (ADR 046), after the previous run's calls, rebuilt from the stored rows
+        UUID agent = agentOn("qwen3.8-flash");
         UUID session = insertChatSession(agent, "external");
 
         UUID first = say(session, "What is today's date? Use the getDate tool.");
@@ -91,7 +92,7 @@ class AgentRunExternalTest extends ServiceTestSupport {
         runner.run(agent, session, second);
 
         List<Map<String, Object>> rows = rows(session);
-        log("queued gemini", rows);
+        log("queued qwen", rows);
         assertToolRowsAnswerEarlierCalls(rows);
         assertEndsWithAnAnswer(rows.subList(0, firstRun));
         assertThat(rows).hasSizeGreaterThan(firstRun);

@@ -26,7 +26,7 @@ public class CreateAgentRequest {
     private String systemPrompt;
     @NotNull
     @Pattern(regexp = ChatModelNames.PATTERN, message = ChatModelNames.PATTERN_MESSAGE)
-    @Schema(allowableValues = {ChatModelNames.DEEPSEEK_CHAT, ChatModelNames.GEMINI_FLASH})
+    @Schema(allowableValues = {ChatModelNames.DEEPSEEK_CHAT, ChatModelNames.GEMINI_FLASH, ChatModelNames.QWEN_FLASH})
     private String model;
     /** Each name must be an optional tool (checked by the service); duplicates are dropped. */
     @Size(max = RequestLimits.LIST)

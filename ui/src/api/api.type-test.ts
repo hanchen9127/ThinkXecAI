@@ -34,7 +34,7 @@ export type ApiTypeChecks = [
   Expect<Equal<Data<typeof listOptionalTools>, ToolVO[]>>,
   Expect<Equal<ToolType, 'FIXED' | 'OPTIONAL'>>,
   Expect<Equal<keyof ToolVO, 'name' | 'description' | 'type'>>,
-  Expect<Equal<AgentModel, 'deepseek-chat' | 'gemini-3.8-flash'>>,
+  Expect<Equal<AgentModel, 'deepseek-chat' | 'gemini-3.8-flash' | 'qwen3.8-flash'>>,
   Expect<Equal<Agent['id'], string>>,
   Expect<Equal<Agent['description'], string | null>>,
   Expect<Equal<ChatMessage['metadata'], ChatMessageMetadata | null>>,

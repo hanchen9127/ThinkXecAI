@@ -257,7 +257,7 @@ export interface components {
             description: string | null;
             id: string;
             /** @enum {string} */
-            model: "deepseek-chat" | "gemini-3.8-flash";
+            model: "deepseek-chat" | "gemini-3.8-flash" | "qwen3.8-flash";
             name: string;
             systemPrompt: string | null;
             /** Format: date-time */
@@ -382,7 +382,7 @@ export interface components {
             chatOptions?: components["schemas"]["ChatOptionsInput"];
             description?: string;
             /** @enum {string} */
-            model: "deepseek-chat" | "gemini-3.8-flash";
+            model: "deepseek-chat" | "gemini-3.8-flash" | "qwen3.8-flash";
             name: string;
             systemPrompt?: string;
         };
@@ -449,7 +449,7 @@ export interface components {
             chatOptions?: components["schemas"]["ChatOptionsInput"];
             description?: string;
             /** @enum {string} */
-            model?: "deepseek-chat" | "gemini-3.8-flash";
+            model?: "deepseek-chat" | "gemini-3.8-flash" | "qwen3.8-flash";
             name?: string;
             systemPrompt?: string;
         };

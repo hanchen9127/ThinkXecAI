@@ -1,6 +1,8 @@
 package com.thinkxecai.agent.model;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.ai.chat.client.ChatClient;
 
 import java.util.Map;
@@ -9,25 +11,45 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 
-/** Every model name an agent can be saved with resolves, and nothing else does (ADR 040). */
+/**
+ * Every model name an agent can be saved with resolves, and nothing else does (ADR 040); without a
+ * Gemini key, Gemini is refused like an unknown name, so a run on it leaves a notice (ADR 050).
+ */
 class ChatClientRegistryTest {
+
+    private static final String GEMINI_KEY = "gemini-key";
 
     private final ChatClient deepSeek = mock(ChatClient.class);
     private final ChatClient gemini = mock(ChatClient.class);
-    private final ChatClientRegistry registry =
-            new ChatClientRegistry(Map.of("deepseek-chat", deepSeek, "gemini-3.8-flash", gemini));
+    private final ChatClient qwen = mock(ChatClient.class);
+    private final Map<String, ChatClient> clients =
+            Map.of("deepseek-chat", deepSeek, "gemini-3.8-flash", gemini, "qwen3.8-flash", qwen);
+    private final ChatClientRegistry registry = new ChatClientRegistry(clients, GEMINI_KEY);
 
     @Test
     void eachModelNameResolvesToItsClient() {
         assertThat(registry.get("deepseek-chat")).isSameAs(deepSeek);
         assertThat(registry.get("gemini-3.8-flash")).isSameAs(gemini);
+        assertThat(registry.get("qwen3.8-flash")).isSameAs(qwen);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", " "})
+    void withoutAGeminiKeyGeminiIsRefusedAndTheOthersResolve(String geminiKey) {
+        ChatClientRegistry withoutGemini = new ChatClientRegistry(clients, geminiKey);
+
+        assertThatThrownBy(() -> withoutGemini.get("gemini-3.8-flash"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Chat model gemini-3.8-flash is not configured: its API key is not set");
+        assertThat(withoutGemini.get("deepseek-chat")).isSameAs(deepSeek);
+        assertThat(withoutGemini.get("qwen3.8-flash")).isSameAs(qwen);
     }
 
     @Test
     void anUnknownNameFailsNamingTheRegisteredOnes() {
         assertThatThrownBy(() -> registry.get("gpt-5.4-mini"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Unknown chat model: gpt-5.4-mini (registered: deepseek-chat, gemini-3.8-flash)");
+                .hasMessage("Unknown chat model: gpt-5.4-mini (registered: deepseek-chat, gemini-3.8-flash, qwen3.8-flash)");
     }
 
     @Test
@@ -45,17 +67,18 @@ class ChatClientRegistryTest {
 
     @Test
     void aMissingClientFailsAtStartup() {
-        assertThatThrownBy(() -> new ChatClientRegistry(Map.of("deepseek-chat", deepSeek)))
+        assertThatThrownBy(() -> new ChatClientRegistry(Map.of("deepseek-chat", deepSeek, "gemini-3.8-flash", gemini),
+                GEMINI_KEY))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("missing: [gemini-3.8-flash]");
+                .hasMessageContaining("missing: [qwen3.8-flash]");
     }
 
     @Test
     void anUnexpectedClientFailsAtStartup() {
-        Map<String, ChatClient> clients =
-                Map.of("deepseek-chat", deepSeek, "gemini-3.8-flash", gemini, "gpt-5.4-mini", mock(ChatClient.class));
+        Map<String, ChatClient> withExtra = Map.of("deepseek-chat", deepSeek, "gemini-3.8-flash", gemini,
+                "qwen3.8-flash", qwen, "gpt-5.4-mini", mock(ChatClient.class));
 
-        assertThatThrownBy(() -> new ChatClientRegistry(clients))
+        assertThatThrownBy(() -> new ChatClientRegistry(withExtra, GEMINI_KEY))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("unexpected: [gpt-5.4-mini]");
     }
