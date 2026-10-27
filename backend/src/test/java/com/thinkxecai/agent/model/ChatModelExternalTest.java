@@ -65,9 +65,8 @@ class ChatModelExternalTest {
         ChatResponse first = chatClient.prompt().messages(conversation).toolCallbacks(getDate).call().chatResponse();
 
         AssistantMessage call = first.getResult().getOutput();
-        log.info("{} first answer: generations={}, text=\"{}\", toolCalls={}, thoughtSignatures={}", model,
-                first.getResults().size(), call.getText(), call.getToolCalls(),
-                call.getMetadata().get("thoughtSignatures") instanceof List<?> signatures ? signatures.size() : 0);
+        log.info("{} first answer: generations={}, text=\"{}\", toolCalls={}", model,
+                first.getResults().size(), call.getText(), call.getToolCalls());
         assertThat(call.getToolCalls()).extracting(AssistantMessage.ToolCall::name).containsExactly("getDate");
 
         AssistantMessage.ToolCall toolCall = call.getToolCalls().get(0);
