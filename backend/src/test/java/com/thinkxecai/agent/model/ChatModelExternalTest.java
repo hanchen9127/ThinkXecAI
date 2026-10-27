@@ -23,12 +23,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Calls the real DeepSeek and Gemini APIs through the registry (needs real
- * {@code THINKXECAI_DEEPSEEK_API_KEY} and {@code THINKXECAI_GEMINI_API_KEY}; costs a few requests).
+ * Calls the real DeepSeek and Qwen APIs through the registry (needs real
+ * {@code THINKXECAI_DEEPSEEK_API_KEY} and {@code THINKXECAI_QWEN_API_KEY}; costs a few requests).
  * The tool round trip answers the model's call by hand, as the agent runtime will, and sends the
- * original assistant message back: for Gemini that includes its thought signatures, which Gemini
- * checks on the current turn. The shape of the first answer is logged, since only a real response
- * shows whether Gemini mixes text and a call (ADR 038).
+ * original assistant message back. The shape of the first answer is logged, since only a real
+ * response shows whether a model mixes text and a call. Gemini is no longer called here: its free
+ * tier answered too slowly to test (ADR 050).
  */
 @Tag("external")
 @SpringBootTest
@@ -41,7 +41,7 @@ class ChatModelExternalTest {
     private ChatClientRegistry chatClientRegistry;
 
     @ParameterizedTest
-    @ValueSource(strings = {"deepseek-chat", "gemini-3.8-flash"})
+    @ValueSource(strings = {"deepseek-chat", "qwen3.8-flash"})
     void eachModelAnswers(String model) {
         String answer = chatClientRegistry.get(model).prompt()
                 .user("Reply with exactly the word OK and nothing else.")
@@ -53,7 +53,7 @@ class ChatModelExternalTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"deepseek-chat", "gemini-3.8-flash"})
+    @ValueSource(strings = {"deepseek-chat", "qwen3.8-flash"})
     void aToolCallCanBeAnsweredAndTheConversationContinues(String model) {
         ChatClient chatClient = chatClientRegistry.get(model);
         AtomicInteger toolRuns = new AtomicInteger();
@@ -87,7 +87,7 @@ class ChatModelExternalTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"deepseek-chat", "gemini-3.8-flash"})
+    @ValueSource(strings = {"deepseek-chat", "qwen3.8-flash"})
     void aConversationWithToolCallsCanBeAnsweredWithoutTools(String model) {
         // ADR 045: after a terminate without text the runtime asks once more, offering no tools
         ChatClient chatClient = chatClientRegistry.get(model);
