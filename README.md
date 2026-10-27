@@ -95,9 +95,12 @@ Required variables (the backend fails fast at startup if any is missing):
 | Variable                      | Purpose                             |
 |-------------------------------|-------------------------------------|
 | `THINKXECAI_DB_PASSWORD`      | PostgreSQL password                 |
-| `THINKXECAI_GEMINI_API_KEY`   | Gemini API key (`gemini-3.8-flash`) |
 | `THINKXECAI_DEEPSEEK_API_KEY` | DeepSeek API key (`deepseek-chat`)  |
 | `THINKXECAI_QWEN_API_KEY`     | Alibaba Cloud Model Studio API key (`qwen3.8-flash`), international site |
+
+Optional: `THINKXECAI_GEMINI_API_KEY`, the Gemini API key (`gemini-3.8-flash`). Without it the backend
+still starts, and an agent set to Gemini answers that its model is not available. Gemini is kept but no
+longer tested against the real API: on the free tier it took 56–109 seconds per answer.
 
 Messages, documents found by the knowledge tool, and tool results are sent to the chosen model's
 provider. On Gemini's free tier Google may use submitted content to improve its products, so use a

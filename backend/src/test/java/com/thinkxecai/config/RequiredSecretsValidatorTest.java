@@ -7,28 +7,29 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Startup stops only for the secrets the application cannot work without; email settings are optional. */
+/**
+ * Startup stops only for the secrets the application cannot work without; email settings and the Gemini
+ * key are optional (ADR 050).
+ */
 class RequiredSecretsValidatorTest {
 
     private static final String[] REQUIRED = {
-            "THINKXECAI_DB_PASSWORD=db", "THINKXECAI_GEMINI_API_KEY=gemini", "THINKXECAI_DEEPSEEK_API_KEY=deepseek",
-            "THINKXECAI_QWEN_API_KEY=qwen"};
+            "THINKXECAI_DB_PASSWORD=db", "THINKXECAI_DEEPSEEK_API_KEY=deepseek", "THINKXECAI_QWEN_API_KEY=qwen"};
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withUserConfiguration(RequiredSecretsValidator.class);
 
     @Test
-    void startsWithTheRequiredSecretsAndNoEmailSettings() {
+    void startsWithTheRequiredSecretsAndNoEmailSettingsOrGeminiKey() {
         runner.withPropertyValues(REQUIRED)
                 .withPropertyValues("THINKXECAI_GMAIL_SENDER=", "THINKXECAI_GMAIL_CLIENT_ID=",
                         "THINKXECAI_GMAIL_CLIENT_SECRET=", "THINKXECAI_GMAIL_REFRESH_TOKEN=",
-                        "THINKXECAI_MAIL_ALLOWED_RECIPIENTS=")
+                        "THINKXECAI_MAIL_ALLOWED_RECIPIENTS=", "THINKXECAI_GEMINI_API_KEY=")
                 .run(context -> assertThat(context).hasNotFailed());
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"THINKXECAI_DB_PASSWORD", "THINKXECAI_GEMINI_API_KEY", "THINKXECAI_DEEPSEEK_API_KEY",
-            "THINKXECAI_QWEN_API_KEY"})
+    @ValueSource(strings = {"THINKXECAI_DB_PASSWORD", "THINKXECAI_DEEPSEEK_API_KEY", "THINKXECAI_QWEN_API_KEY"})
     void aMissingOrBlankRequiredSecretStopsStartupAndIsNamed(String variable) {
         runner.withPropertyValues(REQUIRED)
                 .withPropertyValues(variable + "= ")
