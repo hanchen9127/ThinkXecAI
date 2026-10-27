@@ -10,17 +10,10 @@ spring:
   application:
     name: thinkxecai-backend
 
-  # The Ollama starter is only here for embeddings, and the OpenAI starter only as Qwen's chat client. Their
-  # other models can't be switched off through spring.ai.model.* without also switching off the ones in use
-  # (DeepSeek, Gemini, Qwen; Ollama's embeddings), so their auto-configurations are excluded.
+  # The Ollama starter is only here for embeddings. Its chat model can't be switched off through
+  # spring.ai.model.chat without also switching off DeepSeek and Gemini, so its auto-configuration is excluded.
   autoconfigure:
-    exclude:
-      - org.springframework.ai.model.ollama.autoconfigure.OllamaChatAutoConfiguration
-      - org.springframework.ai.model.openai.autoconfigure.OpenAiEmbeddingAutoConfiguration
-      - org.springframework.ai.model.openai.autoconfigure.OpenAiImageAutoConfiguration
-      - org.springframework.ai.model.openai.autoconfigure.OpenAiAudioSpeechAutoConfiguration
-      - org.springframework.ai.model.openai.autoconfigure.OpenAiAudioTranscriptionAutoConfiguration
-      - org.springframework.ai.model.openai.autoconfigure.OpenAiModerationAutoConfiguration
+    exclude: org.springframework.ai.model.ollama.autoconfigure.OllamaChatAutoConfiguration
 
   # API messages are always English: a fixed locale makes validation messages ignore the
   # browser's Accept-Language header (otherwise a zh-CN browser gets Chinese messages).
@@ -84,15 +77,6 @@ spring:
         chat:
           options:
             model: gemini-3.8-flash
-    # Qwen through Alibaba Cloud Model Studio's OpenAI-compatible endpoint, international site (its keys are
-    # refused by the mainland and US endpoints); Spring AI appends /v1/chat/completions. ChatModelConfig builds
-    # the client, so only these settings are read.
-    openai:
-      api-key: ${THINKXECAI_QWEN_API_KEY:}
-      base-url: https://dashscope-intl.aliyuncs.com/compatible-mode
-      chat:
-        options:
-          model: qwen3.8-flash
 
 springdoc:
   # The API description (/v3/api-docs) is generated from the controllers; CI turns it into the frontend's types.
@@ -123,6 +107,13 @@ thinkxecai:
     connect-timeout: 10s
     read-timeout: 120s
     gemini-base-url: https://generativelanguage.googleapis.com
+    # Qwen through Alibaba Cloud Model Studio's OpenAI-compatible endpoint, international site (its keys are
+    # refused by the mainland and US endpoints); Spring AI appends /v1/chat/completions. Not spring.ai.openai.*:
+    # an OpenAI key or URL in the environment (SPRING_AI_OPENAI_*) would replace these (ADR 050).
+    qwen:
+      api-key: ${THINKXECAI_QWEN_API_KEY:}
+      base-url: https://dashscope-intl.aliyuncs.com/compatible-mode
+      model: qwen3.8-flash
   # The email tool sends through the Gmail API. Everything here is optional: startup never checks it, and
   # a send with any Gmail value missing tells the model which variables are missing (values never shown).
   mail:

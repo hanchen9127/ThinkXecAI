@@ -13,8 +13,10 @@ import org.springframework.ai.openai.OpenAiImageModel;
 import org.springframework.ai.openai.OpenAiModerationModel;
 import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
+import org.springframework.util.ClassUtils;
 
 import java.util.Map;
 
@@ -23,8 +25,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Pins the configured chat models without calling any API. The Gemini model must be set explicitly:
  * Spring AI's default (gemini-2.0-flash) has been shut down, and falling back to it would only fail at
- * the first real request. Qwen goes through the OpenAI starter, which must add no model besides it
- * (ADR 050): Ollama stays the only embedding model.
+ * the first real request. Qwen goes through Spring AI's OpenAI module without its auto-configuration, so
+ * it adds no model besides Qwen's and nothing reads {@code spring.ai.openai.*}; Ollama stays the only
+ * embedding model (ADR 050). Qwen's endpoint is pinned here because the HTTP tests replace it.
  */
 @SpringBootTest
 class ChatModelConfigurationTest {
@@ -50,6 +53,9 @@ class ChatModelConfigurationTest {
     @Autowired
     private ApplicationContext context;
 
+    @Value("${thinkxecai.chat.qwen.base-url}")
+    private String qwenBaseUrl;
+
     @Test
     void exactlyDeepSeekGeminiAndQwenAreConfigured() {
         assertThat(chatModels.values())
@@ -66,7 +72,17 @@ class ChatModelConfigurationTest {
     }
 
     @Test
-    void theOpenAiStarterAddsNothingButQwensClient() {
+    void qwenCallsTheInternationalCompatibleEndpointWithItsModelsOwnSampling() {
+        // The international site is the only one that accepts the project's key; Spring AI appends /v1/chat/completions.
+        assertThat(qwenBaseUrl).isEqualTo("https://dashscope-intl.aliyuncs.com/compatible-mode");
+        assertThat(qwenChatModel.getDefaultOptions().getTemperature()).isNull();
+        assertThat(qwenChatModel.getDefaultOptions().getTopP()).isNull();
+    }
+
+    @Test
+    void theOpenAiModuleAddsNothingButQwensClient() {
+        assertThat(ClassUtils.isPresent(
+                "org.springframework.ai.model.openai.autoconfigure.OpenAiChatAutoConfiguration", null)).isFalse();
         assertThat(embeddingModels.values()).singleElement().isInstanceOf(OllamaEmbeddingModel.class);
         assertThat(openAiApis).containsOnlyKeys("qwenOpenAiApi");
         assertThat(context.getBeanNamesForType(OpenAiImageModel.class)).isEmpty();

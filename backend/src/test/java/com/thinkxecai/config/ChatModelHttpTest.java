@@ -57,6 +57,7 @@ class ChatModelHttpTest {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String GEMINI_KEY = "test-gemini-key";
     private static final String QWEN_KEY = "test-qwen-key";
+    private static final String OPENAI_KEY = "test-openai-key";
     private static final String QWEN_PATH = "/compatible-mode/v1/chat/completions";
     private static final byte[] SIGNATURE = "signature-1".getBytes(StandardCharsets.UTF_8);
     private static final Duration SLOW_ANSWER = Duration.ofSeconds(5);
@@ -86,8 +87,14 @@ class ChatModelHttpTest {
         registry.add("thinkxecai.chat.gemini-base-url", () -> url);
         registry.add("spring.ai.google.genai.api-key", () -> GEMINI_KEY);
         registry.add("spring.ai.deepseek.base-url", () -> url);
-        registry.add("spring.ai.openai.base-url", () -> url + "/compatible-mode");
-        registry.add("spring.ai.openai.api-key", () -> QWEN_KEY);
+        registry.add("thinkxecai.chat.qwen.base-url", () -> url + "/compatible-mode");
+        registry.add("thinkxecai.chat.qwen.api-key", () -> QWEN_KEY);
+        // As SPRING_AI_OPENAI_* in a developer's environment would set them: Qwen must ignore these (ADR 050).
+        registry.add("spring.ai.openai.base-url", () -> url + "/openai");
+        registry.add("spring.ai.openai.api-key", () -> OPENAI_KEY);
+        registry.add("spring.ai.openai.chat.base-url", () -> url + "/openai-chat");
+        registry.add("spring.ai.openai.chat.api-key", () -> OPENAI_KEY);
+        registry.add("spring.ai.openai.chat.options.model", () -> "gpt-5.4-mini");
         registry.add("thinkxecai.chat.read-timeout", () -> "1s");
         registry.add("spring.ai.retry.backoff.initial-interval", () -> "10ms");
         registry.add("spring.ai.retry.backoff.max-interval", () -> "50ms");
@@ -181,7 +188,7 @@ class ChatModelHttpTest {
     }
 
     @Test
-    void qwenAnswersThroughItsConfiguredClient() throws IOException {
+    void qwenUsesItsOwnEndpointKeyAndModelWhateverTheOpenAiSettingsSay() throws IOException {
         ChatResponse response = qwenChatModel.call(new Prompt("hi"));
 
         assertThat(response.getResult().getOutput().getText()).isEqualTo("Hello.");
@@ -189,7 +196,9 @@ class ChatModelHttpTest {
         RecordedRequest request = requests.get(0);
         assertThat(request.path()).isEqualTo(QWEN_PATH);
         assertThat(request.authorization()).isEqualTo("Bearer " + QWEN_KEY);
-        assertThat(JSON.readTree(request.body()).get("model").asText()).isEqualTo("qwen3.8-flash");
+        JsonNode body = JSON.readTree(request.body());
+        assertThat(body.get("model").asText()).isEqualTo("qwen3.8-flash");
+        assertThat(body.has("temperature")).isFalse();
     }
 
     @ParameterizedTest

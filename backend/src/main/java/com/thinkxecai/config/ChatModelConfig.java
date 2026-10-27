@@ -15,13 +15,12 @@ import org.springframework.ai.model.deepseek.autoconfigure.DeepSeekChatPropertie
 import org.springframework.ai.model.deepseek.autoconfigure.DeepSeekConnectionProperties;
 import org.springframework.ai.model.google.genai.autoconfigure.chat.GoogleGenAiChatProperties;
 import org.springframework.ai.model.google.genai.autoconfigure.chat.GoogleGenAiConnectionProperties;
-import org.springframework.ai.model.openai.autoconfigure.OpenAiChatProperties;
-import org.springframework.ai.model.openai.autoconfigure.OpenAiConnectionProperties;
 import org.springframework.ai.model.tool.DefaultToolExecutionEligibilityPredicate;
 import org.springframework.ai.model.tool.ToolCallingChatOptions;
 import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.ai.model.tool.ToolExecutionEligibilityPredicate;
 import org.springframework.ai.openai.OpenAiChatModel;
+import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.ai.retry.autoconfigure.SpringAiRetryProperties;
 import org.springframework.beans.factory.ObjectProvider;
@@ -137,33 +136,38 @@ public class ChatModelConfig {
         return chatModel;
     }
 
-    /** Qwen's endpoint; as a bean, it also keeps the auto-configuration from building an unused one. */
+    /**
+     * Qwen's endpoint, from {@code thinkxecai.chat.qwen.*} only: Spring AI's shared {@code spring.ai.openai.*}
+     * names would let an OpenAI key or URL in the environment ({@code SPRING_AI_OPENAI_*}) replace them, and
+     * send that key, or the conversation, to the wrong service (ADR 050).
+     */
     @Bean
     public OpenAiApi qwenOpenAiApi(
-            OpenAiConnectionProperties connectionProperties, OpenAiChatProperties chatProperties,
+            @Value("${thinkxecai.chat.qwen.base-url}") String baseUrl,
+            @Value("${thinkxecai.chat.qwen.api-key}") String apiKey,
             ObjectProvider<RestClient.Builder> restClientBuilder, ResponseErrorHandler responseErrorHandler,
             @Value("${thinkxecai.chat.connect-timeout}") Duration connectTimeout,
             @Value("${thinkxecai.chat.read-timeout}") Duration readTimeout) {
         JdkClientHttpRequestFactory requestFactory = requestFactory(connectTimeout, readTimeout);
-        // Same resolution as the auto-configuration: a chat-level setting wins over the shared one.
         return OpenAiApi.builder()
-                .baseUrl(firstSet(chatProperties.getBaseUrl(), connectionProperties.getBaseUrl()))
-                .apiKey(firstSet(chatProperties.getApiKey(), connectionProperties.getApiKey()))
-                .completionsPath(chatProperties.getCompletionsPath())
+                .baseUrl(baseUrl)
+                .apiKey(apiKey)
                 .restClientBuilder(restClientBuilder.getIfAvailable(RestClient::builder).requestFactory(requestFactory))
                 .responseErrorHandler(responseErrorHandler)
                 .build();
     }
 
+    /** Only the model is set: no temperature or topP is sent, so Qwen uses its own defaults. */
     @Bean
     public OpenAiChatModel qwenChatModel(
-            OpenAiApi qwenOpenAiApi, OpenAiChatProperties chatProperties, ToolCallingManager toolCallingManager,
-            RetryTemplate retryTemplate, ObjectProvider<ObservationRegistry> observationRegistry,
+            OpenAiApi qwenOpenAiApi, @Value("${thinkxecai.chat.qwen.model}") String model,
+            ToolCallingManager toolCallingManager, RetryTemplate retryTemplate,
+            ObjectProvider<ObservationRegistry> observationRegistry,
             ObjectProvider<ChatModelObservationConvention> observationConvention,
             ObjectProvider<ToolExecutionEligibilityPredicate> toolExecutionEligibilityPredicate) {
         OpenAiChatModel chatModel = OpenAiChatModel.builder()
                 .openAiApi(qwenOpenAiApi)
-                .defaultOptions(chatProperties.getOptions())
+                .defaultOptions(OpenAiChatOptions.builder().model(model).build())
                 .toolCallingManager(toolCallingManager)
                 .toolExecutionEligibilityPredicate(
                         toolExecutionEligibilityPredicate.getIfUnique(DefaultToolExecutionEligibilityPredicate::new))
