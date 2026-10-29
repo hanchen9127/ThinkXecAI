@@ -36,15 +36,17 @@ public class SseController {
 
     @GetMapping("/sse/connect/{chatSessionId}")
     public SseEmitter connect(@PathVariable UUID chatSessionId) {
+        // BizException 404 when the session does not exist. Nothing is registered yet, so an unknown session or a
+        // failed lookup leaves another tab's stream of the session alone.
+        chatSessionFacadeService.getChatSession(chatSessionId);
         SseEmitter emitter = sseService.connect(chatSessionId);
-        // Checked after the stream is registered: a delete committing meanwhile either closes the stream
-        // after its commit or is seen here (ADR 049). Checked first, the stream of a session deleted between
-        // the check and connect would stay open until its timeout.
+        // Checked again now that the stream is registered: a delete that committed after the first check found
+        // no stream to close (ADR 049); one committing later finds it. Only this request's stream is closed; the
+        // stream it replaced has had `replaced` (lost for nothing only if the lookup fails here after passing above).
         try {
-            // BizException 404 when the session does not exist
             chatSessionFacadeService.getChatSession(chatSessionId);
         } catch (RuntimeException e) {
-            sseService.close(chatSessionId);
+            sseService.close(chatSessionId, emitter);
             throw e;
         }
         return emitter;

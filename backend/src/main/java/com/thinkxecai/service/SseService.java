@@ -27,4 +27,7 @@ public interface SseService {
     /** Completes and forgets the session's stream, if it has one. */
     void close(UUID chatSessionId);
 
+    /** Completes this emitter, and forgets it if it is still the session's stream (a newer one is left alone). */
+    void close(UUID chatSessionId, SseEmitter emitter);
+
 }

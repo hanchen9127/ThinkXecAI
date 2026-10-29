@@ -106,4 +106,10 @@ public class SseServiceImpl implements SseService {
         }
     }
 
+    @Override
+    public void close(UUID chatSessionId, SseEmitter emitter) {
+        emitters.remove(chatSessionId, emitter);
+        emitter.complete();
+    }
+
 }

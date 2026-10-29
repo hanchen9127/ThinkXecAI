@@ -226,6 +226,30 @@ class SseServiceImplTest {
     }
 
     @Test
+    void closingTheCurrentStreamByItsEmitterCompletesAndForgetsIt() {
+        FakeEmitter emitter = connect();
+
+        service.close(SESSION, emitter);
+        service.send(SESSION, message("1"));
+
+        assertThat(emitter.completed).isTrue();
+        assertThat(emitter.sent).containsExactly(INIT);
+    }
+
+    @Test
+    void closingAReplacedStreamByItsEmitterLeavesItsSuccessor() {
+        FakeEmitter old = connect();
+        FakeEmitter current = connect();
+        SseMessage message = message("1");
+
+        service.close(SESSION, old);
+        service.send(SESSION, message);
+
+        assertThat(current.sent).containsExactly(INIT, event(message));
+        assertThat(current.completed).isFalse();
+    }
+
+    @Test
     void closingWithoutAClientDoesNothing() {
         service.close(SESSION);
     }

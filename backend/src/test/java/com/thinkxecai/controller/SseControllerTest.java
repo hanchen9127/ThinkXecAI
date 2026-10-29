@@ -1,6 +1,9 @@
 package com.thinkxecai.controller;
 
 import com.thinkxecai.exception.BizException;
+import com.thinkxecai.model.ChatMessageRole;
+import com.thinkxecai.model.sse.SseMessage;
+import com.thinkxecai.model.vo.ChatMessageVO;
 import com.thinkxecai.model.vo.ChatSessionVO;
 import com.thinkxecai.service.ChatSessionFacadeService;
 import com.thinkxecai.service.SseService;
@@ -28,8 +31,11 @@ import java.io.IOException;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -104,19 +110,36 @@ class SseControllerTest {
                 .andExpect(jsonPath("$.message").value("Chat session not found"))
                 .andExpect(jsonPath("$.data").doesNotExist());
 
-        verify(sseService).close(SESSION);
+        verify(sseService, never()).connect(any());
     }
 
     @Test
-    void theSessionIsCheckedAfterItsStreamIsRegistered() throws Exception {
+    void theSessionIsCheckedBeforeAndAgainAfterItsStreamIsRegistered() throws Exception {
         sessionExists();
 
         connect(PATH).andExpect(request().asyncStarted());
 
-        // so a delete committing in between either closes the registered stream or is seen by the check (ADR 049)
+        // so a delete committing after the first check either closes the registered stream or is seen by the
+        // second (ADR 049)
         InOrder order = inOrder(sseService, chatSessionFacadeService);
+        order.verify(chatSessionFacadeService).getChatSession(SESSION);
         order.verify(sseService).connect(SESSION);
         order.verify(chatSessionFacadeService).getChatSession(SESSION);
+    }
+
+    @Test
+    void aSessionDeletedWhileConnectingIsNotFoundAndOnlyItsOwnStreamIsClosed() throws Exception {
+        when(chatSessionFacadeService.getChatSession(SESSION))
+                .thenReturn(new ChatSessionVO())
+                .thenThrow(new BizException(404, "Chat session not found"));
+
+        connect(PATH)
+                .andExpect(request().asyncNotStarted())
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(404));
+
+        verify(sseService).close(eq(SESSION), any(SseEmitter.class));
+        verify(sseService, never()).close(SESSION);
     }
 
     @Test
@@ -143,7 +166,24 @@ class SseControllerTest {
                 .andExpect(jsonPath("$.code").value(500))
                 .andExpect(jsonPath("$.message").value("Internal server error"));
 
-        verify(sseService).close(SESSION);
+        verify(sseService, never()).connect(any());
+    }
+
+    @Test
+    void aFailedLookupLeavesAnotherTabsStreamAlone() throws Exception {
+        sessionExists();
+        MvcResult otherTab = connect(PATH).andExpect(request().asyncStarted()).andReturn();
+        when(chatSessionFacadeService.getChatSession(SESSION))
+                .thenThrow(new DataAccessResourceFailureException("connection refused to 127.0.0.1:5433"));
+
+        connect(PATH).andExpect(status().isInternalServerError());
+        sseService.send(SESSION, SseMessage.generated(ChatMessageVO.builder().id("m1")
+                .sessionId(SESSION.toString()).role(ChatMessageRole.ASSISTANT).content("still here").build()));
+
+        assertThat(otherTab.getResponse().getContentAsString())
+                .startsWith("event:init\ndata:connected\n\n")
+                .contains("event:message", "still here")
+                .doesNotContain("replaced");
     }
 
     @Test
