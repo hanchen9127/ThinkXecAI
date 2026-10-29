@@ -21,9 +21,10 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.util.UUID;
 
 /**
- * A chat session's stream, outside /api and so not in the OpenAPI document (ADR 021). Unlike /api, an error
- * has a real HTTP status (with the envelope as JSON): a browser EventSource stops on a status other than 200
- * instead of reconnecting to a session that does not exist (ADR 047).
+ * A chat session's stream, outside /api and so not in the OpenAPI document (ADR 021). Unlike /api, a stream
+ * that cannot be opened (unknown session, malformed id, failed lookup) gets a real HTTP status with the envelope
+ * as JSON: a browser EventSource stops on a status other than 200 instead of reconnecting to a session that does
+ * not exist (ADR 047). Requests Spring MVC refuses before this controller (another method) get the usual envelope.
  */
 @Slf4j
 @RestController
@@ -35,9 +36,18 @@ public class SseController {
 
     @GetMapping("/sse/connect/{chatSessionId}")
     public SseEmitter connect(@PathVariable UUID chatSessionId) {
-        // BizException 404 when the session does not exist
-        chatSessionFacadeService.getChatSession(chatSessionId);
-        return sseService.connect(chatSessionId);
+        SseEmitter emitter = sseService.connect(chatSessionId);
+        // Checked after the stream is registered: a delete committing meanwhile either closes the stream
+        // after its commit or is seen here (ADR 049). Checked first, the stream of a session deleted between
+        // the check and connect would stay open until its timeout.
+        try {
+            // BizException 404 when the session does not exist
+            chatSessionFacadeService.getChatSession(chatSessionId);
+        } catch (RuntimeException e) {
+            sseService.close(chatSessionId);
+            throw e;
+        }
+        return emitter;
     }
 
     /** Takes precedence over GlobalExceptionHandler for this controller only. */
