@@ -10,9 +10,12 @@ import com.thinkxecai.model.request.CreateChatSessionRequest;
 import com.thinkxecai.model.request.UpdateChatSessionRequest;
 import com.thinkxecai.model.vo.ChatSessionVO;
 import com.thinkxecai.service.ChatSessionFacadeService;
+import com.thinkxecai.service.SseService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
 import java.util.UUID;
@@ -24,6 +27,7 @@ public class ChatSessionFacadeServiceImpl implements ChatSessionFacadeService {
     private final ChatSessionMapper chatSessionMapper;
     private final AgentMapper agentMapper;
     private final ChatSessionConverter chatSessionConverter;
+    private final SseService sseService;
 
     @Override
     public List<ChatSessionVO> listChatSessions() {
@@ -73,6 +77,14 @@ public class ChatSessionFacadeServiceImpl implements ChatSessionFacadeService {
         if (chatSessionMapper.deleteById(chatSessionId) == 0) {
             throw notFound();
         }
+        // Once the delete has committed (a rollback keeps the session and its stream): the browser's
+        // reconnect then gets 404 and stops (ADR 049). close() never throws.
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                sseService.close(chatSessionId);
+            }
+        });
     }
 
     private ChatSessionEntity findExisting(UUID chatSessionId) {

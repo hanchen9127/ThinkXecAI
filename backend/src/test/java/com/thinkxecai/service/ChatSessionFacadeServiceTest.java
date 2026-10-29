@@ -103,7 +103,8 @@ class ChatSessionFacadeServiceTest extends ServiceTestSupport {
         UUID id = UUID.randomUUID();
         when(mapper.selectById(id)).thenReturn(
                 ChatSessionEntity.builder().id(id).agentId(UUID.randomUUID()).title("old title").build());
-        ChatSessionFacadeService unit = new ChatSessionFacadeServiceImpl(mapper, mock(AgentMapper.class), new ChatSessionConverter());
+        ChatSessionFacadeService unit = new ChatSessionFacadeServiceImpl(mapper, mock(AgentMapper.class), new ChatSessionConverter(),
+                mock(SseService.class));
 
         unit.updateChatSession(id, updateRequest("new title"));
 

@@ -210,6 +210,24 @@ class SseDeliveryEndToEndTest extends ServiceTestSupport {
         assertThat(answer.get("content").asText()).isEqualTo("It is today.");
     }
 
+    @Test
+    void deletingTheSessionEndsItsStreamAndAReconnectIsNotFound() throws Exception {
+        SseClient client = connect();
+
+        HttpResponse<String> deleted = http.send(
+                HttpRequest.newBuilder(uri("/api/chat-sessions/" + session)).DELETE().build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertThat(JSON.readTree(deleted.body()).get("code").asInt()).isEqualTo(200);
+
+        // a normal end, after which a browser's EventSource reconnects (ADR 049)
+        assertThat(client.next()).isEqualTo(SseClient.END);
+        HttpResponse<String> reconnect = http.send(HttpRequest.newBuilder(uri("/sse/connect/" + session))
+                        .header("Accept", "text/event-stream").build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertThat(reconnect.statusCode()).isEqualTo(404);
+        assertThat(JSON.readTree(reconnect.body()).get("message").asText()).isEqualTo("Chat session not found");
+    }
+
     record Event(String name, String data) {
     }
 
