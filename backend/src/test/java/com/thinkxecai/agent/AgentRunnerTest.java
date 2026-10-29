@@ -255,6 +255,25 @@ class AgentRunnerTest extends ServiceTestSupport {
     }
 
     @Test
+    void aQueuedRunRemembersOnlyTheNewestRowsAfterItsQuestion() {
+        // at most messageLength + 2 * MAX_STEPS + 1 = 51 rows after the question (ADR 046); here 55
+        userSays("first");
+        UUID second = userSays("second");
+        for (int i = 1; i <= 55; i++) {
+            insert("assistant", "step " + i, null);
+        }
+        model.thenReply("Second answer.");
+
+        runner.run(agent, session, second);
+
+        List<String> texts = textsOf(prompt(0));
+        assertThat(texts).hasSize(2 + 51)
+                .doesNotContain("assistant:step 1", "assistant:step 4")
+                .startsWith("user:first", "assistant:step 5")
+                .endsWith("assistant:step 55", "user:second");
+    }
+
+    @Test
     void aDeletedQuestionLeavesTheStoredOrder() {
         userSays("first");
         UUID second = userSays("second");
