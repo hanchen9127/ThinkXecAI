@@ -32,7 +32,7 @@ import java.util.stream.Stream;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    static final String INTERNAL_ERROR_MESSAGE = "Internal server error";
+    public static final String INTERNAL_ERROR_MESSAGE = "Internal server error";
 
     @Value("${spring.servlet.multipart.max-request-size}")
     private DataSize maxRequestSize;
