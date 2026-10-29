@@ -38,6 +38,8 @@ public class SseServiceImpl implements SseService {
     public SseEmitter connect(UUID chatSessionId) {
         SseEmitter emitter = emitterFactory.get();
         // Each callback removes only its own emitter: a replaced one completes after its successor is registered.
+        // Spring MVC wires them when it takes the emitter; if the client is gone by then they never run, and the
+        // next send or connect removes the emitter instead.
         emitter.onCompletion(() -> emitters.remove(chatSessionId, emitter));
         emitter.onError(error -> emitters.remove(chatSessionId, emitter));
         emitter.onTimeout(() -> {
@@ -49,7 +51,7 @@ public class SseServiceImpl implements SseService {
             // before it is registered, so it is the first event even when a run is sending to the session
             emitter.send(SseEmitter.event().name("init").data("connected"));
         } catch (IOException | IllegalStateException e) {
-            log.warn("SSE init failed for session {}: {}", chatSessionId, e.getClass().getSimpleName());
+            log.warn("SSE init failed for session {}: {}", chatSessionId, failure(e));
             emitter.completeWithError(e);
             return emitter;
         }
@@ -81,10 +83,19 @@ public class SseServiceImpl implements SseService {
         try {
             emitter.send(SseEmitter.event().name("message").data(message, MediaType.APPLICATION_JSON));
         } catch (IOException | IllegalStateException e) {
-            log.warn("SSE send failed for session {}: {}", chatSessionId, e.getClass().getSimpleName());
+            log.warn("SSE send failed for session {}: {}", chatSessionId, failure(e));
             emitters.remove(chatSessionId, emitter);
             emitter.completeWithError(e);
         }
+    }
+
+    /**
+     * Exception class names only, never messages, which can quote what was sent. Spring wraps anything but an
+     * I/O error (a message that cannot be written as JSON, say) in IllegalStateException; the cause names it.
+     */
+    private static String failure(Exception e) {
+        return e.getCause() == null ? e.getClass().getSimpleName()
+                : e.getClass().getSimpleName() + " caused by " + e.getCause().getClass().getSimpleName();
     }
 
     @Override

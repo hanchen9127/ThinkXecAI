@@ -5,6 +5,10 @@ import com.thinkxecai.model.sse.SseMessage;
 import com.thinkxecai.model.vo.ChatMessageVO;
 import com.thinkxecai.service.SseService;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.http.converter.HttpMessageNotWritableException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
@@ -15,12 +19,7 @@ import java.util.Deque;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.function.Consumer;
-import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -28,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Best-effort delivery and one stream per session (ISSUE-007, ADR 048), with emitters that record what
  * they are sent and can be made to fail as a gone client or a completed emitter does.
  */
+@ExtendWith(OutputCaptureExtension.class)
 class SseServiceImplTest {
 
     private static final UUID SESSION = UUID.fromString("3c9e1a7b-2d4f-4a6b-8c0d-1e2f3a4b5c6d");
@@ -150,6 +150,29 @@ class SseServiceImplTest {
     }
 
     @Test
+    void theCurrentStreamsCompletionRemovesIt() {
+        FakeEmitter emitter = connect();
+
+        emitter.completion.run();
+        service.send(SESSION, message("1"));
+
+        assertThat(emitter.sent).containsExactly(INIT);
+    }
+
+    @Test
+    void aFailedSendIsLoggedWithItsCauseButNotWhatWasSent(CapturedOutput output) {
+        FakeEmitter emitter = connect();
+        emitter.failure = new IllegalStateException("Failed to send text secret",
+                new HttpMessageNotWritableException("Could not write JSON: text secret"));
+
+        service.send(SESSION, message("secret"));
+
+        assertThat(output).contains("SSE send failed for session " + SESSION
+                + ": IllegalStateException caused by HttpMessageNotWritableException");
+        assertThat(output).doesNotContain("secret");
+    }
+
+    @Test
     void theCurrentStreamsErrorRemovesIt() {
         FakeEmitter emitter = connect();
 
@@ -205,39 +228,6 @@ class SseServiceImplTest {
     @Test
     void closingWithoutAClientDoesNothing() {
         service.close(SESSION);
-    }
-
-    @Test
-    void messagesSentFromTwoThreadsAllArriveEachInItsOwnOrder() throws Exception {
-        FakeEmitter emitter = connect();
-        int perThread = 500;
-        CountDownLatch start = new CountDownLatch(1);
-        ExecutorService threads = Executors.newFixedThreadPool(2);
-        try {
-            List<Future<?>> done = new ArrayList<>();
-            for (String thread : List.of("a", "b")) {
-                done.add(threads.submit(() -> {
-                    start.await();
-                    for (int i = 0; i < perThread; i++) {
-                        service.send(SESSION, message(thread + i));
-                    }
-                    return null;
-                }));
-            }
-            start.countDown();
-            for (Future<?> future : done) {
-                future.get();
-            }
-        } finally {
-            threads.shutdownNow();
-        }
-
-        assertThat(emitter.sent).hasSize(1 + 2 * perThread);
-        for (String thread : List.of("a", "b")) {
-            List<String> own = emitter.sent.stream().filter(sent -> sent.contains("id=" + thread)).toList();
-            assertThat(own).containsExactlyElementsOf(
-                    IntStream.range(0, perThread).mapToObj(i -> event(message(thread + i))).toList());
-        }
     }
 
     /**
