@@ -68,6 +68,7 @@ class ChatModelHttpTest {
     private enum Mode { OK, SLOW, SERVER_ERROR, CLIENT_ERROR }
 
     private static volatile Mode mode = Mode.OK;
+    private static boolean geminiWarmedUp;
 
     @Autowired
     private ThinkXecGoogleGenAiChatModel geminiChatModel;
@@ -99,8 +100,6 @@ class ChatModelHttpTest {
         registry.add("spring.ai.retry.backoff.initial-interval", () -> "10ms");
         registry.add("spring.ai.retry.backoff.max-interval", () -> "50ms");
     }
-
-    private static boolean geminiWarmedUp;
 
     @BeforeEach
     void reset() {

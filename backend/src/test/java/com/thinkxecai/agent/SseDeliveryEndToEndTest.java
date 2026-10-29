@@ -8,13 +8,10 @@ import com.thinkxecai.service.SseService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.system.CapturedOutput;
-import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Propagation;
@@ -49,7 +46,6 @@ import static org.mockito.Mockito.when;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-@ExtendWith(OutputCaptureExtension.class)
 class SseDeliveryEndToEndTest extends ServiceTestSupport {
 
     private static final String MARKER = "sse-delivery-end-to-end-test";
@@ -174,7 +170,7 @@ class SseDeliveryEndToEndTest extends ServiceTestSupport {
     }
 
     @Test
-    void aClientThatGoesAwayMidRunLeavesTheRunToFinish(CapturedOutput output) throws Exception {
+    void aClientThatGoesAwayMidRunLeavesTheRunToFinish() throws Exception {
         SseClient client = connect();
         CountDownLatch closed = new CountDownLatch(1);
         model.thenCall("", call("d", "getDate", "{}")).then(after(closed, "It is today."));
@@ -186,8 +182,8 @@ class SseDeliveryEndToEndTest extends ServiceTestSupport {
         closed.countDown();
 
         awaitRows(4);
+        // what the server does with the gone stream is covered by SseServiceImplTest and SseControllerTest
         assertThat(roles()).containsExactly("user", "assistant", "tool", "assistant");
-        assertThat(output).doesNotContain("SSE connect failed");
     }
 
     @Test
