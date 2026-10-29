@@ -100,10 +100,28 @@ class ChatModelHttpTest {
         registry.add("spring.ai.retry.backoff.max-interval", () -> "50ms");
     }
 
+    private static boolean geminiWarmedUp;
+
     @BeforeEach
     void reset() {
-        requests.clear();
         mode = Mode.OK;
+        if (!geminiWarmedUp) {
+            geminiWarmedUp = true;
+            warmUpGemini();
+        }
+        requests.clear();
+    }
+
+    /**
+     * The SDK's timeout covers the whole call, so a JVM's first Gemini call (classes still loading) can end
+     * before its request is sent on a busy machine; the test that runs first would then see no request.
+     */
+    private void warmUpGemini() {
+        try {
+            geminiChatModel.call(geminiPrompt(List.of(new UserMessage("warm-up"))));
+        } catch (RuntimeException e) {
+            // A cold call that times out still loads what the next one needs.
+        }
     }
 
     @AfterAll
