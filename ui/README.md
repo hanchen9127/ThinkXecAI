@@ -1,6 +1,6 @@
 # ThinkXecAI frontend
 
-React 19 + TypeScript + Vite (`rolldown-vite`) + Ant Design. The pages arrive in Phase 13; for now
+React 19 + TypeScript + Vite 8 + React Router 8 + Ant Design. The pages arrive in Phase 13; for now
 this package holds the typed API client the pages will use. See the repository README for running
 the whole system.
 

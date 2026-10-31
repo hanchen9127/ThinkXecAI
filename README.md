@@ -43,7 +43,7 @@ token-by-token streaming, and document formats other than Markdown.
 | AI models | Spring AI `ChatClient` over DeepSeek (`deepseek-chat`), Qwen (`qwen3.8-flash`, through its OpenAI-compatible API), and Google Gemini (`gemini-3.8-flash`) |
 | Database  | PostgreSQL (`pgvector/pgvector:pg18`) with the `vector` extension           |
 | Embeddings| Local Ollama, model `bge-m3`, 1024-dim vectors                              |
-| Frontend  | React 19, TypeScript, Vite (`rolldown-vite`), Tailwind CSS, Ant Design + `@ant-design/x` |
+| Frontend  | React 19, TypeScript, Vite 8, React Router 8, Tailwind CSS, Ant Design + `@ant-design/x` |
 | Realtime  | Server-Sent Events (SSE), one connection per chat session                   |
 ## Project Status
 
@@ -75,7 +75,7 @@ client and still runs as an empty shell.
 ### Prerequisites
 
 - Java 21 (e.g. Eclipse Temurin) and Maven
-- Node.js 20+ and npm
+- Node.js 22.22+ and npm
 - Docker (for PostgreSQL)
 - [Ollama](https://ollama.com/) running locally with the `bge-m3` model pulled:
   ```bash
