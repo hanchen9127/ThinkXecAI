@@ -12,6 +12,7 @@ the whole system.
 | `npm run build`                   | Type-check and build into `dist/`                                                  |
 | `npm run typecheck`               | `tsc -b`, including the compile-time API type checks in `src/api/api.type-test.ts` |
 | `npm run lint`                    | ESLint; any warning fails                                                          |
+| `npm test`                        | Vitest unit tests (`src/**/*.test.ts(x)`, jsdom); no backend needed                |
 | `npm run format` / `format:check` | Prettier                                                                           |
 | `npm run gen:api`                 | Regenerate `src/api/schema.d.ts` from `../backend/target/openapi.json`             |
 
