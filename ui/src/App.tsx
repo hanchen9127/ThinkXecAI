@@ -6,6 +6,7 @@ import KnowledgeBaseTabContent from './components/tabs/KnowledgeBaseTabContent'
 import AgentChatView from './components/views/AgentChatView'
 import KnowledgeBaseView from './components/views/KnowledgeBaseView'
 import NotFoundView from './components/views/NotFoundView'
+import ChatSessionsProvider from './contexts/ChatSessionsProvider'
 import Content from './layout/Content'
 import Layout from './layout/Layout'
 import Sidebar from './layout/Sidebar'
@@ -42,9 +43,11 @@ export function AppRoutes() {
 export default function App() {
   return (
     <ConfigProvider theme={theme}>
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
+      <ChatSessionsProvider>
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
+      </ChatSessionsProvider>
     </ConfigProvider>
   )
 }
