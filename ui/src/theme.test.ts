@@ -1,0 +1,23 @@
+import { describe, expect, it } from 'vitest'
+import css from './index.css?raw'
+import { palette, radius } from './theme'
+
+function kebab(name: string) {
+  return name.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)
+}
+
+describe('palette', () => {
+  it.each(Object.entries(palette))('declares %s with the same value in index.css', (name, hex) => {
+    const match = new RegExp(`--color-${kebab(name)}:\\s*(#[0-9a-fA-F]{6});`).exec(css)
+    expect(match?.[1].toLowerCase()).toBe(hex.toLowerCase())
+  })
+
+  it('gives Ant Design and Tailwind the same corner radius', () => {
+    expect(css).toContain(`--radius-ui: ${radius}px;`)
+  })
+
+  it('declares no color in index.css that theme.ts lacks', () => {
+    const declared = [...css.matchAll(/--color-([a-z-]+):/g)].map((m) => m[1])
+    expect(declared.sort()).toEqual(Object.keys(palette).map(kebab).sort())
+  })
+})

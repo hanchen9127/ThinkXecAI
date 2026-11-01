@@ -1,5 +1,36 @@
 @import 'tailwindcss';
 
+/* The V1 palette; theme.ts holds the same values for Ant Design (theme.test.ts keeps them equal). */
+@theme {
+  --color-ground: #eef2f5;
+  --color-surface: #ffffff;
+  --color-ink: #1b2430;
+  --color-muted: #5a6675;
+  --color-line: #dce2e8;
+  --color-hairline: #e6eaee;
+  --color-think: #4453c4;
+  --color-think-ink: #2f3a93;
+  --color-execute: #b4560a;
+  --color-execute-ink: #8a4108;
+  --color-rail: #1b2430;
+  --color-rail-active: #2c394b;
+  --color-rail-icon: #aeb8c6;
+
+  --font-sans: 'Instrument Sans', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* Shape and sizes of the V1 look; components use these names, never bracketed values. */
+  --radius-ui: 4px;
+  --text-icon: 20px;
+  --text-wordmark: 22px;
+  --text-wordmark--letter-spacing: -0.01em;
+  --container-panel: 300px;
+  --container-content: 560px;
+}
+
 body {
   margin: 0;
+  background: var(--color-ground);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
 }

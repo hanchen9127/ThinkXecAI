@@ -12,6 +12,8 @@ export default defineConfig({
     // Tests fake `fetch` and `EventSource` with vi.stubGlobal; each test starts from the real globals.
     unstubGlobals: true,
     restoreMocks: true,
+    // CSS is replaced by an empty module in tests; theme.test.ts reads index.css's palette.
+    css: { include: [/src[\\/]index\.css/] },
     // Like the backend tests (ADR 034): a zone far from UTC, with daylight saving time.
     env: { TZ: 'Australia/Sydney' },
   },

@@ -22,6 +22,16 @@ export default defineConfig(
     rules: {
       ...reactHooks.configs.recommended.rules,
       ...reactRefresh.configs.vite.rules,
+      // Sizes, radii, and spacing come from the @theme names in index.css, not bracketed values
+      // such as `pb-[18px]`, so the V1 look is decided in one place.
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            'Literal[value=/[\\w:]-\\[-?[\\d.]/], TemplateElement[value.raw=/[\\w:]-\\[-?[\\d.]/]',
+          message: 'Use a theme name from index.css instead of a bracketed Tailwind value.',
+        },
+      ],
       // katex and mermaid carry advisories without a fix in Ant Design X's ranges; neither is
       // bundled unless one of these is imported (ADR 051).
       'no-restricted-imports': [
