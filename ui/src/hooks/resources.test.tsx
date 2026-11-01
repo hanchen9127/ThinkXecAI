@@ -4,10 +4,10 @@ import { describe, expect, it } from 'vitest'
 import { ApiError } from '../api/http'
 import ChatSessionsProvider from '../contexts/ChatSessionsProvider'
 import { deferred, fakeApi } from '../test/fakeApi'
-import { useAgents } from './useAgents'
+import { useAgents, useAgentsState } from './useAgents'
 import { useChatSessions } from './useChatSessions'
 import { useDocuments } from './useDocuments'
-import { useKnowledgeBases } from './useKnowledgeBases'
+import { useKnowledgeBases, useKnowledgeBasesState } from './useKnowledgeBases'
 import { useOptionalTools } from './useOptionalTools'
 
 function count(calls: { method: string; path: string }[], method: string, path: string) {
@@ -17,7 +17,7 @@ function count(calls: { method: string; path: string }[], method: string, path: 
 describe('useAgents', () => {
   it('loads the agents', async () => {
     fakeApi({ 'GET /agents': [{ id: 'a1', name: 'Store analyst' }] })
-    const { result } = renderHook(() => useAgents())
+    const { result } = renderHook(() => useAgentsState())
 
     await waitFor(() => expect(result.current.loading).toBe(false))
     expect(result.current.agents).toEqual([{ id: 'a1', name: 'Store analyst' }])
@@ -32,7 +32,7 @@ describe('useAgents', () => {
         return agents[0]
       },
     })
-    const { result } = renderHook(() => useAgents())
+    const { result } = renderHook(() => useAgentsState())
     await waitFor(() => expect(result.current.loading).toBe(false))
 
     let created: unknown
@@ -51,7 +51,7 @@ describe('useAgents', () => {
       'PATCH /agents/a1': { id: 'a1', name: 'Renamed' },
       'DELETE /agents/a1': null,
     })
-    const { result } = renderHook(() => useAgents())
+    const { result } = renderHook(() => useAgentsState())
     await waitFor(() => expect(result.current.loading).toBe(false))
 
     await act(() => result.current.update('a1', { name: 'Renamed' }))
@@ -68,7 +68,7 @@ describe('useAgents', () => {
         throw { code: 400, message: 'name: must not be blank' }
       },
     })
-    const { result } = renderHook(() => useAgents())
+    const { result } = renderHook(() => useAgentsState())
     await waitFor(() => expect(result.current.loading).toBe(false))
 
     const failure = result.current.create({ name: ' ', model: 'deepseek-chat' })
@@ -79,7 +79,7 @@ describe('useAgents', () => {
 
   it('reports a failed load', async () => {
     fakeApi({})
-    const { result } = renderHook(() => useAgents())
+    const { result } = renderHook(() => useAgentsState())
 
     await waitFor(() => expect(result.current.loading).toBe(false))
     expect(result.current.error).toBeInstanceOf(ApiError)
@@ -95,7 +95,7 @@ describe('useKnowledgeBases', () => {
       'PATCH /knowledge-bases/k1': { id: 'k1', name: 'Store policies' },
       'DELETE /knowledge-bases/k1': null,
     })
-    const { result } = renderHook(() => useKnowledgeBases())
+    const { result } = renderHook(() => useKnowledgeBasesState())
     await waitFor(() => expect(result.current.knowledgeBases).toHaveLength(1))
 
     await act(() => result.current.create({ name: 'Products' }))
@@ -155,6 +155,15 @@ describe('useDocuments', () => {
     await act(async () => slow.resolve([{ id: 'd1', name: 'returns.md' }]))
 
     expect(result.current.documents).toEqual([{ id: 'd2', name: 'products.md' }])
+  })
+})
+
+describe('shared lists', () => {
+  it.each([
+    ['useAgents', useAgents, /AgentsProvider/],
+    ['useKnowledgeBases', useKnowledgeBases, /KnowledgeBasesProvider/],
+  ])('%s fails outside its provider', (_, hook, message) => {
+    expect(() => renderHook(() => hook())).toThrow(message)
   })
 })
 

@@ -1,16 +1,20 @@
-import { render, screen } from '@testing-library/react'
+import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router'
-import { describe, expect, it } from 'vitest'
-import { AppRoutes } from './App'
+import { beforeEach, describe, expect, it } from 'vitest'
+import { fakeApi } from './test/fakeApi'
+import { renderApp } from './test/renderApp'
 
 function renderAt(path: string) {
-  return render(
-    <MemoryRouter initialEntries={[path]}>
-      <AppRoutes />
-    </MemoryRouter>,
-  )
+  return renderApp(path)
 }
+
+beforeEach(() => {
+  fakeApi({
+    'GET /agents': [],
+    'GET /knowledge-bases': [],
+    'GET /chat-sessions': [],
+  })
+})
 
 function currentSection() {
   const nav = screen.getByRole('navigation', { name: 'Main' })
@@ -22,7 +26,7 @@ function currentSection() {
 describe('routes', () => {
   it.each([
     ['/', 'New chat', 'Chats'],
-    ['/agent', 'New chat', 'Agents'],
+    ['/agent', 'Agents', 'Agents'],
     ['/chat', 'New chat', 'Chats'],
     ['/chat/5b0c', 'Chat', 'Chats'],
     ['/knowledge-base', 'Knowledge bases', 'Knowledge bases'],

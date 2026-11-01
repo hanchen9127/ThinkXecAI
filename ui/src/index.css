@@ -10,8 +10,10 @@
   --color-hairline: #e6eaee;
   --color-think: #4453c4;
   --color-think-ink: #2f3a93;
+  --color-think-wash: #e3e7fa;
   --color-execute: #b4560a;
   --color-execute-ink: #8a4108;
+  --color-execute-wash: #fbebdd;
   --color-rail: #1b2430;
   --color-rail-active: #2c394b;
   --color-rail-icon: #aeb8c6;
@@ -24,6 +26,7 @@
   --text-icon: 20px;
   --text-wordmark: 22px;
   --text-wordmark--letter-spacing: -0.01em;
+  --shadow-current: inset 2px 0 0 var(--color-think);
   --container-panel: 300px;
   --container-content: 560px;
 }

@@ -4,6 +4,7 @@ import { sectionOf } from './sections'
 describe('sectionOf', () => {
   it.each([
     ['/agent', 'agents'],
+    ['/agent/a1', 'agents'],
     ['/', 'chats'],
     ['/chat', 'chats'],
     ['/chat/5b0c', 'chats'],
@@ -14,7 +15,7 @@ describe('sectionOf', () => {
     expect(sectionOf(path)).toBe(section)
   })
 
-  it.each(['/agents', '/chat/a/b', '/chatter', '/knowledge-bases', '/settings'])(
+  it.each(['/agents', '/agent/a/b', '/chat/a/b', '/chatter', '/knowledge-bases', '/settings'])(
     'gives no section to %s',
     (path) => {
       expect(sectionOf(path)).toBeNull()

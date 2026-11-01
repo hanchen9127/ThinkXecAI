@@ -28,7 +28,7 @@ export default defineConfig(
         'error',
         {
           selector:
-            'Literal[value=/[\\w:]-\\[-?[\\d.]/], TemplateElement[value.raw=/[\\w:]-\\[-?[\\d.]/]',
+            'Literal[value=/[\\w:]-\\[[^\\]]*\\]/], TemplateElement[value.raw=/[\\w:]-\\[[^\\]]*\\]/]',
           message: 'Use a theme name from index.css instead of a bracketed Tailwind value.',
         },
       ],

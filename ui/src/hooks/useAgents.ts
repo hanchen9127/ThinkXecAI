@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useContext, useMemo } from 'react'
 import {
   type CreateAgentRequest,
   type UpdateAgentRequest,
@@ -7,10 +7,11 @@ import {
   listAgents,
   updateAgent,
 } from '../api/api'
+import { AgentsContext, type AgentsValue } from '../contexts/agentsContext'
 import { useRemoteData } from './useRemoteData'
 
-/** The agents, newest first, and the changes to them; each change reloads the list. */
-export function useAgents() {
+/** Loads the agents (newest first) and their changes; each change reloads the list. For `AgentsProvider`. */
+export function useAgentsState(): AgentsValue {
   const { data, loading, error, reload } = useRemoteData(listAgents)
 
   const create = useCallback(
@@ -37,5 +38,15 @@ export function useAgents() {
     [reload],
   )
 
-  return { agents: data ?? [], loading, error, reload, create, update, remove }
+  return useMemo(
+    () => ({ agents: data ?? [], loading, error, reload, create, update, remove }),
+    [data, loading, error, reload, create, update, remove],
+  )
+}
+
+/** The shared agent list; only inside `AgentsProvider`. */
+export function useAgents(): AgentsValue {
+  const value = useContext(AgentsContext)
+  if (!value) throw new Error('useAgents must be used inside AgentsProvider')
+  return value
 }
