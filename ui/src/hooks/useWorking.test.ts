@@ -30,18 +30,46 @@ function track(initial: ChatMessage[]) {
   return renderHook(({ messages }) => useWorking(messages), { initialProps: { messages: initial } })
 }
 
+const terminate = {
+  toolCalls: [{ id: 't1', type: 'function', name: 'terminate', arguments: '{}' }],
+}
+const terminated = { toolResponse: { id: 't1', name: 'terminate', responseData: '"Done"' } }
+
+/** `awaitsAgent` on a chat whose newest message is the last one given. */
+function awaits(...messages: ChatMessage[]) {
+  return awaitsAgent(messages.at(-1), messages)
+}
+
 describe('awaitsAgent', () => {
   it('waits after a user message, a call for tools, and a tool result', () => {
-    expect(awaitsAgent(message('m1', 'user'))).toBe(true)
-    expect(awaitsAgent(message('m1', 'assistant', 0, withTools))).toBe(true)
-    expect(awaitsAgent(message('m1', 'tool', 0, result))).toBe(true)
+    expect(awaits(message('m1', 'user'))).toBe(true)
+    expect(awaits(message('m1', 'assistant', 0, withTools))).toBe(true)
+    expect(awaits(message('m1', 'assistant', 0, withTools), message('m2', 'tool', 0, result))).toBe(
+      true,
+    )
   })
 
   it('stops after an answer or a notice, and for an empty chat', () => {
-    expect(awaitsAgent(message('m1', 'assistant'))).toBe(false)
-    expect(awaitsAgent(message('m1', 'assistant', 0, { toolCalls: [] }))).toBe(false)
-    expect(awaitsAgent(message('m1', 'system'))).toBe(false)
-    expect(awaitsAgent(undefined)).toBe(false)
+    expect(awaits(message('m1', 'assistant'))).toBe(false)
+    expect(awaits(message('m1', 'assistant', 0, { toolCalls: [] }))).toBe(false)
+    expect(awaits(message('m1', 'system'))).toBe(false)
+    expect(awaitsAgent(undefined, [])).toBe(false)
+  })
+
+  it('stops after the results of an answer that called terminate (ADR 045)', () => {
+    const answer = message('m1', 'assistant', 1000, terminate)
+    expect(awaits(answer, message('m2', 'tool', 0, terminated))).toBe(false)
+  })
+
+  it('waits after terminate in a reply without text: it is refused and the run goes on', () => {
+    const silent = { ...message('m1', 'assistant', 1000, terminate), content: ' ' }
+    expect(awaits(silent, message('m2', 'tool', 0, terminated))).toBe(true)
+  })
+
+  it('judges by the newest reply holding the call when an older run used the same id', () => {
+    const older = message('m1', 'assistant', 5000, terminate)
+    const silent = { ...message('m2', 'assistant', 1000, terminate), content: '' }
+    expect(awaits(older, silent, message('m3', 'tool', 0, terminated))).toBe(true)
   })
 })
 

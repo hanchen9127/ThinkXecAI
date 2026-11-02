@@ -8,14 +8,37 @@ import { parseApiTimestamp } from '../utils/time'
  */
 export const WORKING_TIMEOUT_MS = 7 * 60 * 1000
 
+/** The tool that ends a run when called in a reply with text (ADR 045). */
+const TERMINATE = 'terminate'
+
 /**
- * Whether the agent still owes a reply after `last` (D4): a user message, an assistant message that
- * asked for tools, or a tool result. An answer or a notice (assistant without tool calls) ends it.
+ * Whether the agent still owes a reply after `last`, the newest of `messages` (D4): a user message,
+ * an assistant message that asked for tools, or a tool result. An answer or a notice (assistant
+ * without tool calls) ends it, and so do the results of a reply with text that called `terminate`:
+ * the run ends there (ADR 045). `terminate` in a reply without text is refused and the run goes on.
  */
-export function awaitsAgent(last: ChatMessage | undefined): boolean {
+export function awaitsAgent(last: ChatMessage | undefined, messages: ChatMessage[]): boolean {
   if (!last) return false
-  if (last.role === 'user' || last.role === 'tool') return true
+  if (last.role === 'user') return true
+  if (last.role === 'tool') return !endsRun(callerOf(last, messages))
   return last.role === 'assistant' && (last.metadata?.toolCalls?.length ?? 0) > 0
+}
+
+/** The newest reply holding the answered call; ids come from the model, so an older run may reuse one. */
+function callerOf(result: ChatMessage, messages: ChatMessage[]) {
+  const id = result.metadata?.toolResponse?.id
+  let caller: ChatMessage | undefined
+  for (const message of messages) {
+    if (!message.metadata?.toolCalls?.some((call) => call.id === id)) continue
+    if (!caller || time(message) >= time(caller)) caller = message
+  }
+  return caller
+}
+
+function endsRun(reply: ChatMessage | undefined) {
+  return (
+    !!reply?.content?.trim() && !!reply.metadata?.toolCalls?.some((call) => call.name === TERMINATE)
+  )
 }
 
 /**
@@ -33,7 +56,7 @@ export function useWorking(messages: ChatMessage[]): boolean {
   }, [messages])
   const [expired, setExpired] = useState<string>()
 
-  const waiting = awaitsAgent(last)
+  const waiting = awaitsAgent(last, messages)
   const id = last?.id
   const deadline = last ? time(last) + WORKING_TIMEOUT_MS : 0
   useEffect(() => {
