@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatApiTimestamp, parseApiTimestamp } from './time'
+import { formatApiTimestamp, parseApiTimestamp, formatListTime } from './time'
 
 // Two-digit fields and a 24-hour clock, so the expected strings do not depend on ICU's spacing.
 const LOCAL: Intl.DateTimeFormatOptions = {
@@ -71,5 +71,29 @@ describe('formatApiTimestamp', () => {
 
   it('returns a value that is not an API timestamp unchanged', () => {
     expect(formatApiTimestamp('yesterday')).toBe('yesterday')
+  })
+})
+
+describe('formatListTime', () => {
+  // 2 Nov 2026, 10:00 in Sydney (UTC+11).
+  const now = new Date('2026-11-01T23:00:00Z')
+
+  it('shows the time for today, counted in the browser time zone', () => {
+    // 1 Nov 14:00 UTC is 2 Nov 01:00 in Sydney: today, though yesterday in UTC.
+    expect(formatListTime('2026-11-01T14:00:00', now)).toBe('1:00 AM')
+  })
+
+  it('says Yesterday for the day before', () => {
+    expect(formatListTime('2026-11-01T12:59:00', now)).toBe('Yesterday')
+    expect(formatListTime('2026-10-31T13:00:00', now)).toBe('Yesterday')
+  })
+
+  it('shows the date for earlier days this year, and the year before that', () => {
+    expect(formatListTime('2026-10-31T12:59:00', now)).toBe('Oct 31')
+    expect(formatListTime('2025-12-30T00:00:00', now)).toBe('Dec 30, 2025')
+  })
+
+  it('returns a value that is not an API timestamp unchanged', () => {
+    expect(formatListTime('soon', now)).toBe('soon')
   })
 })

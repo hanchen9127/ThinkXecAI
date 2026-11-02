@@ -116,8 +116,8 @@ export function updateChatSession(chatSessionId: string, request: UpdateChatSess
   )
 }
 
-export function deleteChatSession(chatSessionId: string) {
-  return http.delete<null>(path`/chat-sessions/${chatSessionId}`)
+export function deleteChatSession(chatSessionId: string, options?: { keepalive?: boolean }) {
+  return http.delete<null>(path`/chat-sessions/${chatSessionId}`, options)
 }
 
 // ---------------------------------------------------------------------------

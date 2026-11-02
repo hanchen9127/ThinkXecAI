@@ -28,7 +28,7 @@ describe('routes', () => {
     ['/', 'New chat', 'Chats'],
     ['/agent', 'Agents', 'Agents'],
     ['/chat', 'New chat', 'Chats'],
-    ['/chat/5b0c', 'Chat', 'Chats'],
+    ['/chat/5b0c', 'Chat not found', 'Chats'],
     ['/knowledge-base', 'Knowledge bases', 'Knowledge bases'],
     ['/knowledge-base/7a1e', 'Knowledge base not found', 'Knowledge bases'],
   ])('%s shows %j with %s open in the side menu', async (path, heading, section) => {

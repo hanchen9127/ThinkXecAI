@@ -39,3 +39,24 @@ export function formatApiTimestamp(
     return value
   }
 }
+
+/**
+ * A short time for list items (V1 element 5): the time today, "Yesterday", the date this year,
+ * otherwise the date with the year. Days are counted in the browser's time zone.
+ */
+export function formatListTime(value: string, now: Date = new Date()): string {
+  let date: Date
+  try {
+    date = parseApiTimestamp(value)
+  } catch {
+    return value
+  }
+  const day = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
+  if (day(date) === day(now)) return formatApiTimestamp(value, { timeStyle: 'short' })
+  if (day(date) === day(yesterday)) return 'Yesterday'
+  if (date.getFullYear() === now.getFullYear()) {
+    return formatApiTimestamp(value, { month: 'short', day: 'numeric' })
+  }
+  return formatApiTimestamp(value, { dateStyle: 'medium' })
+}

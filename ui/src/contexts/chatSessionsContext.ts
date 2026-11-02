@@ -9,7 +9,7 @@ export interface ChatSessionsValue {
   reload: () => void
   create: (request: CreateChatSessionRequest) => Promise<ChatSession>
   update: (chatSessionId: string, request: UpdateChatSessionRequest) => Promise<ChatSession>
-  remove: (chatSessionId: string) => Promise<void>
+  remove: (chatSessionId: string, options?: { keepalive?: boolean }) => Promise<void>
 }
 
 export const ChatSessionsContext = createContext<ChatSessionsValue | null>(null)

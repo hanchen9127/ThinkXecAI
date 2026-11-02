@@ -31,8 +31,8 @@ export default function ChatSessionsProvider({ children }: { children: ReactNode
     [reload],
   )
   const remove = useCallback(
-    async (chatSessionId: string) => {
-      await deleteChatSession(chatSessionId)
+    async (chatSessionId: string, options?: { keepalive?: boolean }) => {
+      await deleteChatSession(chatSessionId, options)
       reload()
     },
     [reload],
