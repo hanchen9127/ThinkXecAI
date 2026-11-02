@@ -73,9 +73,10 @@ describe('side menu', () => {
 
     await userEvent.click(screen.getByRole('link', { name: 'Knowledge bases' }))
 
-    expect(currentSection()).toEqual(['Knowledge bases'])
+    // Navigation waits for the next page's lazy code, so the section changes a moment after the click.
     expect(
       await screen.findByRole('heading', { level: 1, name: 'Knowledge bases' }),
     ).toBeInTheDocument()
+    expect(currentSection()).toEqual(['Knowledge bases'])
   })
 })

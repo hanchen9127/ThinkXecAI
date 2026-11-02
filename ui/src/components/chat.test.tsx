@@ -380,6 +380,8 @@ describe('the chat list', () => {
       within(await screen.findByRole('tooltip')).getByRole('button', { name: 'Delete' }),
     )
     await userEvent.click(screen.getByRole('link', { name: 'Agents' }))
+    // Navigation waits for the next page's lazy code, so the list closes a moment after the click.
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Chats' })).toBeNull())
 
     expect(api.calls.filter((c) => c.method === 'DELETE')).toEqual([
       { method: 'DELETE', path: '/chat-sessions/s1', body: undefined },
