@@ -207,9 +207,9 @@ function KnowledgeBasePage({ knowledgeBase }: { knowledgeBase: KnowledgeBase }) 
 
 /** "Used by A and B", each linked to its profile (V3 K3 B). */
 function UsedBy({ agents }: { agents: Agent[] }) {
-  if (agents.length === 0) return <p className="m-0 mt-1.5">Not used by any agent yet.</p>
+  if (agents.length === 0) return <p className="m-0 mt-1.5 text-sm">Not used by any agent yet.</p>
   return (
-    <p className="m-0 mt-1.5">
+    <p className="m-0 mt-1.5 text-sm">
       Used by{' '}
       {agents.map((agent, i) => (
         <Fragment key={agent.id}>

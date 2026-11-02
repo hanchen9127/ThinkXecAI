@@ -23,6 +23,10 @@ export default function Composer({
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
   const blank = text.trim() === ''
+  // How to send means nothing in a chat that cannot be continued.
+  const hint = !disabled && (
+    <span className="text-xs text-muted">Enter to send, Shift+Enter for a new line</span>
+  )
 
   async function send() {
     if (blank || sending || disabled) return
@@ -57,11 +61,10 @@ export default function Composer({
           }}
         />
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline py-2.5 pr-3 pl-4">
-          {tools ?? (
-            <span className="text-xs text-muted">Enter to send, Shift+Enter for a new line</span>
-          )}
+          {tools ?? hint}
           <Button
             type="primary"
+            className="ml-auto"
             loading={sending}
             disabled={disabled || blank}
             onClick={() => void send()}
@@ -70,9 +73,7 @@ export default function Composer({
           </Button>
         </div>
       </div>
-      {tools && (
-        <span className="text-xs text-muted">Enter to send, Shift+Enter for a new line</span>
-      )}
+      {tools && hint}
     </div>
   )
 }

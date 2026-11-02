@@ -272,6 +272,7 @@ describe('a chat', () => {
     ).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 1, name: 'Untitled chat' })).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Message' })).toBeDisabled()
+    expect(screen.queryByText('Enter to send, Shift+Enter for a new line')).not.toBeInTheDocument()
   })
 
   it('shows the refusal when the agent went away meanwhile', async () => {
