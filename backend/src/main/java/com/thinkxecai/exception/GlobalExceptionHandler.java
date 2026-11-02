@@ -14,25 +14,33 @@ import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartException;
 
+import java.net.http.HttpConnectTimeoutException;
+import java.net.http.HttpTimeoutException;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
  * Maps every exception to the response envelope; the HTTP status stays 200 and the error is in
- * {@code code}. Client errors become 400 / 404 / 409 with a message naming the field; anything
- * else becomes a generic 500, and its details (exception messages, SQL, class names) go only to
- * the log.
+ * {@code code}. Client errors become 400 / 404 / 409 with a message naming the field, and a service
+ * that did not answer a 503 saying to try again; anything else becomes a generic 500, and its
+ * details (exception messages, SQL, class names, URLs) go only to the log.
  */
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     public static final String INTERNAL_ERROR_MESSAGE = "Internal server error";
+    public static final int SERVICE_UNAVAILABLE = 503;
+    public static final String SERVICE_TIMED_OUT_MESSAGE =
+            "A service this request needs did not answer in time; it may still be starting up. Try again in a minute.";
+    public static final String SERVICE_UNREACHABLE_MESSAGE =
+            "A service this request needs could not be reached; check that it is running, then try again.";
 
     @Value("${spring.servlet.multipart.max-request-size}")
     private DataSize maxRequestSize;
@@ -100,6 +108,30 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MultipartException.class)
     public ApiResponse<Void> handleMalformedMultipart(MultipartException ex) {
         return badRequest("Malformed multipart request");
+    }
+
+    /**
+     * An outbound HTTP call that got no answer, from any client built on Spring's HTTP support (today the
+     * embedding model; any model or service added later the same way). Worth trying again, so it is not a
+     * generic 500; the message names no service, and the details go only to the log (ADR 057).
+     */
+    @ExceptionHandler(ResourceAccessException.class)
+    public ApiResponse<Void> handleServiceNotAnswering(ResourceAccessException ex) {
+        log.warn("A service did not answer: {}", LogText.safe(ex.getMessage()));
+        return ApiResponse.error(SERVICE_UNAVAILABLE, timedOut(ex) ? SERVICE_TIMED_OUT_MESSAGE : SERVICE_UNREACHABLE_MESSAGE);
+    }
+
+    /** A read timeout. A connect timeout is a subclass, but then nothing answered at all. */
+    private static boolean timedOut(Throwable ex) {
+        for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
+            if (cause instanceof HttpConnectTimeoutException) {
+                return false;
+            }
+            if (cause instanceof HttpTimeoutException) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @ExceptionHandler(Exception.class)
