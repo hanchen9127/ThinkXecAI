@@ -212,8 +212,8 @@ export function updateDocument(documentId: string, request: UpdateDocumentReques
   )
 }
 
-export function deleteDocument(documentId: string) {
-  return http.delete<null>(path`/documents/${documentId}`)
+export function deleteDocument(documentId: string, options?: { keepalive?: boolean }) {
+  return http.delete<null>(path`/documents/${documentId}`, options)
 }
 
 // ---------------------------------------------------------------------------

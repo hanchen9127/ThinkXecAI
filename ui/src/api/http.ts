@@ -69,8 +69,11 @@ function sendJson<T>(method: 'POST' | 'PATCH' | 'PUT', path: string, body?: unkn
   }).then((res) => unwrap<T>(res))
 }
 
-function deleteJson<T>(path: string): Promise<T> {
-  return fetch(buildUrl(path), { method: 'DELETE' }).then((res) => unwrap<T>(res))
+/** `keepalive` lets the request finish after the page is closed (sent from `pagehide`). */
+function deleteJson<T>(path: string, options?: { keepalive?: boolean }): Promise<T> {
+  return fetch(buildUrl(path), { method: 'DELETE', keepalive: options?.keepalive }).then((res) =>
+    unwrap<T>(res),
+  )
 }
 
 function postForm<T>(path: string, formData: FormData): Promise<T> {

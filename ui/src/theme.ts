@@ -18,6 +18,8 @@ export const palette = {
   executeInk: '#8A4108',
   executeWash: '#FBEBDD',
   danger: '#A0331B',
+  /** Behind a failure that stays on screen (an upload that was refused). */
+  dangerWash: '#FBEDE9',
   rail: '#1B2430',
   railActive: '#2C394B',
   railIcon: '#AEB8C6',

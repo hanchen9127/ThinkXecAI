@@ -35,8 +35,8 @@ export function useDocuments(kbId: string | undefined) {
     [reload],
   )
   const remove = useCallback(
-    async (documentId: string) => {
-      await deleteDocument(documentId)
+    async (documentId: string, options?: { keepalive?: boolean }) => {
+      await deleteDocument(documentId, options)
       reload()
     },
     [reload],
