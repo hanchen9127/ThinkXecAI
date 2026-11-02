@@ -7,6 +7,7 @@ import { useAgents } from '../../hooks/useAgents'
 import { useChatMessages } from '../../hooks/useChatMessages'
 import { useChatSessions } from '../../hooks/useChatSessions'
 import { useChatStream } from '../../hooks/useChatStream'
+import { useWorking } from '../../hooks/useWorking'
 import { errorMessage } from '../../utils/text'
 import AgentRun from '../chat/AgentRun'
 import Composer from '../chat/Composer'
@@ -128,6 +129,7 @@ function Chat({ sessionId }: { sessionId: string }) {
   const { messages, loading, error, reload, send, receive } = useChatMessages(sessionId)
   const [sendError, setSendError] = useState<unknown>()
   const history = useMemo(() => groupHistory(messages), [messages])
+  const working = useWorking(messages)
 
   const session = chatSessions.chatSessions.find((s) => s.id === sessionId)
   const stream = useChatStream(
@@ -242,7 +244,7 @@ function Chat({ sessionId }: { sessionId: string }) {
         {!loading && error === undefined && messages.length === 0 && (
           <p className="m-0 text-muted">No messages yet.</p>
         )}
-        {history.map((item) =>
+        {history.map((item, i) =>
           item.kind === 'user' ? (
             <div
               key={item.message.id}
@@ -256,8 +258,13 @@ function Chat({ sessionId }: { sessionId: string }) {
               agentName={agentName}
               steps={item.steps}
               answers={item.answers}
+              working={working && i === history.length - 1}
             />
           ),
+        )}
+        {/* Nothing from the agent yet: its card starts with the dots. */}
+        {working && history.at(-1)?.kind === 'user' && (
+          <AgentRun agentName={agentName} steps={[]} answers={[]} working />
         )}
       </section>
 

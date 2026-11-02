@@ -233,3 +233,70 @@ describe('when the stream ends', () => {
     expect(source.closed).toBe(false)
   })
 })
+
+describe('the working indicator', () => {
+  /** An API timestamp `ago` ms before the real clock (the indicator counts from message times). */
+  const stamp = (ago: number) => new Date(Date.now() - ago).toISOString().slice(0, -1)
+  const recent = (id: string, role: string, ago: number, metadata: object | null = null) => ({
+    ...message(id, role, 'x', 0),
+    content: role === 'tool' ? null : `${role} ${id}`,
+    metadata,
+    createdAt: stamp(ago),
+    updatedAt: stamp(ago),
+  })
+  const calls = { toolCalls: [{ id: 'c1', type: 'function', name: 'dateTool', arguments: '{}' }] }
+
+  it('shows the agent working after a message is sent, and stops at the answer', async () => {
+    backend({
+      'GET /chat-messages/session/s1': () => [
+        recent('m1', 'user', 60_000),
+        recent('m2', 'assistant', 50_000),
+      ],
+      'POST /chat-messages': ({ body }) => ({ ...recent('m3', 'user', 0), ...(body as object) }),
+    })
+    renderApp('/chat/s1')
+    const box = await screen.findByRole('textbox', { name: 'Message' })
+    await screen.findByText('assistant m2')
+    expect(screen.queryByText(/is working/)).toBeNull()
+
+    await userEvent.type(box, 'Email it.{Enter}')
+
+    expect(await screen.findByText('Store analyst is working')).toBeInTheDocument()
+    expect(box).toBeEnabled()
+
+    FakeEventSource.latest().emit('message', generated(recent('m4', 'assistant', 0)))
+    await waitFor(() => expect(screen.queryByText(/is working/)).toBeNull())
+  })
+
+  it('shows it, with the steps so far, when the opened chat ends with a tool step', async () => {
+    backend({
+      'GET /chat-messages/session/s1': () => [
+        recent('m1', 'user', 90_000),
+        recent('m2', 'assistant', 60_000, calls),
+      ],
+    })
+    renderApp('/chat/s1')
+
+    const run = await screen.findByRole('article', { name: 'Store analyst' })
+    expect(await within(run).findByRole('status')).toHaveTextContent(
+      'Store analyst is working, 1 step so far',
+    )
+  })
+
+  it('shows nothing for a run that died long ago', async () => {
+    backend({
+      'GET /chat-messages/session/s1': () => [
+        {
+          ...recent('m1', 'user', 0),
+          createdAt: '2020-01-01T00:00:00',
+          updatedAt: '2020-01-01T00:00:00',
+        },
+      ],
+    })
+    renderApp('/chat/s1')
+
+    expect(await screen.findByText('user m1')).toBeInTheDocument()
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(screen.queryByText(/is working/)).toBeNull()
+  })
+})

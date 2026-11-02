@@ -6,16 +6,19 @@ import { type Step, type ToolCall, decodeToolResult, formatArguments } from './m
 /**
  * What the agent did for one user message (V1 elements 6 and 7): its steps on one rail, then its
  * answers. Only the last step shows until "Show N earlier steps" (V4 C2 B), and each tool result
- * stays closed until asked for (V4 C3 C).
+ * stays closed until asked for (V4 C3 C). While `working`, dots after the last step say so
+ * (V1 element 9 A, ADR 055).
  */
 export default function AgentRun({
   agentName,
   steps,
   answers,
+  working = false,
 }: {
   agentName: string
   steps: Step[]
   answers: { id: string; content: string | null }[]
+  working?: boolean
 }) {
   const [showAll, setShowAll] = useState(false)
   const earlier = steps.length - 1
@@ -77,6 +80,24 @@ export default function AgentRun({
           <Markdown text={answer.content ?? ''} className="text-base" />
         </div>
       ))}
+      {working && (
+        <div
+          role="status"
+          className={cx(
+            'flex items-center gap-2.5 text-sm text-muted',
+            (steps.length > 0 || answers.length > 0) && 'mt-5.5 border-t border-hairline pt-4.5',
+          )}
+        >
+          <span aria-hidden="true" className="flex gap-1.5">
+            <span className="size-1.75 rounded-full bg-think motion-safe:animate-pulse" />
+            <span className="size-1.75 rounded-full bg-think/60 motion-safe:animate-pulse" />
+            <span className="size-1.75 rounded-full bg-think/30 motion-safe:animate-pulse" />
+          </span>
+          {agentName} is working
+          {steps.length > 0 &&
+            `, ${steps.length === 1 ? '1 step' : `${steps.length} steps`} so far`}
+        </div>
+      )}
     </article>
   )
 }
