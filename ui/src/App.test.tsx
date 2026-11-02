@@ -39,10 +39,12 @@ describe('routes', () => {
     expect(screen.getByRole('region', { name: section })).toBeInTheDocument()
   })
 
-  it('shows a not-found page for an unknown path, with no section open', () => {
+  it('shows a not-found page for an unknown path, with no section open', async () => {
     renderAt('/settings')
 
-    expect(screen.getByRole('heading', { level: 1, name: 'Page not found' })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Page not found' }),
+    ).toBeInTheDocument()
     expect(currentSection()).toEqual([])
     expect(screen.getByRole('link', { name: 'Go to chats' })).toHaveAttribute('href', '/chat')
   })
@@ -72,6 +74,8 @@ describe('side menu', () => {
     await userEvent.click(screen.getByRole('link', { name: 'Knowledge bases' }))
 
     expect(currentSection()).toEqual(['Knowledge bases'])
-    expect(screen.getByRole('heading', { level: 1, name: 'Knowledge bases' })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Knowledge bases' }),
+    ).toBeInTheDocument()
   })
 })
