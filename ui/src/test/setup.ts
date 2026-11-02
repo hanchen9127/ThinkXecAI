@@ -1,6 +1,13 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
-import { afterEach } from 'vitest'
+import { afterEach, beforeEach, vi } from 'vitest'
+import { FakeEventSource } from './fakeEventSource'
+
+// jsdom has no EventSource; chats open one. Each test starts with no streams.
+beforeEach(() => {
+  FakeEventSource.instances = []
+  vi.stubGlobal('EventSource', FakeEventSource)
+})
 
 // Testing Library unmounts automatically only when test globals are enabled; they are not.
 afterEach(() => {

@@ -1,11 +1,12 @@
-import { Alert, Select } from 'antd'
+import { Alert, Button, Select } from 'antd'
 import { useMemo, useRef, useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
 import { type ChatSession, createChatMessage } from '../../api/api'
 import { ApiError, path } from '../../api/http'
 import { useAgents } from '../../hooks/useAgents'
 import { useChatMessages } from '../../hooks/useChatMessages'
 import { useChatSessions } from '../../hooks/useChatSessions'
+import { useChatStream } from '../../hooks/useChatStream'
 import { errorMessage } from '../../utils/text'
 import AgentRun from '../chat/AgentRun'
 import Composer from '../chat/Composer'
@@ -28,6 +29,8 @@ function NewChat() {
   const chatSessions = useChatSessions()
   const navigate = useNavigate()
   const [params] = useSearchParams()
+  // Set when the open chat was deleted elsewhere (V4 C5 C).
+  const leftDeleted = (useLocation().state as { deleted?: boolean } | null)?.deleted === true
   const [chosen, setChosen] = useState<string>()
   const [sendError, setSendError] = useState<unknown>()
   // A session created for a message that then failed: sending again uses it, not a second one.
@@ -78,42 +81,67 @@ function NewChat() {
   }
 
   return (
-    <div className="box-border flex flex-1 flex-col justify-center px-12 py-12">
-      <div className="mx-auto flex w-full max-w-180 flex-col gap-4">
-        <h1 className="m-0 text-3xl font-semibold tracking-tight">
-          What should {agent.name} look into?
-        </h1>
-        {sendError !== undefined && <Alert type="error" showIcon title={errorMessage(sendError)} />}
-        <Composer
-          onSend={send}
-          tools={
-            <span className="flex items-center gap-2 text-sm text-muted">
-              Agent
-              <Select
-                aria-label="Agent"
-                size="small"
-                className="min-w-40"
-                popupMatchSelectWidth={false}
-                value={agent.id}
-                onChange={(id) => setChosen(id)}
-                options={agents.map((a) => ({ value: a.id, label: a.name }))}
-              />
-            </span>
-          }
-        />
+    <>
+      {leftDeleted && (
+        <div
+          role="status"
+          className="border-b border-line bg-think-wash px-12 py-2.5 text-sm text-think-ink"
+        >
+          The chat you had open was deleted.
+        </div>
+      )}
+      <div className="box-border flex flex-1 flex-col justify-center px-12 py-12">
+        <div className="mx-auto flex w-full max-w-180 flex-col gap-4">
+          <h1 className="m-0 text-3xl font-semibold tracking-tight">
+            What should {agent.name} look into?
+          </h1>
+          {sendError !== undefined && (
+            <Alert type="error" showIcon title={errorMessage(sendError)} />
+          )}
+          <Composer
+            onSend={send}
+            tools={
+              <span className="flex items-center gap-2 text-sm text-muted">
+                Agent
+                <Select
+                  aria-label="Agent"
+                  size="small"
+                  className="min-w-40"
+                  popupMatchSelectWidth={false}
+                  value={agent.id}
+                  onChange={(id) => setChosen(id)}
+                  options={agents.map((a) => ({ value: a.id, label: a.name }))}
+                />
+              </span>
+            }
+          />
+        </div>
       </div>
-    </div>
+    </>
   )
 }
 
 function Chat({ sessionId }: { sessionId: string }) {
   const chatSessions = useChatSessions()
   const agents = useAgents()
-  const { messages, loading, error, reload, send } = useChatMessages(sessionId)
+  const navigate = useNavigate()
+  const { messages, loading, error, reload, send, receive } = useChatMessages(sessionId)
   const [sendError, setSendError] = useState<unknown>()
   const history = useMemo(() => groupHistory(messages), [messages])
 
   const session = chatSessions.chatSessions.find((s) => s.id === sessionId)
+  const stream = useChatStream(
+    sessionId,
+    {
+      onInit: reload,
+      onMessage: receive,
+      onGone: () => {
+        chatSessions.reload()
+        navigate('/chat', { replace: true, state: { deleted: true } })
+      },
+    },
+    session !== undefined,
+  )
   if (!session) {
     return (
       <div className="flex flex-col gap-3 px-12 py-9">
@@ -165,6 +193,27 @@ function Chat({ sessionId }: { sessionId: string }) {
           {agent ? `${agent.name} on ${agent.model}` : agentGone ? 'No agent' : '…'}
         </p>
       </header>
+      {stream.status === 'stopped' && (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-danger-wash px-12 py-2.5 text-sm text-danger"
+        >
+          <span>
+            Live replies stopped.
+            {stream.problem === undefined
+              ? ' Messages you send are still saved.'
+              : ` ${errorMessage(stream.problem)}`}
+          </span>
+          <Button
+            size="small"
+            onClick={() => {
+              stream.reconnect()
+            }}
+          >
+            Try again
+          </Button>
+        </div>
+      )}
       {agentGone && (
         <div
           role="status"
@@ -214,11 +263,27 @@ function Chat({ sessionId }: { sessionId: string }) {
 
       <div className="box-border flex w-full max-w-230 flex-col gap-3 px-12 pt-2 pb-9">
         {sendError !== undefined && <Alert type="error" showIcon title={errorMessage(sendError)} />}
-        <Composer
-          disabled={agentGone}
-          placeholder={agentGone ? "This chat can't continue" : `Ask ${agentName}`}
-          onSend={submit}
-        />
+        {stream.status === 'replaced' ? (
+          // Replies would only reach the other tab, so nothing is sent from here (V4 C4 C).
+          <div
+            role="status"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-ui border border-dashed border-field bg-surface px-4 py-3.5 text-sm"
+          >
+            <span>
+              <strong>This chat is open in another tab.</strong> Continue there, or use it here
+              instead.
+            </span>
+            <Button type="primary" onClick={stream.reconnect}>
+              Use it here
+            </Button>
+          </div>
+        ) : (
+          <Composer
+            disabled={agentGone}
+            placeholder={agentGone ? "This chat can't continue" : `Ask ${agentName}`}
+            onSend={submit}
+          />
+        )}
       </div>
     </>
   )
