@@ -34,6 +34,12 @@ type RequestBody<P extends keyof paths, M extends keyof paths[P]> = paths[P][M] 
 // ---------------------------------------------------------------------------
 
 export type AgentModel = Schemas['AgentVO']['model']
+/** The models an agent can use, in the order a picker shows them (Gemini last: it needs a key, ADR 050). */
+export const AGENT_MODELS = [
+  'deepseek-chat',
+  'qwen3.8-flash',
+  'gemini-3.8-flash',
+] as const satisfies readonly AgentModel[]
 
 /** Chat options as stored and returned: all fields present. */
 export type ChatOptions = Schemas['ChatOptions']

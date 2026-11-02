@@ -1,5 +1,7 @@
+import { Button } from 'antd'
 import type { ReactNode } from 'react'
 import { Link, useParams } from 'react-router'
+import { useAgentDialogs } from '../../hooks/useAgentDialogs'
 import { useAgents } from '../../hooks/useAgents'
 import { useKnowledgeBaseNames } from '../../hooks/useKnowledgeBaseNames'
 import { cx } from '../../utils/cx'
@@ -12,6 +14,7 @@ export default function AgentProfileView() {
   const { agentId } = useParams()
   const { agents, loading, error } = useAgents()
   const kbNames = useKnowledgeBaseNames()
+  const { openEdit, openDelete, dialogs } = useAgentDialogs()
   const agent = agents.find((a) => a.id === agentId)
 
   if (!agent) {
@@ -46,13 +49,20 @@ export default function AgentProfileView() {
             <p className="m-0 mt-0.5 text-sm text-muted">{agent.description}</p>
           )}
         </div>
-        <Link
-          to={`/chat?${new URLSearchParams({ agent: agent.id })}`}
-          className="flex h-9 items-center rounded-ui bg-think px-4 font-semibold text-white no-underline hover:bg-think-ink"
-        >
-          Start chat
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => openEdit(agent)}>Edit</Button>
+          <Button danger onClick={() => openDelete(agent)}>
+            Delete
+          </Button>
+          <Link
+            to={`/chat?${new URLSearchParams({ agent: agent.id })}`}
+            className="flex h-8 items-center rounded-ui bg-think px-4 font-semibold text-white no-underline hover:bg-think-ink"
+          >
+            Start chat
+          </Link>
+        </div>
       </header>
+      {dialogs}
 
       <section aria-label="Setup" className="box-border w-full max-w-220 px-12 py-8">
         <dl className="m-0 rounded-ui border border-line bg-surface px-7 py-1">

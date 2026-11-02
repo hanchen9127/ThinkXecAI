@@ -8,12 +8,14 @@
   --color-muted: #5a6675;
   --color-line: #dce2e8;
   --color-hairline: #e6eaee;
+  --color-field: #8a96a3;
   --color-think: #4453c4;
   --color-think-ink: #2f3a93;
   --color-think-wash: #e3e7fa;
   --color-execute: #b4560a;
   --color-execute-ink: #8a4108;
   --color-execute-wash: #fbebdd;
+  --color-danger: #a0331b;
   --color-rail: #1b2430;
   --color-rail-active: #2c394b;
   --color-rail-icon: #aeb8c6;

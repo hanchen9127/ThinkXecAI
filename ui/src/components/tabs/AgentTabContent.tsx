@@ -1,7 +1,10 @@
+import { MoreOutlined } from '@ant-design/icons'
+import { Button, Dropdown } from 'antd'
 import { useState } from 'react'
 import { Link, matchPath, useLocation } from 'react-router'
 import type { Agent } from '../../api/api'
 import { path } from '../../api/http'
+import { useAgentDialogs } from '../../hooks/useAgentDialogs'
 import { useAgents } from '../../hooks/useAgents'
 import { useKnowledgeBaseNames } from '../../hooks/useKnowledgeBaseNames'
 import { cx } from '../../utils/cx'
@@ -13,10 +16,18 @@ import TabHeading from './TabHeading'
 export default function AgentTabContent() {
   const { agents, loading, error, reload } = useAgents()
   const openId = matchPath('/agent/:agentId', useLocation().pathname)?.params.agentId
+  const { openCreate, openEdit, openDelete, dialogs } = useAgentDialogs()
 
   return (
     <section aria-label="Agents" className="flex flex-col gap-5">
-      <TabHeading title="Agents" />
+      <TabHeading
+        title="Agents"
+        action={
+          <Button type="primary" onClick={openCreate}>
+            New agent
+          </Button>
+        }
+      />
       {error !== undefined && (
         <div role="alert" className="flex flex-col items-start gap-2 text-muted">
           <p className="m-0">Couldn't load agents. {errorMessage(error)}</p>
@@ -32,28 +43,66 @@ export default function AgentTabContent() {
       {agents.length > 0 && (
         <ul className="m-0 list-none p-0">
           {agents.map((agent) => (
-            <AgentItem key={agent.id} agent={agent} open={agent.id === openId} />
+            <AgentItem
+              key={agent.id}
+              agent={agent}
+              open={agent.id === openId}
+              onEdit={() => openEdit(agent)}
+              onDelete={() => openDelete(agent)}
+            />
           ))}
         </ul>
       )}
+      {dialogs}
     </section>
   )
 }
 
-function AgentItem({ agent, open }: { agent: Agent; open: boolean }) {
+function AgentItem({
+  agent,
+  open,
+  onEdit,
+  onDelete,
+}: {
+  agent: Agent
+  open: boolean
+  onEdit: () => void
+  onDelete: () => void
+}) {
   const kbNames = useKnowledgeBaseNames()
   const [shown, setShown] = useState<'tools' | 'knowledge' | null>(null)
   const toggle = (part: 'tools' | 'knowledge') => setShown(shown === part ? null : part)
 
   return (
     <li className={cx('border-b border-hairline py-3.5 pl-3', open && 'shadow-current')}>
-      <Link
-        to={path`/agent/${agent.id}`}
-        aria-current={open ? 'page' : undefined}
-        className={cx('block text-ink no-underline hover:text-think', open && 'font-semibold')}
-      >
-        {agent.name}
-      </Link>
+      <div className="flex items-center gap-2">
+        <Link
+          to={path`/agent/${agent.id}`}
+          aria-current={open ? 'page' : undefined}
+          className={cx(
+            'min-w-0 flex-1 text-ink no-underline hover:text-think',
+            open && 'font-semibold',
+          )}
+        >
+          {agent.name}
+        </Link>
+        <Dropdown
+          trigger={['click']}
+          menu={{
+            items: [
+              { key: 'edit', label: 'Edit', onClick: onEdit },
+              { key: 'delete', label: 'Delete', danger: true, onClick: onDelete },
+            ],
+          }}
+        >
+          <Button
+            type="text"
+            size="small"
+            aria-label={`More actions for ${agent.name}`}
+            icon={<MoreOutlined />}
+          />
+        </Dropdown>
+      </div>
       <p className="m-0 text-xs text-muted">
         {agent.model},{' '}
         <CountToggle
