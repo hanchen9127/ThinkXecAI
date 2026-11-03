@@ -17,7 +17,7 @@ on the frontend, and PostgreSQL + pgvector for storage and retrieval.
   allowed knowledge bases, and chat options (temperature, top-p, memory window).
 - **Think-Execute agent loop** — restores recent chat memory, calls the selected model,
   detects and manually executes tool calls, persists generated messages, and stops on
-  completion, `terminate`, or a 20-step cap.
+  completion, `terminate`, a 20-step cap, or when the user stops the chat's runs (between steps).
 - **Tool system** — fixed tools (knowledge retrieval, terminate, city, date, weather) are
   always available; optional tools (read-only PostgreSQL query, email through Gmail) are
   selected per agent. Knowledge retrieval only searches the agent's own knowledge bases; SQL
@@ -31,7 +31,8 @@ on the frontend, and PostgreSQL + pgvector for storage and retrieval.
   generated assistant and tool messages to the frontend as they're produced.
 - **React frontend** — an icon rail with lists of agents, chats, and knowledge bases; agent
   profiles and dialogs to create, edit, and delete; Markdown upload; a chat view that shows each
-  run's steps and tool results, live over SSE, with a sign while the agent is working.
+  run as a trace of its steps and tool results, live over SSE, with a timer while the agent works,
+  a Stop button, and Try again on a run that did not answer.
 
 Out of scope by design: authentication/authorization, multi-tenancy, WebSocket transport,
 token-by-token streaming, and document formats other than Markdown.
@@ -230,8 +231,17 @@ The icon rail on the left switches between three lists:
   onto its page. A file waits in the list while its sections are indexed. Deleting a knowledge base
   removes it from every agent that used it, and the dialog names those agents first.
 - **Chats** — the newest first, with search by title or agent. A new chat asks what the chosen
-  agent should look into; sending starts the agent, whose steps (what it thought, which tool it
-  called with what arguments, and the result on request) and answer appear as they are produced.
+  agent should look into; sending starts the agent. Its steps appear on a rail as they are
+  produced: what it thought, and each tool it called with a one-line summary of the result (Show
+  opens the arguments and the full result). A timer counts while it works. Once it answers, the
+  steps fold into one line ("6 steps in 7.0 s" and the tools used) above the answer; Show steps
+  opens them again.
+
+While the agent works and the message box is empty, Send turns into **Stop**. Stopping takes effect
+between steps, so a model call or tool already running finishes first; the button reads
+Stopping… until the run ends with "Stopped.". Stop also ends the messages queued behind it. Typing
+turns the button back into Send, so you can still queue a message. "Stopped." and a run that could
+not finish end with **Try again**, which sends the same question again.
 
 Deleting a chat or a document waits 5 seconds for Undo before it is sent; leaving the page or
 closing the tab sends it at once. Messages keep arriving if you close the tab mid-run: they are
@@ -270,7 +280,7 @@ Timestamps (`createdAt`, `updatedAt`) are UTC, written without an offset (`2026-
 | Resource        | Endpoints                                                                 |
 |-----------------|---------------------------------------------------------------------------|
 | Agents          | `GET/POST /agents`, `PATCH/DELETE /agents/{agentId}` |
-| Chat sessions   | `GET/POST /chat-sessions`, `GET/PATCH/DELETE /chat-sessions/{chatSessionId}`, `GET /chat-sessions/agent/{agentId}` |
+| Chat sessions   | `GET/POST /chat-sessions`, `GET/PATCH/DELETE /chat-sessions/{chatSessionId}`, `POST /chat-sessions/{chatSessionId}/stop`, `GET /chat-sessions/agent/{agentId}` |
 | Chat messages   | `GET /chat-messages/session/{sessionId}`, `POST /chat-messages` (user messages only), `DELETE /chat-messages/{chatMessageId}` |
 | Knowledge bases | `GET/POST /knowledge-bases`, `PATCH/DELETE /knowledge-bases/{knowledgeBaseId}` |
 | Documents       | `GET/POST /documents`, `GET /documents/kb/{kbId}`, `POST /documents/upload`, `PATCH/DELETE /documents/{documentId}` |
