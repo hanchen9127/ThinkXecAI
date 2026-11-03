@@ -184,7 +184,8 @@ describe('deleting a knowledge base', () => {
     const api = backend()
     renderApp('/knowledge-base/k1')
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Delete' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'More actions' }))
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }))
     const dialog = await screen.findByRole('dialog', { name: 'Delete Store policies?' })
     expect(
       await within(dialog).findByText(
@@ -213,7 +214,8 @@ describe('deleting a knowledge base', () => {
     backend({ 'GET /agents': () => [] })
     renderApp('/knowledge-base/k1')
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Delete' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'More actions' }))
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }))
     const dialog = await screen.findByRole('dialog', { name: 'Delete Store policies?' })
     expect(
       await within(dialog).findByText('This deletes its 2 documents. No agent uses it.'),
@@ -224,7 +226,8 @@ describe('deleting a knowledge base', () => {
     backend()
     renderApp('/knowledge-base/k2')
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Delete' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'More actions' }))
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }))
     const dialog = await screen.findByRole('dialog', { name: 'Delete Product manuals?' })
     expect(
       await within(dialog).findByText('This removes it from these agents:'),

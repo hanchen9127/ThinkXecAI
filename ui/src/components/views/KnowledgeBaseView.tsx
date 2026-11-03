@@ -12,6 +12,7 @@ import { useUndoableDelete } from '../../hooks/useUndoableDelete'
 import { parseApiTimestamp } from '../../utils/time'
 import { countLabel, errorMessage } from '../../utils/text'
 import DeleteFeedback from '../DeleteFeedback'
+import DeleteMenu from '../DeleteMenu'
 import DocumentRow from '../knowledgeBases/DocumentRow'
 import { agentsUsing, fileProblem } from '../knowledgeBases/knowledgeBases'
 
@@ -45,7 +46,7 @@ export default function KnowledgeBaseView() {
           <>
             <h1 className="m-0 text-xl font-semibold">Knowledge base not found</h1>
             <p className="m-0 text-muted">It may have been deleted.</p>
-            <Link to="/knowledge-base" className="text-think">
+            <Link to="/knowledge-base" className="text-ink underline">
               Back to knowledge bases
             </Link>
           </>
@@ -119,9 +120,7 @@ function KnowledgeBasePage({ knowledgeBase }: { knowledgeBase: KnowledgeBase }) 
         </div>
         <div className="flex flex-wrap gap-2">
           <Button onClick={() => openEdit(knowledgeBase)}>Edit</Button>
-          <Button danger onClick={() => openDelete(knowledgeBase)}>
-            Delete
-          </Button>
+          <DeleteMenu onDelete={() => openDelete(knowledgeBase)} />
         </div>
       </header>
       {dialogs}
@@ -136,7 +135,7 @@ function KnowledgeBasePage({ knowledgeBase }: { knowledgeBase: KnowledgeBase }) 
             return Upload.LIST_IGNORE
           }}
         >
-          <UploadOutlined className="text-icon text-think" />
+          <UploadOutlined className="text-icon text-muted" />
           <p className="m-0 mt-1.5">Drop a Markdown file here, or choose one</p>
           <p className="m-0 text-xs text-muted">.md or .markdown, up to 1 MB</p>
         </Upload.Dragger>
@@ -148,7 +147,7 @@ function KnowledgeBasePage({ knowledgeBase }: { knowledgeBase: KnowledgeBase }) 
           {error !== undefined && (
             <div role="alert" className="flex flex-col items-start gap-2 text-muted">
               <p className="m-0">Couldn't load the documents. {errorMessage(error)}</p>
-              <button type="button" onClick={reload} className="text-think underline">
+              <button type="button" onClick={reload} className="cursor-pointer text-ink underline">
                 Try again
               </button>
             </div>
@@ -190,7 +189,7 @@ function UsedBy({ agents }: { agents: Agent[] }) {
       {agents.map((agent, i) => (
         <Fragment key={agent.id}>
           {i > 0 && (i === agents.length - 1 ? ' and ' : ', ')}
-          <Link to={path`/agent/${agent.id}`} className="text-think">
+          <Link to={path`/agent/${agent.id}`} className="text-ink underline">
             {agent.name}
           </Link>
         </Fragment>
@@ -206,7 +205,7 @@ function UploadItem({ row, onDismiss }: { row: UploadRow; onDismiss: () => void 
       <li className="flex items-center justify-between gap-3 border-b border-hairline bg-ground px-3 py-2.5">
         <div>
           <div className="font-medium">{row.name}</div>
-          <div role="status" className="text-sm text-think-ink">
+          <div role="status" className="text-sm text-muted">
             Reading its sections and indexing them…
           </div>
         </div>

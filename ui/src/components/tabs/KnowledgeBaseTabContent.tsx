@@ -33,7 +33,7 @@ export default function KnowledgeBaseTabContent() {
       {error !== undefined && (
         <div role="alert" className="flex flex-col items-start gap-2 text-muted">
           <p className="m-0">Couldn't load knowledge bases. {errorMessage(error)}</p>
-          <button type="button" onClick={reload} className="text-think underline">
+          <button type="button" onClick={reload} className="cursor-pointer text-ink underline">
             Try again
           </button>
         </div>
@@ -79,13 +79,13 @@ function KnowledgeBaseItem({
   const [shown, setShown] = useState(false)
 
   return (
-    <li className={cx('border-b border-hairline py-3.5 pl-3', open && 'shadow-current')}>
+    <li className={cx('border-b border-hairline py-3.5 pl-3', open && 'bg-ground')}>
       <div className="flex items-center gap-2">
         <Link
           to={path`/knowledge-base/${knowledgeBase.id}`}
           aria-current={open ? 'page' : undefined}
           className={cx(
-            'min-w-0 flex-1 text-ink no-underline hover:text-think',
+            'min-w-0 flex-1 text-ink no-underline hover:underline',
             open && 'font-semibold',
           )}
         >
@@ -115,7 +115,7 @@ function KnowledgeBaseItem({
           type="button"
           aria-expanded={shown}
           onClick={() => setShown(!shown)}
-          className="cursor-pointer text-xs text-think-ink underline decoration-dotted"
+          className="cursor-pointer text-xs text-ink underline decoration-dotted"
         >
           Used by {users.length === 1 ? '1 agent' : `${users.length} agents`}
         </button>
@@ -129,7 +129,7 @@ function KnowledgeBaseItem({
             <li key={agent.id}>
               <Link
                 to={path`/agent/${agent.id}`}
-                className="rounded-ui border border-line px-2 text-xs text-ink no-underline hover:text-think"
+                className="rounded-ui border border-line px-2 text-xs text-ink no-underline hover:underline"
               >
                 {agent.name}
               </Link>

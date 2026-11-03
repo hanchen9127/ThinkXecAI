@@ -31,7 +31,7 @@ export default function AgentTabContent() {
       {error !== undefined && (
         <div role="alert" className="flex flex-col items-start gap-2 text-muted">
           <p className="m-0">Couldn't load agents. {errorMessage(error)}</p>
-          <button type="button" onClick={reload} className="text-think underline">
+          <button type="button" onClick={reload} className="cursor-pointer text-ink underline">
             Try again
           </button>
         </div>
@@ -74,13 +74,13 @@ function AgentItem({
   const toggle = (part: 'tools' | 'knowledge') => setShown(shown === part ? null : part)
 
   return (
-    <li className={cx('border-b border-hairline py-3.5 pl-3', open && 'shadow-current')}>
+    <li className={cx('border-b border-hairline py-3.5 pl-3', open && 'bg-ground')}>
       <div className="flex items-center gap-2">
         <Link
           to={path`/agent/${agent.id}`}
           aria-current={open ? 'page' : undefined}
           className={cx(
-            'min-w-0 flex-1 text-ink no-underline hover:text-think',
+            'min-w-0 flex-1 text-ink no-underline hover:underline',
             open && 'font-semibold',
           )}
         >
@@ -104,7 +104,7 @@ function AgentItem({
         </Dropdown>
       </div>
       <p className="m-0 text-xs text-muted">
-        {agent.model},{' '}
+        <span className="font-mono">{agent.model}</span>,{' '}
         <CountToggle
           count={agent.allowedTools.length}
           one="tool"
@@ -150,7 +150,7 @@ function CountToggle(props: {
       type="button"
       aria-expanded={props.expanded}
       onClick={props.onToggle}
-      className="inline cursor-pointer text-think-ink underline decoration-dotted"
+      className="inline cursor-pointer text-ink underline decoration-dotted"
     >
       {label}
     </button>

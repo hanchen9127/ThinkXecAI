@@ -52,7 +52,7 @@ describe('routes', () => {
   it('always shows the full product name', () => {
     renderAt('/')
 
-    expect(screen.getByText('Xec').closest('p')).toHaveTextContent(/^ThinkXecAI$/)
+    expect(screen.getByText('ThinkXecAI')).toBeInTheDocument()
   })
 })
 

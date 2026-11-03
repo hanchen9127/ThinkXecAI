@@ -87,9 +87,7 @@ export default function AgentFormModal({
               onClick={() => setSection(id)}
               className={cx(
                 'cursor-pointer px-5 py-2.5 text-left',
-                section === id
-                  ? 'font-semibold text-ink shadow-current'
-                  : 'text-muted hover:text-ink',
+                section === id ? 'bg-ground font-semibold text-ink' : 'text-muted hover:text-ink',
               )}
             >
               {label}

@@ -207,17 +207,17 @@ describe('a chat', () => {
     backend()
     renderApp('/chat/s1')
 
-    expect(
-      await screen.findByRole('heading', { level: 1, name: 'Out-of-stock products' }),
-    ).toBeInTheDocument()
-    expect(screen.getByText('Store analyst on deepseek-chat')).toBeInTheDocument()
+    const heading = await screen.findByRole('heading', { level: 1, name: 'Out-of-stock products' })
+    expect(heading.nextElementSibling).toHaveTextContent(/^Store analyst on deepseek-chat$/)
     expect(
       await screen.findByText('Which phones are out of stock, and when do they come back?'),
     ).toBeInTheDocument()
 
     const run = screen.getByRole('article', { name: 'Store analyst' })
     const steps = within(run).getByRole('list', { name: 'Agent steps' })
-    expect(within(steps).getByText('Step 3, Execute: knowledgeSearch')).toBeInTheDocument()
+    expect(within(steps).getByText('knowledgeSearch').closest('p')).toHaveTextContent(
+      /^Step 3, Execute: knowledgeSearch$/,
+    )
     expect(within(steps).queryByText('Step 1, Think')).toBeNull()
     expect(within(run).getByText('Nova X12 Lite').tagName).toBe('STRONG')
 

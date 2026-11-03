@@ -39,7 +39,7 @@ export default function AgentRun({
                 type="button"
                 aria-expanded={showAll}
                 onClick={() => setShowAll(!showAll)}
-                className="cursor-pointer text-sm text-think-ink underline decoration-dotted"
+                className="cursor-pointer text-sm text-ink underline decoration-dotted"
               >
                 {showAll
                   ? 'Hide earlier steps'
@@ -63,7 +63,7 @@ export default function AgentRun({
                 <li key={`${step.id}-${toolCall.call.id}`} className="relative">
                   <Dot className="bg-execute" />
                   <p className="m-0 mb-2 text-xs font-semibold text-execute-ink">
-                    Step {number}, Execute: {toolCall.call.name}
+                    Step {number}, Execute: <span className="font-mono">{toolCall.call.name}</span>
                   </p>
                   <Call toolCall={toolCall} />
                 </li>
@@ -140,7 +140,7 @@ function Call({ toolCall }: { toolCall: ToolCall }) {
               type="button"
               aria-expanded={open}
               onClick={() => setOpen(!open)}
-              className="cursor-pointer text-sm text-think-ink underline decoration-dotted"
+              className="cursor-pointer text-sm text-ink underline decoration-dotted"
             >
               {open ? 'Hide the result' : 'Show the result'}
             </button>

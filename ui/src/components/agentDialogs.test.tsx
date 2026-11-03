@@ -202,7 +202,8 @@ describe('deleting an agent', () => {
     backend()
     renderApp('/agent/a1')
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Delete' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'More actions' }))
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }))
     const dialog = await screen.findByRole('dialog', { name: 'Delete Store analyst?' })
 
     expect(

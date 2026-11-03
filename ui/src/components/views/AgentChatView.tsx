@@ -52,7 +52,7 @@ function NewChat() {
             <p className="m-0 text-muted">
               A chat needs an agent to answer, and there is none yet.
             </p>
-            <Link to="/agent" className="text-think">
+            <Link to="/agent" className="text-ink underline">
               Create an agent
             </Link>
           </>
@@ -86,7 +86,7 @@ function NewChat() {
       {leftDeleted && (
         <div
           role="status"
-          className="border-b border-line bg-think-wash px-12 py-2.5 text-sm text-think-ink"
+          className="border-b border-line bg-surface px-12 py-2.5 text-sm text-muted"
         >
           The chat you had open was deleted.
         </div>
@@ -157,7 +157,7 @@ function Chat({ sessionId }: { sessionId: string }) {
           <>
             <h1 className="m-0 text-xl font-semibold">Chat not found</h1>
             <p className="m-0 text-muted">It may have been deleted.</p>
-            <Link to="/chat" className="text-think">
+            <Link to="/chat" className="text-ink underline">
               Start a new chat
             </Link>
           </>
@@ -192,7 +192,15 @@ function Chat({ sessionId }: { sessionId: string }) {
       <header className="border-b border-line bg-surface px-12 pt-6 pb-5">
         <h1 className="m-0 text-xl font-semibold break-words">{chatTitle(session)}</h1>
         <p className="m-0 mt-0.5 text-sm text-muted">
-          {agent ? `${agent.name} on ${agent.model}` : agentGone ? 'No agent' : '…'}
+          {agent ? (
+            <>
+              {agent.name} on <span className="font-mono text-xs">{agent.model}</span>
+            </>
+          ) : agentGone ? (
+            'No agent'
+          ) : (
+            '…'
+          )}
         </p>
       </header>
       {stream.status === 'stopped' && (
@@ -219,10 +227,10 @@ function Chat({ sessionId }: { sessionId: string }) {
       {agentGone && (
         <div
           role="status"
-          className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-execute-wash px-12 py-2.5 text-sm text-execute-ink"
+          className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-surface px-12 py-2.5 text-sm text-ink"
         >
           <span>Its agent was deleted. You can read this chat but not continue it.</span>
-          <Link to="/chat" className="font-semibold text-execute-ink">
+          <Link to="/chat" className="font-semibold text-ink underline">
             New chat
           </Link>
         </div>
@@ -235,7 +243,7 @@ function Chat({ sessionId }: { sessionId: string }) {
         {error !== undefined && (
           <div role="alert" className="flex flex-col items-start gap-2 text-muted">
             <p className="m-0">Couldn't load the messages. {errorMessage(error)}</p>
-            <button type="button" onClick={reload} className="text-think underline">
+            <button type="button" onClick={reload} className="cursor-pointer text-ink underline">
               Try again
             </button>
           </div>

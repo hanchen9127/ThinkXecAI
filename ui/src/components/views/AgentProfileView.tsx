@@ -7,6 +7,7 @@ import { useKnowledgeBaseNames } from '../../hooks/useKnowledgeBaseNames'
 import { cx } from '../../utils/cx'
 import { formatApiTimestamp } from '../../utils/time'
 import { errorMessage } from '../../utils/text'
+import DeleteMenu from '../DeleteMenu'
 import Tag from '../Tag'
 
 /** `/agent/:agentId`: how one agent is set up, and a way to start chatting with it (V2 A3 B). */
@@ -30,7 +31,7 @@ export default function AgentProfileView() {
           <>
             <h1 className="m-0 text-xl font-semibold">Agent not found</h1>
             <p className="m-0 text-muted">It may have been deleted.</p>
-            <Link to="/agent" className="text-think">
+            <Link to="/agent" className="text-ink underline">
               Back to agents
             </Link>
           </>
@@ -51,22 +52,22 @@ export default function AgentProfileView() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button onClick={() => openEdit(agent)}>Edit</Button>
-          <Button danger onClick={() => openDelete(agent)}>
-            Delete
-          </Button>
           <Link
             to={`/chat?${new URLSearchParams({ agent: agent.id })}`}
-            className="flex h-8 items-center rounded-ui bg-think px-4 font-semibold text-white no-underline hover:bg-think-ink"
+            className="flex h-8 items-center rounded-ui bg-ink px-4 font-semibold text-white no-underline hover:bg-ink/85"
           >
             Start chat
           </Link>
+          <DeleteMenu onDelete={() => openDelete(agent)} />
         </div>
       </header>
       {dialogs}
 
       <section aria-label="Setup" className="box-border w-full max-w-220 px-12 py-8">
         <dl className="m-0 rounded-ui border border-line bg-surface px-7 py-1">
-          <Row term="Model">{agent.model}</Row>
+          <Row term="Model">
+            <span className="font-mono text-xs text-muted">{agent.model}</span>
+          </Row>
           <Row term="Tools">
             {agent.allowedTools.map((tool) => (
               <Tag key={tool} kind="tool">

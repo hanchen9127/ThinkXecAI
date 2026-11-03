@@ -89,7 +89,7 @@ export default function ChatTabContent() {
       {error !== undefined && (
         <div role="alert" className="flex flex-col items-start gap-2 text-muted">
           <p className="m-0">Couldn't load chats. {errorMessage(error)}</p>
-          <button type="button" onClick={reload} className="text-think underline">
+          <button type="button" onClick={reload} className="cursor-pointer text-ink underline">
             Try again
           </button>
         </div>
@@ -137,7 +137,7 @@ function ChatItem({
   const title = chatTitle(session)
 
   return (
-    <li className={cx('border-b border-hairline py-3 pl-3', open && 'shadow-current')}>
+    <li className={cx('border-b border-hairline py-3 pl-3', open && 'bg-ground')}>
       {editing ? (
         <RenameField
           label={`Title of ${title}`}
@@ -151,7 +151,7 @@ function ChatItem({
           <Link
             to={path`/chat/${session.id}`}
             aria-current={open ? 'page' : undefined}
-            className="min-w-0 flex-1 text-ink no-underline hover:text-think"
+            className="min-w-0 flex-1 text-ink no-underline hover:underline"
           >
             <span className={cx('block break-words', open && 'font-semibold')}>{title}</span>
             <span className="block text-xs text-muted">
