@@ -24,6 +24,13 @@ public interface ChatSessionFacadeService {
     /** Changes the title only; the agent is fixed at creation. Unknown id → BizException 404. */
     ChatSessionVO updateChatSession(UUID chatSessionId, UpdateChatSessionRequest request);
 
+    /**
+     * Stops the session's running run and every run queued behind it (ADR 060). They stop
+     * between steps, so the step in progress finishes first. Runs submitted later run as usual; nothing
+     * running is fine. Unknown id → BizException 404.
+     */
+    void stopChatSession(UUID chatSessionId);
+
     /** Deletes the session and its messages (foreign key cascade). Unknown id → BizException 404. */
     void deleteChatSession(UUID chatSessionId);
 

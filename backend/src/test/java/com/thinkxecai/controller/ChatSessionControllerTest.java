@@ -144,6 +144,15 @@ class ChatSessionControllerTest {
         verify(service).deleteChatSession(ID);
     }
 
+    @Test
+    void stopReturnsNullData() throws Exception {
+        mockMvc.perform(post("/api/chat-sessions/" + ID + "/stop"))
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data").value(nullValue()));
+
+        verify(service).stopChatSession(ID);
+    }
+
     private ResultActions send(MockHttpServletRequestBuilder request, String json) throws Exception {
         return mockMvc.perform(request.contentType(MediaType.APPLICATION_JSON).content(json))
                 .andExpect(status().isOk());

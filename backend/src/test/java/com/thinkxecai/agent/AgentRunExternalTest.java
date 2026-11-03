@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.BooleanSupplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -28,6 +29,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @Tag("external")
 class AgentRunExternalTest extends ServiceTestSupport {
+
+    /** A run nobody stops. */
+    private static final BooleanSupplier NOT_STOPPED = () -> false;
 
     private static final Logger log = LoggerFactory.getLogger(AgentRunExternalTest.class);
     private static final Set<String> NOTICES = Set.of(AgentNotices.MODEL_FAILED, AgentNotices.AGENT_GONE,
@@ -44,7 +48,7 @@ class AgentRunExternalTest extends ServiceTestSupport {
 
         UUID question = say(session, "What is the weather in my city today? Find my city and today's date with the tools, "
                 + "then get the weather and tell me.");
-        runner.run(agent, session, question);
+        runner.run(agent, session, question, NOT_STOPPED);
 
         List<Map<String, Object>> rows = rows(session);
         log(model, rows);
@@ -58,11 +62,11 @@ class AgentRunExternalTest extends ServiceTestSupport {
         UUID agent = agentOn("qwen3.8-flash");
         UUID session = insertChatSession(agent, "external");
 
-        runner.run(agent, session, say(session, "What is today's date? Use the getDate tool."));
+        runner.run(agent, session, say(session, "What is today's date? Use the getDate tool."), NOT_STOPPED);
         useModel(agent, "deepseek-chat");
-        runner.run(agent, session, say(session, "Which city do I have? Use the getCity tool."));
+        runner.run(agent, session, say(session, "Which city do I have? Use the getCity tool."), NOT_STOPPED);
         useModel(agent, "qwen3.8-flash");
-        runner.run(agent, session, say(session, "What is the weather there on that date? Use the weather tool."));
+        runner.run(agent, session, say(session, "What is the weather there on that date? Use the weather tool."), NOT_STOPPED);
 
         List<Map<String, Object>> rows = rows(session);
         log("qwen → deepseek → qwen", rows);
@@ -87,9 +91,9 @@ class AgentRunExternalTest extends ServiceTestSupport {
 
         UUID first = say(session, "What is today's date? Use the getDate tool.");
         UUID second = say(session, "And which city do I have? Use the getCity tool.");
-        runner.run(agent, session, first);
+        runner.run(agent, session, first, NOT_STOPPED);
         int firstRun = rows(session).size();
-        runner.run(agent, session, second);
+        runner.run(agent, session, second, NOT_STOPPED);
 
         List<Map<String, Object>> rows = rows(session);
         log("queued qwen", rows);

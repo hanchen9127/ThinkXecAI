@@ -14,12 +14,18 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Runs one session's agent runs one at a time, in the order they were submitted; runs of different
  * sessions run in parallel (ADR 042). Each session keeps the tail of a chain of runs; a new run starts
  * on the executor once the tail is done, so no thread blocks while waiting, and the entry is removed
  * when the session has nothing left to run.
+ * <p>
+ * The runs queued in a session share a stop flag. {@link #stop} sets it and gives the session a new one,
+ * so it stops the running run and those queued behind it, and a run submitted afterwards runs as usual
+ * (ADR 060). A queued run that was stopped saves its notice without calling the model. In memory only:
+ * the app runs as one instance, and a restart ends every run anyway.
  */
 @Slf4j
 @Component
@@ -30,7 +36,15 @@ public class AgentRunScheduler {
     private final AgentRunner runner;
     private final Executor executor;
     private final TransactionTemplate withoutTransaction;
-    private final ConcurrentMap<UUID, CompletableFuture<Void>> tails = new ConcurrentHashMap<>();
+    /** Changed only atomically per session, so a submit, a stop, and a finished run never interleave. */
+    private final ConcurrentMap<UUID, Line> lines = new ConcurrentHashMap<>();
+
+    /**
+     * A session's last queued run ({@code tail}), the run it waits for ({@code after}), and the stop flag
+     * of the runs queued since the last stop.
+     */
+    private record Line(CompletableFuture<Void> tail, CompletableFuture<?> after, AtomicBoolean stopped) {
+    }
 
     public AgentRunScheduler(AgentRunner runner, @Qualifier("asyncEventExecutor") Executor executor,
                              PlatformTransactionManager transactionManager) {
@@ -47,19 +61,35 @@ public class AgentRunScheduler {
     public void submit(UUID agentId, UUID sessionId, UUID messageId) {
         // The session's turn ends only after a rejected run's notice is saved, so the next run sees it.
         CompletableFuture<Void> turn = new CompletableFuture<>();
-        CompletableFuture<Void> previous = tails.put(sessionId, turn);
-        (previous == null ? IDLE : previous)
-                .thenRunAsync(() -> runner.run(agentId, sessionId, messageId), executor)
+        Line line = lines.merge(sessionId, new Line(turn, IDLE, new AtomicBoolean()),
+                (current, first) -> new Line(turn, current.tail(), current.stopped()));
+        AtomicBoolean stopped = line.stopped();
+        line.after()
+                .thenRunAsync(() -> {
+                    if (stopped.get()) {
+                        runner.notify(sessionId, AgentNotices.STOPPED);
+                    } else {
+                        runner.run(agentId, sessionId, messageId, stopped::get);
+                    }
+                }, executor)
                 .whenComplete((ignored, failure) -> {
                     try {
                         if (failure != null) {
                             failed(agentId, sessionId, failure);
                         }
                     } finally {
-                        tails.remove(sessionId, turn);
+                        lines.computeIfPresent(sessionId, (id, current) -> current.tail() == turn ? null : current);
                         turn.complete(null);
                     }
                 });
+    }
+
+    /** Stops the session's running and queued runs between steps; nothing running is fine (ADR 060). */
+    public void stop(UUID sessionId) {
+        lines.computeIfPresent(sessionId, (id, current) -> {
+            current.stopped().set(true);
+            return new Line(current.tail(), current.after(), new AtomicBoolean());
+        });
     }
 
     private void failed(UUID agentId, UUID sessionId, Throwable failure) {
@@ -83,7 +113,7 @@ public class AgentRunScheduler {
 
     /** Sessions with a run queued or running; for tests. */
     int activeSessions() {
-        return tails.size();
+        return lines.size();
     }
 
 }

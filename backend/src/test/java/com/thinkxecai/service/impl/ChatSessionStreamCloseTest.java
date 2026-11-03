@@ -1,5 +1,6 @@
 package com.thinkxecai.service.impl;
 
+import com.thinkxecai.agent.AgentRunScheduler;
 import com.thinkxecai.converter.ChatSessionConverter;
 import com.thinkxecai.exception.BizException;
 import com.thinkxecai.mapper.AgentMapper;
@@ -32,7 +33,8 @@ class ChatSessionStreamCloseTest {
     private final ChatSessionMapper mapper = mock(ChatSessionMapper.class);
     private final SseService sseService = mock(SseService.class);
     private final ChatSessionFacadeServiceImpl service =
-            new ChatSessionFacadeServiceImpl(mapper, mock(AgentMapper.class), new ChatSessionConverter(), sseService);
+            new ChatSessionFacadeServiceImpl(mapper, mock(AgentMapper.class), new ChatSessionConverter(), sseService,
+                    mock(AgentRunScheduler.class));
 
     @BeforeEach
     void beginTransaction() {

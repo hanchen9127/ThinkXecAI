@@ -74,7 +74,7 @@ class GeminiWithoutKeyTest extends ServiceTestSupport {
         UUID question = jdbcTemplate.queryForObject("INSERT INTO chat_message (session_id, role, content) "
                 + "VALUES (?, 'user', 'Hello') RETURNING id", UUID.class, session);
 
-        runner.run(agent, session, question);
+        runner.run(agent, session, question, () -> false);
 
         assertThat(jdbcTemplate.queryForObject("SELECT content FROM chat_message WHERE session_id = ? "
                 + "ORDER BY created_at DESC LIMIT 1", String.class, session)).isEqualTo(AgentNotices.MODEL_UNAVAILABLE);

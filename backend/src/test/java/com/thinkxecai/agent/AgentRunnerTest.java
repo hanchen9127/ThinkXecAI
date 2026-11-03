@@ -23,6 +23,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.BooleanSupplier;
 
 import static com.thinkxecai.agent.ScriptedChatModel.call;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -43,6 +44,8 @@ import static org.mockito.Mockito.when;
 class AgentRunnerTest extends ServiceTestSupport {
 
     private static final String MODEL = "deepseek-chat";
+    /** A run nobody stops. */
+    private static final BooleanSupplier NOT_STOPPED = () -> false;
 
     @Autowired
     private AgentRunner runner;
@@ -106,7 +109,7 @@ class AgentRunnerTest extends ServiceTestSupport {
         userSays("Hello");
         model.thenReply("Hi, how can I help?");
 
-        runner.run(agent, session, lastQuestion);
+        runner.run(agent, session, lastQuestion, NOT_STOPPED);
 
         assertThat(roles()).containsExactly("user", "assistant");
         assertThat(lastContent()).isEqualTo("Hi, how can I help?");
@@ -118,7 +121,7 @@ class AgentRunnerTest extends ServiceTestSupport {
         userSays("What is the date?");
         model.thenCall("Let me check.", call("", "getDate", "{}")).thenReply("Today is the date shown.");
 
-        runner.run(agent, session, lastQuestion);
+        runner.run(agent, session, lastQuestion, NOT_STOPPED);
 
         assertThat(roles()).containsExactly("user", "assistant", "tool", "assistant");
         String callId = jdbcTemplate.queryForObject("SELECT metadata->'toolCalls'->0->>'id' FROM chat_message "
@@ -140,7 +143,7 @@ class AgentRunnerTest extends ServiceTestSupport {
         userSays("Where and when?");
         model.thenCall("", call("a", "getCity", "{}"), call("b", "getDate", "{}")).thenReply("Done.");
 
-        runner.run(agent, session, lastQuestion);
+        runner.run(agent, session, lastQuestion, NOT_STOPPED);
 
         assertThat(roles()).containsExactly("user", "assistant", "tool", "tool", "assistant");
         List<String> resultIds = jdbcTemplate.queryForList("SELECT metadata->'toolResponse'->>'id' FROM chat_message "
@@ -153,7 +156,7 @@ class AgentRunnerTest extends ServiceTestSupport {
         userSays("Thanks, that's all.");
         model.thenCall("Glad to help.", call("t", "terminate", "{}"));
 
-        runner.run(agent, session, lastQuestion);
+        runner.run(agent, session, lastQuestion, NOT_STOPPED);
 
         assertThat(roles()).containsExactly("user", "assistant", "tool");
         assertThat(model.prompts).hasSize(1);
@@ -167,7 +170,7 @@ class AgentRunnerTest extends ServiceTestSupport {
                 .thenCall("", call("t", "terminate", "{}"))
                 .thenReply("Today is 2026-10-20.");
 
-        runner.run(agent, session, lastQuestion);
+        runner.run(agent, session, lastQuestion, NOT_STOPPED);
 
         assertThat(roles()).containsExactly("user", "assistant", "tool", "assistant", "tool", "assistant");
         String result = jdbcTemplate.queryForObject("SELECT content FROM chat_message WHERE session_id = ? "
@@ -203,7 +206,7 @@ class AgentRunnerTest extends ServiceTestSupport {
         insert("assistant", "First answer.", null);
         model.thenReply("Second answer.");
 
-        runner.run(agent, session, second);
+        runner.run(agent, session, second, NOT_STOPPED);
 
         // Gemini refuses a request that ends with the model's turn
         assertThat(textsOf(prompt(0))).containsExactly("user:first", "assistant:First answer.", "user:second");
@@ -219,7 +222,7 @@ class AgentRunnerTest extends ServiceTestSupport {
         insert("assistant", "It is 2026-10-21.", null);
         model.thenReply("Second answer.");
 
-        runner.run(agent, session, second);
+        runner.run(agent, session, second, NOT_STOPPED);
 
         assertThat(textsOf(prompt(0))).containsExactly(
                 "user:first", "assistant:", "tool:d", "assistant:It is 2026-10-21.", "user:second");
@@ -233,7 +236,7 @@ class AgentRunnerTest extends ServiceTestSupport {
         insert("assistant", "First answer.", null);
         model.thenReply("Second answer.");
 
-        runner.run(agent, session, second);
+        runner.run(agent, session, second, NOT_STOPPED);
 
         assertThat(textsOf(prompt(0))).containsExactly("user:first", "assistant:First answer.", "user:second");
     }
@@ -248,7 +251,7 @@ class AgentRunnerTest extends ServiceTestSupport {
         }
         model.thenReply("Second answer.");
 
-        runner.run(agent, session, second);
+        runner.run(agent, session, second, NOT_STOPPED);
 
         List<String> texts = textsOf(prompt(0));
         assertThat(texts).hasSize(17).startsWith("user:first", "assistant:step 1").endsWith("assistant:step 15", "user:second");
@@ -264,7 +267,7 @@ class AgentRunnerTest extends ServiceTestSupport {
         }
         model.thenReply("Second answer.");
 
-        runner.run(agent, session, second);
+        runner.run(agent, session, second, NOT_STOPPED);
 
         List<String> texts = textsOf(prompt(0));
         assertThat(texts).hasSize(2 + 51)
@@ -281,7 +284,7 @@ class AgentRunnerTest extends ServiceTestSupport {
         jdbcTemplate.update("DELETE FROM chat_message WHERE id = ?", second);
         model.thenReply("Hello again.");
 
-        runner.run(agent, session, second);
+        runner.run(agent, session, second, NOT_STOPPED);
 
         assertThat(textsOf(prompt(0))).containsExactly("user:first", "assistant:First answer.");
     }
@@ -294,7 +297,7 @@ class AgentRunnerTest extends ServiceTestSupport {
         userSays("second");
         model.thenReply("Second answer.");
 
-        runner.run(agent, session, answer);
+        runner.run(agent, session, answer, NOT_STOPPED);
 
         assertThat(textsOf(prompt(0))).containsExactly("user:first", "assistant:First answer.", "user:second");
     }
@@ -306,11 +309,42 @@ class AgentRunnerTest extends ServiceTestSupport {
             model.thenCall("", call("call_" + step, "getDate", "{}"));
         }
 
-        runner.run(agent, session, lastQuestion);
+        runner.run(agent, session, lastQuestion, NOT_STOPPED);
 
         assertThat(model.prompts).hasSize(AgentLimits.MAX_STEPS);
         assertThat(rows()).hasSize(1 + 2 * AgentLimits.MAX_STEPS + 1);
         assertThat(lastContent()).isEqualTo(AgentNotices.MAX_STEPS);
+    }
+
+    @Test
+    void aRunStoppedBeforeItsFirstStepCallsNoModelAndSaysStopped() {
+        userSays("Hello");
+
+        runner.run(agent, session, lastQuestion, () -> true);
+
+        assertThat(model.prompts).isEmpty();
+        assertThat(roles()).containsExactly("user", "assistant");
+        assertThat(lastContent()).isEqualTo(AgentNotices.STOPPED);
+    }
+
+    @Test
+    void aRunStoppedAfterThinkingRunsNoToolAndTheNextRunForgetsTheCall() {
+        userSays("What is the date?");
+        model.thenCall("Let me check.", call("c1", "getDate", "{}"));
+
+        // Stopped while the model was answering: the reply is saved, its tool is not run.
+        runner.run(agent, session, lastQuestion, () -> !model.prompts.isEmpty());
+
+        assertThat(roles()).containsExactly("user", "assistant", "assistant");
+        assertThat(lastContent()).isEqualTo(AgentNotices.STOPPED);
+
+        userSays("Hello?");
+        model.thenReply("Hi");
+        runner.run(agent, session, lastQuestion, NOT_STOPPED);
+
+        assertThat(prompt(1).getInstructions()).noneMatch(message ->
+                message instanceof AssistantMessage assistant && assistant.hasToolCalls());
+        assertThat(lastContent()).isEqualTo("Hi");
     }
 
     @Test
@@ -320,7 +354,7 @@ class AgentRunnerTest extends ServiceTestSupport {
             throw new RuntimeException("HTTP 503 - overloaded");
         });
 
-        runner.run(agent, session, lastQuestion);
+        runner.run(agent, session, lastQuestion, NOT_STOPPED);
 
         assertThat(roles()).containsExactly("user", "assistant");
         assertThat(lastContent()).isEqualTo(AgentNotices.MODEL_FAILED);
@@ -331,7 +365,7 @@ class AgentRunnerTest extends ServiceTestSupport {
         userSays("Hello");
         jdbcTemplate.update("DELETE FROM agent WHERE id = ?", agent);
 
-        runner.run(agent, session, lastQuestion);
+        runner.run(agent, session, lastQuestion, NOT_STOPPED);
 
         assertThat(lastContent()).isEqualTo(AgentNotices.AGENT_GONE);
         assertThat(model.prompts).isEmpty();
@@ -343,7 +377,7 @@ class AgentRunnerTest extends ServiceTestSupport {
         jdbcTemplate.update("UPDATE agent SET model = 'gpt-5.4-mini' WHERE id = ?", agent);
         when(chatClientRegistry.get("gpt-5.4-mini")).thenThrow(new IllegalArgumentException("Unknown chat model"));
 
-        runner.run(agent, session, lastQuestion);
+        runner.run(agent, session, lastQuestion, NOT_STOPPED);
 
         assertThat(lastContent()).isEqualTo(AgentNotices.MODEL_UNAVAILABLE);
     }
@@ -354,7 +388,7 @@ class AgentRunnerTest extends ServiceTestSupport {
         model.thenReply("Hi");
         jdbcTemplate.update("DELETE FROM chat_session WHERE id = ?", session);
 
-        runner.run(agent, session, lastQuestion);
+        runner.run(agent, session, lastQuestion, NOT_STOPPED);
 
         assertThat(rows()).isEmpty();
         verify(publisher, never()).publish(any(), any());
@@ -370,7 +404,7 @@ class AgentRunnerTest extends ServiceTestSupport {
         userSays("Hello");
         model.thenReply("Hi");
 
-        runner.run(agent, session, lastQuestion);
+        runner.run(agent, session, lastQuestion, NOT_STOPPED);
 
         List<Message> instructions = prompt(0).getInstructions();
         assertThat(instructions).filteredOn(message -> message.getMessageType() == MessageType.SYSTEM).hasSize(1);
@@ -386,7 +420,7 @@ class AgentRunnerTest extends ServiceTestSupport {
         userSays("Hello");
         model.thenReply("Hi");
 
-        runner.run(agent, session, lastQuestion);
+        runner.run(agent, session, lastQuestion, NOT_STOPPED);
 
         assertThat(prompt(0).getInstructions().get(0).getText())
                 .isEqualTo(RuntimeInstructions.GUIDANCE + "\n\nYou have no knowledge bases.");
@@ -401,7 +435,7 @@ class AgentRunnerTest extends ServiceTestSupport {
         userSays("Hello");
         model.thenReply("Hi");
 
-        runner.run(agent, session, lastQuestion);
+        runner.run(agent, session, lastQuestion, NOT_STOPPED);
 
         assertThat(lastContent()).isEqualTo("Hi");
         assertThat(prompt(0).getInstructions().get(0).getText()).contains("- " + kept + ": Kept").doesNotContain(deleted.toString());
@@ -415,7 +449,7 @@ class AgentRunnerTest extends ServiceTestSupport {
         jdbcTemplate.update("UPDATE agent SET allowed_kbs = '[\"not-a-uuid\"]'::jsonb WHERE id = ?", agent);
         userSays("Hello");
 
-        runner.run(agent, session, lastQuestion);
+        runner.run(agent, session, lastQuestion, NOT_STOPPED);
 
         assertThat(roles()).containsExactly("user", "assistant");
         assertThat(lastContent()).isEqualTo(AgentNotices.UNEXPECTED);
@@ -431,11 +465,11 @@ class AgentRunnerTest extends ServiceTestSupport {
 
         AgentRuntime answered = runtimeFactory.create(agent, session, lastQuestion);
         assertThat(answered.state()).isEqualTo(AgentState.IDLE);
-        answered.run();
+        answered.run(NOT_STOPPED);
         assertThat(answered.state()).isEqualTo(AgentState.FINISHED);
 
         AgentRuntime failed = runtimeFactory.create(agent, session, lastQuestion);
-        assertThatThrownBy(failed::run).isInstanceOf(AgentRunFailure.class);
+        assertThatThrownBy(() -> failed.run(NOT_STOPPED)).isInstanceOf(AgentRunFailure.class);
         assertThat(failed.state()).isEqualTo(AgentState.ERROR);
     }
 
@@ -445,7 +479,7 @@ class AgentRunnerTest extends ServiceTestSupport {
         userSays("Hello");
         model.thenReply("Hi");
 
-        runner.run(agent, session, lastQuestion);
+        runner.run(agent, session, lastQuestion, NOT_STOPPED);
 
         assertThat(prompt(0).getOptions()).isInstanceOfSatisfying(ToolCallingChatOptions.class, options -> {
             assertThat(options.getInternalToolExecutionEnabled()).isFalse();
@@ -468,7 +502,7 @@ class AgentRunnerTest extends ServiceTestSupport {
                         call("k2", "KnowledgeTool", "{\"kbsId\":\"" + other + "\",\"query\":\"setup\"}"))
                 .thenReply("Install with npm.");
 
-        runner.run(agent, session, lastQuestion);
+        runner.run(agent, session, lastQuestion, NOT_STOPPED);
 
         List<String> results = jdbcTemplate.queryForList("SELECT content FROM chat_message WHERE session_id = ? "
                 + "AND role = 'tool' ORDER BY created_at", String.class, session);
@@ -484,7 +518,7 @@ class AgentRunnerTest extends ServiceTestSupport {
         userSays("Count the orders.");
         model.thenCall("", call("x", "databaseQuery", "{\"sql\":\"SELECT 1\"}")).thenReply("I cannot query the database.");
 
-        runner.run(agent, session, lastQuestion);
+        runner.run(agent, session, lastQuestion, NOT_STOPPED);
 
         assertThat(roles()).containsExactly("user", "assistant", "tool", "assistant");
         String result = jdbcTemplate.queryForObject(
@@ -498,7 +532,7 @@ class AgentRunnerTest extends ServiceTestSupport {
         userSays("Weather in Sydney?");
         model.thenCall("", call("w", "weather", "{\"city\": Sydney")).thenReply("Sorry, let me try again later.");
 
-        runner.run(agent, session, lastQuestion);
+        runner.run(agent, session, lastQuestion, NOT_STOPPED);
 
         assertThat(roles()).containsExactly("user", "assistant", "tool", "assistant");
         String result = jdbcTemplate.queryForObject(
@@ -515,7 +549,7 @@ class AgentRunnerTest extends ServiceTestSupport {
         userSays("Hello");
         model.thenReply(" ");
 
-        runner.run(agent, session, lastQuestion);
+        runner.run(agent, session, lastQuestion, NOT_STOPPED);
 
         assertThat(roles()).containsExactly("user", "assistant");
         assertThat(lastContent()).isEqualTo(AgentNotices.MODEL_FAILED);
@@ -531,7 +565,7 @@ class AgentRunnerTest extends ServiceTestSupport {
         userSays("the newest question");
         model.thenReply("answer");
 
-        runner.run(agent, session, lastQuestion);
+        runner.run(agent, session, lastQuestion, NOT_STOPPED);
 
         // The latest 10 rows start with an old answer, which sanitizing drops: memory starts at a user message.
         List<Message> instructions = prompt(0).getInstructions();
@@ -550,7 +584,7 @@ class AgentRunnerTest extends ServiceTestSupport {
         userSays("Hello?");
         model.thenReply("Hi");
 
-        runner.run(agent, session, lastQuestion);
+        runner.run(agent, session, lastQuestion, NOT_STOPPED);
 
         assertThat(prompt(0).getInstructions()).noneMatch(message ->
                 message instanceof AssistantMessage assistant && assistant.hasToolCalls());
@@ -563,7 +597,7 @@ class AgentRunnerTest extends ServiceTestSupport {
         userSays("What is the date?");
         model.thenCall("", call("d", "getDate", "{}")).thenReply("Done.");
 
-        runner.run(agent, session, lastQuestion);
+        runner.run(agent, session, lastQuestion, NOT_STOPPED);
 
         assertThat(roles()).containsExactly("user", "assistant", "tool", "assistant");
     }

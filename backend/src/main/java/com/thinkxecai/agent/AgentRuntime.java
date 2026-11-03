@@ -18,12 +18,14 @@ import org.springframework.ai.model.tool.ToolCallingManager;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.function.BooleanSupplier;
 
 /**
  * One agent run: the Think-Execute loop over one session's memory. Think: call the model with the
  * memory and save its reply. Execute: run the tools it asked for and save their results. It ends when
- * a reply asks for no tool, when {@code terminate} was called, or after {@link AgentLimits#MAX_STEPS}
- * steps. Spring AI never runs tools itself here (ADR 040): the loop does, so every step is saved.
+ * a reply asks for no tool, when {@code terminate} was called, after {@link AgentLimits#MAX_STEPS}
+ * steps, or when a stop was requested (checked before each Think and each Execute, so a model call or
+ * tool already running finishes first; ADR 060). Spring AI never runs tools itself here (ADR 040): the loop does, so every step is saved.
  * <p>
  * Each saved message is handed to the {@link GeneratedMessagePublisher}; whatever delivery does, the
  * run goes on (ISSUE-007). Built by {@link AgentRuntimeFactory}, run once by {@link AgentRunner}.
@@ -32,7 +34,7 @@ import java.util.UUID;
 public class AgentRuntime {
 
     /** How a run that did not fail ended. */
-    public enum Outcome { ANSWERED, TERMINATED, MAX_STEPS }
+    public enum Outcome { ANSWERED, TERMINATED, MAX_STEPS, STOPPED }
 
     /** No tools: both models then answer a history with tool calls in text (checked against the real APIs). */
     private static final ToolCallingChatOptions ANSWER_ONLY = ToolCallingChatOptions.builder()
@@ -69,20 +71,28 @@ public class AgentRuntime {
     }
 
     /**
+     * @param stopRequested asked before each Think and each Execute; true ends the run with {@code STOPPED}
      * @throws AgentRunFailure if the model call fails; any other exception is unexpected. The state is
      *                         {@code ERROR} afterwards.
      */
-    public Outcome run() {
+    public Outcome run(BooleanSupplier stopRequested) {
         if (state != AgentState.IDLE) {
             throw new IllegalStateException("An agent runtime runs once");
         }
         try {
             for (int step = 1; step <= AgentLimits.MAX_STEPS; step++) {
+                if (stopRequested.getAsBoolean()) {
+                    return stopped(step);
+                }
                 moveTo(AgentState.THINKING, step);
                 AssistantMessage reply = think();
                 if (!reply.hasToolCalls()) {
                     moveTo(AgentState.FINISHED, step);
                     return Outcome.ANSWERED;
+                }
+                // The saved reply keeps its calls; the next run's memory sanitizing drops calls without results.
+                if (stopRequested.getAsBoolean()) {
+                    return stopped(step);
                 }
                 moveTo(AgentState.EXECUTING, step);
                 if (execute(reply)) {
@@ -96,6 +106,12 @@ public class AgentRuntime {
             state = AgentState.ERROR;
             throw e;
         }
+    }
+
+    private Outcome stopped(int step) {
+        log.info("Agent {} in session {} stopped before step {} went on", agentId, sessionId, step);
+        moveTo(AgentState.FINISHED, step);
+        return Outcome.STOPPED;
     }
 
     /** Calls the model and saves its reply, with every tool call given an id first. */

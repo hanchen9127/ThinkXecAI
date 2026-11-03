@@ -52,6 +52,12 @@ public class ChatSessionController {
         return ApiResponse.success(chatSessionFacadeService.updateChatSession(chatSessionId, request));
     }
 
+    @PostMapping("/{chatSessionId}/stop")
+    public ApiResponse<Void> stopChatSession(@PathVariable UUID chatSessionId) {
+        chatSessionFacadeService.stopChatSession(chatSessionId);
+        return ApiResponse.success();
+    }
+
     @DeleteMapping("/{chatSessionId}")
     public ApiResponse<Void> deleteChatSession(@PathVariable UUID chatSessionId) {
         chatSessionFacadeService.deleteChatSession(chatSessionId);

@@ -1,5 +1,6 @@
 package com.thinkxecai.service;
 
+import com.thinkxecai.agent.AgentRunScheduler;
 import com.thinkxecai.converter.ChatSessionConverter;
 import com.thinkxecai.exception.BizException;
 import com.thinkxecai.mapper.AgentMapper;
@@ -104,7 +105,7 @@ class ChatSessionFacadeServiceTest extends ServiceTestSupport {
         when(mapper.selectById(id)).thenReturn(
                 ChatSessionEntity.builder().id(id).agentId(UUID.randomUUID()).title("old title").build());
         ChatSessionFacadeService unit = new ChatSessionFacadeServiceImpl(mapper, mock(AgentMapper.class), new ChatSessionConverter(),
-                mock(SseService.class));
+                mock(SseService.class), mock(AgentRunScheduler.class));
 
         unit.updateChatSession(id, updateRequest("new title"));
 
@@ -130,6 +131,21 @@ class ChatSessionFacadeServiceTest extends ServiceTestSupport {
     @Test
     void deleteOfUnknownIdIsNotFound() {
         assertNotFound(() -> service.deleteChatSession(UUID.randomUUID()));
+    }
+
+    @Test
+    void stopWithNothingRunningSavesNothing() {
+        UUID session = insertChatSession(null, "chat");
+        jdbcTemplate.update("INSERT INTO chat_message (session_id, role, content) VALUES (?, 'user', 'hi')", session);
+
+        service.stopChatSession(session);
+
+        assertThat(countRows("chat_message", "session_id = ?", session)).isEqualTo(1);
+    }
+
+    @Test
+    void stopOfUnknownIdIsNotFound() {
+        assertNotFound(() -> service.stopChatSession(UUID.randomUUID()));
     }
 
     private static CreateChatSessionRequest createRequest(UUID agentId, String title) {

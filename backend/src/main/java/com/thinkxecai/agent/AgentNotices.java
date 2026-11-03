@@ -16,6 +16,9 @@ public final class AgentNotices {
     public static final String MAX_STEPS =
             "The agent stopped after " + AgentLimits.MAX_STEPS + " steps without finishing the request.";
 
+    /** A run the user stopped (ADR 060). */
+    public static final String STOPPED = "Stopped.";
+
     private AgentNotices() {
     }
 
