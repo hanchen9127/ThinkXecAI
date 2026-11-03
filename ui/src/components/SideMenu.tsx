@@ -44,7 +44,7 @@ export default function SideMenu({ active }: { active: Section | null }) {
             )}
           >
             <span className="text-icon leading-none">{item.icon}</span>
-            <span aria-hidden="true" className="text-rail">
+            <span aria-hidden="true" className="text-label">
               {item.short}
             </span>
           </Link>

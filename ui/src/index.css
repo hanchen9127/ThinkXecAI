@@ -28,7 +28,7 @@
   /* Shape and sizes; components use these names, never bracketed values. */
   --radius-ui: 4px;
   --text-icon: 20px;
-  --text-rail: 11px;
+  --text-label: 11px;
   --container-panel: 300px;
   --container-content: 560px;
 

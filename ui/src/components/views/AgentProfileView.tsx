@@ -54,7 +54,7 @@ export default function AgentProfileView() {
           <Button onClick={() => openEdit(agent)}>Edit</Button>
           <Link
             to={`/chat?${new URLSearchParams({ agent: agent.id })}`}
-            className="flex h-8 items-center rounded-ui bg-ink px-4 font-semibold text-white no-underline hover:bg-ink/85"
+            className="flex h-8 items-center rounded-ui bg-ink px-4 text-sm font-semibold text-white no-underline hover:bg-ink/85"
           >
             Start chat
           </Link>
