@@ -76,17 +76,17 @@ function KnowledgeBasePage({ knowledgeBase }: { knowledgeBase: KnowledgeBase }) 
   const [uploads, setUploads] = useState<UploadRow[]>([])
   const nextKey = useRef(0)
 
-  const shown = useMemo(
+  // Newest upload first; the backend orders by last change, which a rename would move. A deleted
+  // document stays listed while its row folds away (ADR 061).
+  const listedDocuments = useMemo(
     () =>
-      documents
-        .filter((document) => !deletes.hidden.has(document.id))
-        // Newest upload first; the backend orders by last change, which a rename would move.
-        .sort(
-          (a, b) =>
-            parseApiTimestamp(b.createdAt).getTime() - parseApiTimestamp(a.createdAt).getTime(),
-        ),
-    [documents, deletes.hidden],
+      [...documents].sort(
+        (a, b) =>
+          parseApiTimestamp(b.createdAt).getTime() - parseApiTimestamp(a.createdAt).getTime(),
+      ),
+    [documents],
   )
+  const shown = listedDocuments.filter((document) => !deletes.hidden.has(document.id))
   const listed = new Set(documents.map((document) => document.id))
   const rows = uploads.filter((row) => !(row.documentId && listed.has(row.documentId)))
   // A finished row leaves for good once the list shows its document; kept, it would come back as
@@ -158,15 +158,16 @@ function KnowledgeBasePage({ knowledgeBase }: { knowledgeBase: KnowledgeBase }) 
           {!loading && error === undefined && shown.length === 0 && rows.length === 0 && (
             <p className="m-0 text-muted">No documents yet. Upload one above.</p>
           )}
-          {(rows.length > 0 || shown.length > 0) && (
+          {(rows.length > 0 || listedDocuments.length > 0) && (
             <ul className="m-0 list-none border-t border-hairline p-0">
               {rows.map((row) => (
                 <UploadItem key={row.key} row={row} onDismiss={() => dismiss(row.key)} />
               ))}
-              {shown.map((document) => (
+              {listedDocuments.map((document) => (
                 <DocumentRow
                   key={document.id}
                   document={document}
+                  leaving={deletes.hidden.has(document.id)}
                   onRename={(name) => update(document.id, { name }).then(() => undefined)}
                   onDelete={() => deletes.confirm({ id: document.id, name: document.name })}
                 />

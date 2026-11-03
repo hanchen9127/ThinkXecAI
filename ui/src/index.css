@@ -31,6 +31,108 @@
   --text-rail: 11px;
   --container-panel: 300px;
   --container-content: 560px;
+
+  /* Motion (ADR 061): every transition; theme.ts holds the same as `motion`. */
+  --default-transition-duration: 150ms;
+  --default-transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* With reduced motion every state switches at once (ADR 061). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0s !important;
+    transition-delay: 0s !important;
+  }
+}
+
+/* Expand and collapse (ADR 061, `Expandable`): the height eases between 0fr and 1fr. "slide" moves
+   the content down 12px as it opens (results, steps); "fold" fades a row that leaves (a delete);
+   "rise" fades in the Undo bar from 8px below. A clip margin keeps focus rings inside visible. */
+.expandable {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition-property: grid-template-rows, opacity;
+  transition-duration: var(--default-transition-duration);
+  transition-timing-function: var(--default-transition-timing-function);
+}
+
+.expandable[data-open] {
+  grid-template-rows: 1fr;
+}
+
+.expandable > div {
+  min-height: 0;
+  overflow: clip;
+  overflow-clip-margin: 4px;
+}
+
+.expandable > div > div {
+  transition: translate var(--default-transition-duration) var(--default-transition-timing-function);
+}
+
+.expandable[data-motion='slide']:not([data-open]) > div > div {
+  translate: 0 -12px;
+}
+
+.expandable[data-motion='rise']:not([data-open]) > div > div {
+  translate: 0 8px;
+}
+
+.expandable[data-motion='fold']:not([data-open]),
+.expandable[data-motion='rise']:not([data-open]) {
+  opacity: 0;
+}
+
+/* A step that arrives while the run is watched (ADR 061): the rail above it grows from the top,
+   then its dot and content fade in 80ms later. Rows shown on page load carry no data-fresh. */
+.rail-line {
+  transform-origin: top;
+  transition: scale var(--default-transition-duration) var(--default-transition-timing-function);
+}
+
+[data-fresh] > .rail-mark .rail-dot,
+[data-fresh] > .rail-content {
+  transition: opacity var(--default-transition-duration) var(--default-transition-timing-function)
+    80ms;
+}
+
+@starting-style {
+  [data-grows] .rail-line {
+    scale: 1 0;
+  }
+
+  [data-fresh] > .rail-mark .rail-dot,
+  [data-fresh] > .rail-content {
+    opacity: 0;
+  }
+}
+
+/* Send turns into Stop (ADR 061): the icon's shape changes from a triangle to a square; both use
+   four points so the clip path can ease between them. */
+.shape-icon {
+  width: 9px;
+  height: 9px;
+  background: currentColor;
+  clip-path: polygon(0 0, 100% 50%, 100% 50%, 0 100%);
+  transition: clip-path var(--default-transition-duration) var(--default-transition-timing-function);
+}
+
+.shape-icon[data-shape='square'] {
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+}
+
+/* Stopping… keeps the ink button, dimmed, instead of Ant Design's grey disabled look. */
+.ant-btn.stopping:disabled {
+  background: var(--color-ink);
+  color: #ffffff;
+  opacity: 0.6;
+}
+
+/* A slight press on buttons (ADR 061, M6); list rows press with `active:scale-98`. */
+.ant-btn:not(:disabled):active {
+  scale: 0.97;
 }
 
 body {

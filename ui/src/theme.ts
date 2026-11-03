@@ -29,6 +29,15 @@ export const palette = {
 /** Corner radius in px; index.css declares the same as `--radius-ui`. */
 export const radius = 4
 
+/**
+ * Every transition (ADR 061): 150 ms, ease-out. index.css declares the same as Tailwind's default
+ * transition; theme.test.ts keeps the two equal.
+ */
+export const motion = { ms: 150, easing: 'cubic-bezier(0.2, 0, 0, 1)' } as const
+
+const reducedMotion =
+  typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
 export const theme: ThemeConfig = {
   token: {
     // Primary buttons, links, and focus are ink; indigo is kept for Think steps.
@@ -44,6 +53,13 @@ export const theme: ThemeConfig = {
     fontSize: 14,
     fontFamily: "'Instrument Sans', system-ui, sans-serif",
     fontFamilyCode: "'JetBrains Mono', ui-monospace, monospace",
+    // Dialogs and menus move like the rest; with reduced motion they do not move at all.
+    motion: !reducedMotion,
+    motionDurationFast: `${motion.ms / 1000}s`,
+    motionDurationMid: `${motion.ms / 1000}s`,
+    motionDurationSlow: `${motion.ms / 1000}s`,
+    motionEaseOut: motion.easing,
+    motionEaseInOut: motion.easing,
   },
   components: {
     Input: { colorBorder: palette.field },

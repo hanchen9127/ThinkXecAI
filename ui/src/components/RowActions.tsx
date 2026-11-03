@@ -41,6 +41,8 @@ export default function RowActions({
       <span>
         <Dropdown
           trigger={['click']}
+          // A closed menu leaves the page, so a row that folds away leaves no menu behind.
+          destroyOnHidden
           menu={{
             items: [
               { key: 'rename', label: 'Rename', onClick: onRename },

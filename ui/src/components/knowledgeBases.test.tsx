@@ -433,12 +433,13 @@ describe('deleting a document', () => {
     await confirmDelete()
 
     expect(await screen.findByRole('status')).toHaveTextContent('opening-hours.md deleted')
-    expect(screen.queryByText('opening-hours.md')).toBeNull()
+    // The row folds away: still in the page while it moves, but hidden from assistive technology.
+    expect(screen.getByText('opening-hours.md').closest('[aria-hidden="true"]')).not.toBeNull()
     expect(screen.getByRole('heading', { name: '1 document' })).toBeInTheDocument()
     expect(sent(api, 'DELETE')).toEqual([])
 
     await userEvent.click(screen.getByRole('button', { name: 'Undo' }))
-    expect(screen.getByText('opening-hours.md')).toBeInTheDocument()
+    expect(screen.getByText('opening-hours.md').closest('[aria-hidden="true"]')).toBeNull()
     expect(screen.queryByRole('status')).toBeNull()
     expect(sent(api, 'DELETE')).toEqual([])
   })

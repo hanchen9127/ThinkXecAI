@@ -2,6 +2,7 @@ import { type ReactNode, useEffect, useState } from 'react'
 import { cx } from '../../utils/cx'
 import { countLabel } from '../../utils/text'
 import { parseApiTimestamp } from '../../utils/time'
+import Expandable from '../Expandable'
 import Tag from '../Tag'
 import Markdown from './Markdown'
 import {
@@ -46,6 +47,11 @@ export default function AgentRun({
 }) {
   const [expanded, setExpanded] = useState(false)
   const rows = toRows(steps)
+  // Rows shown when the run first renders do not animate; later ones arrived live (ADR 061).
+  const [initial] = useState(
+    () => new Set([...rows.map((row) => row.key), ...(working ? [WAITING] : [])]),
+  )
+  const fresh = (key: string) => !initial.has(key)
   const folded = answers.length > 0 && !working
   const tools = [...new Set(steps.flatMap((step) => step.calls.map(({ call }) => call.name)))]
 
@@ -72,33 +78,37 @@ export default function AgentRun({
           </button>
         </div>
       )}
-      {(rows.length > 0 || working) && (!folded || expanded) && (
-        <ol aria-label="Agent steps" className="m-0 list-none p-0">
-          {rows.map((row, i) => (
-            <RailItem
-              key={row.key}
-              dot={row.kind === 'think' ? 'bg-think' : 'bg-execute'}
-              last={i === rows.length - 1 && !working}
-            >
-              {row.kind === 'think' ? (
-                <>
-                  <StepLabel kind="Think" number={i + 1} ms={row.ms} />
-                  <Markdown text={row.text} />
-                </>
-              ) : (
-                <>
-                  <StepLabel kind="Execute" number={i + 1} ms={row.toolCall.ms} />
-                  <Call toolCall={row.toolCall} />
-                </>
-              )}
-            </RailItem>
-          ))}
-          {working && (
-            <RailItem dot="bg-line" last>
-              <Waiting agentName={agentName} steps={rows.length} since={since} />
-            </RailItem>
-          )}
-        </ol>
+      {(rows.length > 0 || working) && (
+        <Expandable open={!folded || expanded} motion="slide">
+          <ol aria-label="Agent steps" className="m-0 list-none p-0">
+            {rows.map((row, i) => (
+              <RailItem
+                key={row.key}
+                dot={row.kind === 'think' ? 'bg-think' : 'bg-execute'}
+                last={i === rows.length - 1 && !working}
+                fresh={fresh(row.key)}
+                grows={fresh(rows[i + 1]?.key ?? (working ? WAITING : ''))}
+              >
+                {row.kind === 'think' ? (
+                  <>
+                    <StepLabel kind="Think" number={i + 1} ms={row.ms} />
+                    <Markdown text={row.text} />
+                  </>
+                ) : (
+                  <>
+                    <StepLabel kind="Execute" number={i + 1} ms={row.toolCall.ms} />
+                    <Call toolCall={row.toolCall} />
+                  </>
+                )}
+              </RailItem>
+            ))}
+            {working && (
+              <RailItem dot="bg-line" last fresh={fresh(WAITING)} grows={false}>
+                <Waiting agentName={agentName} steps={rows.length} since={since} />
+              </RailItem>
+            )}
+          </ol>
+        </Expandable>
       )}
       {answers.map((answer) =>
         onRetry && isNotice(answer.content) ? (
@@ -120,6 +130,8 @@ export default function AgentRun({
   )
 }
 
+const WAITING = 'waiting'
+
 function toRows(steps: Step[]): Row[] {
   return steps.flatMap((step): Row[] => [
     ...(step.think === null
@@ -133,16 +145,32 @@ function toRows(steps: Step[]): Row[] {
   ])
 }
 
-/** A rail row: the dot, the line down to the next row, and the row's content. */
-function RailItem({ dot, last, children }: { dot: string; last: boolean; children: ReactNode }) {
+/**
+ * A rail row: the dot, the line down to the next row, and the row's content. A `fresh` row arrived
+ * while the run was watched and fades in; `grows` marks the line under it, drawn when the next row
+ * arrives (index.css).
+ */
+function RailItem({
+  dot,
+  last,
+  fresh,
+  grows,
+  children,
+}: {
+  dot: string
+  last: boolean
+  fresh: boolean
+  grows: boolean
+  children: ReactNode
+}) {
   return (
-    <li className="flex gap-3">
-      <div aria-hidden="true" className="flex w-3.5 shrink-0 flex-col items-center">
+    <li className="flex gap-3" data-fresh={fresh || undefined} data-grows={grows || undefined}>
+      <div aria-hidden="true" className="rail-mark flex w-3.5 shrink-0 flex-col items-center">
         <span className="h-1.5 shrink-0" />
-        <span className={cx('size-2 shrink-0 rounded-full', dot)} />
-        {!last && <span className="w-px flex-1 bg-line" />}
+        <span className={cx('rail-dot size-2 shrink-0 rounded-full', dot)} />
+        {!last && <span className="rail-line w-px flex-1 bg-line" />}
       </div>
-      <div className="flex min-w-0 flex-1 flex-col gap-1 pb-3">{children}</div>
+      <div className="rail-content flex min-w-0 flex-1 flex-col gap-1 pb-3">{children}</div>
     </li>
   )
 }
@@ -231,7 +259,7 @@ function Call({ toolCall }: { toolCall: ToolCall }) {
           {open ? 'Hide' : 'Show'}
         </button>
       </div>
-      {open && (
+      <Expandable open={open} motion="slide">
         <div className="flex flex-col gap-2 rounded-ui border border-line bg-surface px-3 py-2.5">
           <pre className="m-0 font-mono text-xs break-words whitespace-pre-wrap text-muted">
             {formatArguments(call.arguments)}
@@ -243,7 +271,7 @@ function Call({ toolCall }: { toolCall: ToolCall }) {
               <pre className="m-0 font-mono text-xs whitespace-pre-wrap">{decoded.text}</pre>
             ))}
         </div>
-      )}
+      </Expandable>
     </>
   )
 }

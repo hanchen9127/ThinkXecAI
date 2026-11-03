@@ -303,14 +303,40 @@ describe('the working indicator', () => {
     expect(screen.queryByText(/is working/)).toBeNull()
   })
 
+  it('lets only a step that arrives live fade in (ADR 061)', async () => {
+    backend({
+      'GET /chat-messages/session/s1': () => [
+        recent('m1', 'user', 90_000),
+        recent('m2', 'assistant', 60_000, calls),
+      ],
+    })
+    renderApp('/chat/s1')
+    const steps = await screen.findByRole('list', { name: 'Agent steps' })
+    const loaded = within(steps).getAllByRole('listitem')
+    expect(loaded.filter((row) => row.hasAttribute('data-fresh'))).toEqual([])
+
+    const next = { toolCalls: [{ id: 'c2', type: 'function', name: 'cityTool', arguments: '{}' }] }
+    FakeEventSource.latest().emit('message', generated(recent('m3', 'assistant', 0, next)))
+
+    const row = (await within(steps).findByText('cityTool')).closest('li')
+    expect(row).toHaveAttribute('data-fresh')
+    // The Execute row before it now draws the rail down to it.
+    expect(within(steps).getByText('dateTool').closest('li')).toHaveAttribute('data-grows')
+  })
+
   it('turns Send into Stop while it works, and back into Send for a message to queue', async () => {
     backend({ 'GET /chat-messages/session/s1': () => [recent('m1', 'user', 1_000)] })
     renderApp('/chat/s1')
 
-    expect(await screen.findByRole('button', { name: 'Stop' })).toBeEnabled()
+    const stop = await screen.findByRole('button', { name: 'Stop' })
+    expect(stop).toBeEnabled()
+    // One button: its icon changes shape and its labels cross-fade (ADR 061).
+    expect(stop.querySelector('.shape-icon')).toHaveAttribute('data-shape', 'square')
     await userEvent.type(screen.getByRole('textbox', { name: 'Message' }), 'And the price?')
     expect(screen.queryByRole('button', { name: 'Stop' })).toBeNull()
-    expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled()
+    expect(stop).toHaveAccessibleName('Send')
+    expect(stop).toBeEnabled()
+    expect(stop.querySelector('.shape-icon')).toHaveAttribute('data-shape', 'triangle')
   })
 
   it('stops the session, says Stopping… until the notice, then offers Try again', async () => {

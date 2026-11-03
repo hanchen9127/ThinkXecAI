@@ -79,7 +79,12 @@ function KnowledgeBaseItem({
   const [shown, setShown] = useState(false)
 
   return (
-    <li className={cx('border-b border-hairline py-3.5 pl-3', open && 'bg-ground')}>
+    <li
+      className={cx(
+        'border-b border-hairline py-3.5 pl-3 transition active:scale-98',
+        open ? 'bg-ground' : 'hover:bg-ground',
+      )}
+    >
       <div className="flex items-center gap-2">
         <Link
           to={path`/knowledge-base/${knowledgeBase.id}`}
