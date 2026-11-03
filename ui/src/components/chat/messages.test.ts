@@ -6,6 +6,7 @@ import {
   formatArguments,
   formatDuration,
   groupHistory,
+  isNotice,
   summarizeResult,
   titleFrom,
 } from './messages'
@@ -111,6 +112,19 @@ describe('summarizeResult', () => {
       'Returns within 30 days.',
     )
     expect(summarizeResult('x'.repeat(100))).toBe(`${'x'.repeat(80)}…`)
+  })
+})
+
+describe('isNotice', () => {
+  it('knows the notices a run ends with, and nothing else', () => {
+    expect(isNotice('Stopped.')).toBe(true)
+    expect(isNotice('The agent could not finish this request: the agent no longer exists.')).toBe(
+      true,
+    )
+    expect(isNotice('The agent stopped after 20 steps without finishing the request.')).toBe(true)
+    expect(isNotice('Stopped. Then the stock was checked.')).toBe(false)
+    expect(isNotice('One phone is out of stock.')).toBe(false)
+    expect(isNotice(null)).toBe(false)
   })
 })
 

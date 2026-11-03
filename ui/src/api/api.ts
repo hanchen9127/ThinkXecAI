@@ -116,6 +116,11 @@ export function updateChatSession(chatSessionId: string, request: UpdateChatSess
   )
 }
 
+/** Stops the session's running run and those queued behind it, between steps (ADR 060). */
+export function stopChatSession(chatSessionId: string) {
+  return http.post<null>(path`/chat-sessions/${chatSessionId}/stop`)
+}
+
 export function deleteChatSession(chatSessionId: string, options?: { keepalive?: boolean }) {
   return http.delete<null>(path`/chat-sessions/${chatSessionId}`, options)
 }

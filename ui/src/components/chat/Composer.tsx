@@ -8,17 +8,24 @@ const MESSAGE_LENGTH = 20000
  * The message box (V1 element 8 C): Enter sends, Shift+Enter starts a new line. `onSend` gets the
  * trimmed text and throws to keep it; the box empties only once the message is stored. `tools`
  * sits left of Send (the agent picker of a new chat, V4 C1 C), else the keyboard hint.
+ * <p>
+ * With `onStop` (the agent is working), an empty box turns Send into Stop; typing turns it back, so a
+ * message can still be queued. `stopping` shows "Stopping…" until the run ends (ADR 060).
  */
 export default function Composer({
   placeholder,
   disabled,
   tools,
   onSend,
+  onStop,
+  stopping = false,
 }: {
   placeholder?: string
   disabled?: boolean
   tools?: ReactNode
   onSend: (content: string) => Promise<void>
+  onStop?: () => void
+  stopping?: boolean
 }) {
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
@@ -62,15 +69,29 @@ export default function Composer({
         />
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline py-2.5 pr-3 pl-4">
           {tools ?? hint}
-          <Button
-            type="primary"
-            className="ml-auto"
-            loading={sending}
-            disabled={disabled || blank}
-            onClick={() => void send()}
-          >
-            Send
-          </Button>
+          {onStop && blank && !disabled ? (
+            <Button
+              type="primary"
+              className="ml-auto min-w-24"
+              disabled={stopping}
+              icon={
+                stopping ? undefined : <span aria-hidden="true" className="size-2.25 bg-white" />
+              }
+              onClick={onStop}
+            >
+              {stopping ? 'Stopping…' : 'Stop'}
+            </Button>
+          ) : (
+            <Button
+              type="primary"
+              className="ml-auto min-w-24"
+              loading={sending}
+              disabled={disabled || blank}
+              onClick={() => void send()}
+            >
+              Send
+            </Button>
+          )}
         </div>
       </div>
       {tools && hint}

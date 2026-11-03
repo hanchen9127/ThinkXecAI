@@ -10,6 +10,7 @@ import {
   decodeToolResult,
   formatArguments,
   formatDuration,
+  isNotice,
   summarizeResult,
 } from './messages'
 
@@ -22,7 +23,8 @@ type Row =
  * What the agent did for one user message, as a trace (ADR 059): no card, its steps on one rail,
  * then its answers. While it works every step shows, and a skeleton row with a timer counts from
  * `since`, its newest message; once it has answered, the steps fold into one line above the answer
- * ("4 steps in 6.8 s" and the tools used), opened with Show steps.
+ * ("4 steps in 6.8 s" and the tools used), opened with Show steps. With `onRetry`, a notice that
+ * ends the run ("Stopped.", a failure) is followed by Try again (ADR 060).
  */
 export default function AgentRun({
   agentName,
@@ -31,6 +33,7 @@ export default function AgentRun({
   ms,
   working = false,
   since,
+  onRetry,
 }: {
   agentName: string
   steps: Step[]
@@ -39,6 +42,7 @@ export default function AgentRun({
   ms?: number
   working?: boolean
   since?: string
+  onRetry?: () => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const rows = toRows(steps)
@@ -96,9 +100,22 @@ export default function AgentRun({
           )}
         </ol>
       )}
-      {answers.map((answer) => (
-        <Markdown key={answer.id} text={answer.content ?? ''} className="max-w-prose text-base" />
-      ))}
+      {answers.map((answer) =>
+        onRetry && isNotice(answer.content) ? (
+          <div key={answer.id} className="flex flex-wrap items-baseline gap-2.5">
+            <Markdown text={answer.content ?? ''} className="text-base" />
+            <button
+              type="button"
+              onClick={onRetry}
+              className="cursor-pointer text-sm text-ink underline"
+            >
+              Try again
+            </button>
+          </div>
+        ) : (
+          <Markdown key={answer.id} text={answer.content ?? ''} className="max-w-prose text-base" />
+        ),
+      )}
     </article>
   )
 }

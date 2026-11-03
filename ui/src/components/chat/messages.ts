@@ -153,6 +153,17 @@ export function formatArguments(args: string): string {
     .join('\n')
 }
 
+/**
+ * Whether an answer is one of the notices a run ends with when it gave no answer: stopped by the user
+ * (ADR 060), failed, or out of steps (ADR 043). The texts are `AgentNotices` in the backend.
+ */
+export function isNotice(content: string | null): boolean {
+  return NOTICE.test(content ?? '')
+}
+
+const NOTICE =
+  /^(?:Stopped\.$|The agent could not finish this request: |The agent stopped after \d+ steps )/
+
 /** Chat titles are at most 200 characters (ADR 032); one from a first message is kept short. */
 export const TITLE_LENGTH = 200
 const SHORT_TITLE = 60

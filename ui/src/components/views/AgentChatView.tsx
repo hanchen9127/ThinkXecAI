@@ -1,7 +1,7 @@
 import { Alert, Button, Select } from 'antd'
 import { useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
-import { type ChatSession, createChatMessage } from '../../api/api'
+import { type ChatSession, createChatMessage, stopChatSession } from '../../api/api'
 import { ApiError, path } from '../../api/http'
 import { useAgents } from '../../hooks/useAgents'
 import { useChatMessages } from '../../hooks/useChatMessages'
@@ -11,7 +11,7 @@ import { newestMessage, useWorking } from '../../hooks/useWorking'
 import { errorMessage } from '../../utils/text'
 import AgentRun from '../chat/AgentRun'
 import Composer from '../chat/Composer'
-import { chatTitle, groupHistory, titleFrom } from '../chat/messages'
+import { type HistoryItem, chatTitle, groupHistory, titleFrom } from '../chat/messages'
 
 /** `/`, `/chat` (a new chat, `?agent=<id>` chooses its agent), and `/chat/:chatSessionId`. */
 export default function AgentChatView() {
@@ -131,6 +131,9 @@ function Chat({ sessionId }: { sessionId: string }) {
   const history = useMemo(() => groupHistory(messages), [messages])
   const working = useWorking(messages)
   const since = useMemo(() => newestMessage(messages)?.createdAt, [messages])
+  const [stopping, setStopping] = useState(false)
+  // "Stopping…" lasts until the run ends with its notice.
+  if (stopping && !working) setStopping(false)
 
   const session = chatSessions.chatSessions.find((s) => s.id === sessionId)
   const stream = useChatStream(
@@ -186,6 +189,25 @@ function Chat({ sessionId }: { sessionId: string }) {
       setSendError(failure)
       throw failure
     }
+  }
+
+  function stop() {
+    setStopping(true)
+    setSendError(undefined)
+    stopChatSession(sessionId).catch((failure: unknown) => {
+      setStopping(false)
+      setSendError(failure)
+    })
+  }
+
+  /**
+   * Try again for the run after `before`: sends that question again as a new message (ADR 060); a
+   * failure shows like any send. None when the chat cannot continue.
+   */
+  function retryFor(before: HistoryItem | undefined) {
+    const question = before?.kind === 'user' ? before.message.content : null
+    if (agentGone || !question) return undefined
+    return () => void submit(question).catch(() => undefined)
   }
 
   return (
@@ -274,6 +296,7 @@ function Chat({ sessionId }: { sessionId: string }) {
               ms={item.ms}
               working={working && i === history.length - 1}
               since={since}
+              onRetry={retryFor(history[i - 1])}
             />
           ),
         )}
@@ -304,6 +327,8 @@ function Chat({ sessionId }: { sessionId: string }) {
             disabled={agentGone}
             placeholder={agentGone ? "This chat can't continue" : `Ask ${agentName}`}
             onSend={submit}
+            onStop={working ? stop : undefined}
+            stopping={stopping}
           />
         )}
       </div>
