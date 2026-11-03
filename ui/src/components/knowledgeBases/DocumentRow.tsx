@@ -1,9 +1,8 @@
-import { MoreOutlined } from '@ant-design/icons'
-import { Button, Dropdown, Popconfirm } from 'antd'
 import { useState } from 'react'
 import type { Document } from '../../api/api'
 import { formatApiTimestamp } from '../../utils/time'
 import RenameField from '../RenameField'
+import RowActions from '../RowActions'
 import { LIMITS } from './knowledgeBases'
 
 /**
@@ -20,7 +19,6 @@ export default function DocumentRow({
   onDelete: () => void
 }) {
   const [editing, setEditing] = useState(false)
-  const [confirming, setConfirming] = useState(false)
 
   return (
     <li className="border-b border-hairline px-3 py-2.5">
@@ -40,47 +38,12 @@ export default function DocumentRow({
               Uploaded {formatApiTimestamp(document.createdAt)}
             </div>
           </div>
-          <Popconfirm
-            open={confirming}
-            onOpenChange={(open) => {
-              // Opened only from the menu; a click elsewhere closes it.
-              if (!open) setConfirming(false)
-            }}
-            title={`Delete ${document.name}?`}
-            description="Agents stop finding its sections."
-            okText="Delete"
-            okButtonProps={{ danger: true }}
-            cancelText="Cancel"
-            onConfirm={() => {
-              setConfirming(false)
-              onDelete()
-            }}
-            onCancel={() => setConfirming(false)}
-          >
-            <span>
-              <Dropdown
-                trigger={['click']}
-                menu={{
-                  items: [
-                    { key: 'rename', label: 'Rename', onClick: () => setEditing(true) },
-                    {
-                      key: 'delete',
-                      label: 'Delete',
-                      danger: true,
-                      onClick: () => setConfirming(true),
-                    },
-                  ],
-                }}
-              >
-                <Button
-                  type="text"
-                  size="small"
-                  aria-label={`More actions for ${document.name}`}
-                  icon={<MoreOutlined />}
-                />
-              </Dropdown>
-            </span>
-          </Popconfirm>
+          <RowActions
+            name={document.name}
+            deleteDescription="Agents stop finding its sections."
+            onRename={() => setEditing(true)}
+            onDelete={onDelete}
+          />
         </div>
       )}
     </li>

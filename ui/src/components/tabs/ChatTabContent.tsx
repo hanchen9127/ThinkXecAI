@@ -1,5 +1,5 @@
-import { CloseOutlined, MoreOutlined, SearchOutlined } from '@ant-design/icons'
-import { Button, Dropdown, Input, Popconfirm } from 'antd'
+import { SearchOutlined } from '@ant-design/icons'
+import { Button, Input } from 'antd'
 import { useMemo, useState } from 'react'
 import { Link, matchPath, useLocation, useNavigate } from 'react-router'
 import type { ChatSession } from '../../api/api'
@@ -10,7 +10,9 @@ import { useUndoableDelete } from '../../hooks/useUndoableDelete'
 import { cx } from '../../utils/cx'
 import { errorMessage } from '../../utils/text'
 import { formatListTime } from '../../utils/time'
+import DeleteFeedback from '../DeleteFeedback'
 import RenameField from '../RenameField'
+import RowActions from '../RowActions'
 import { TITLE_LENGTH, chatTitle } from '../chat/messages'
 import TabHeading from './TabHeading'
 
@@ -113,35 +115,7 @@ export default function ChatTabContent() {
           ))}
         </ul>
       )}
-      {deletes.pending && (
-        <div
-          role="status"
-          className="flex items-center justify-between gap-3 rounded-ui bg-ink px-3 py-2.5 text-sm text-white"
-        >
-          <span className="min-w-0 break-words">{deletes.pending.name} deleted</span>
-          <button
-            type="button"
-            onClick={deletes.undo}
-            className="cursor-pointer font-semibold text-think-wash underline"
-          >
-            Undo
-          </button>
-        </div>
-      )}
-      {deletes.failure && (
-        <div role="alert" className="flex items-start justify-between gap-2 text-sm text-danger">
-          <span>
-            Couldn't delete {deletes.failure.name}. {errorMessage(deletes.failure.error)}
-          </span>
-          <Button
-            type="text"
-            size="small"
-            aria-label="Dismiss"
-            icon={<CloseOutlined />}
-            onClick={deletes.dismissFailure}
-          />
-        </div>
-      )}
+      <DeleteFeedback deletes={deletes} />
     </section>
   )
 }
@@ -160,7 +134,6 @@ function ChatItem({
   onDelete: () => void
 }) {
   const [editing, setEditing] = useState(false)
-  const [confirming, setConfirming] = useState(false)
   const title = chatTitle(session)
 
   return (
@@ -185,46 +158,12 @@ function ChatItem({
               {agentName}, {formatListTime(session.updatedAt)}
             </span>
           </Link>
-          <Popconfirm
-            open={confirming}
-            onOpenChange={(next) => {
-              if (!next) setConfirming(false)
-            }}
-            title={`Delete ${title}?`}
-            description="Its messages are deleted too."
-            okText="Delete"
-            okButtonProps={{ danger: true }}
-            cancelText="Cancel"
-            onConfirm={() => {
-              setConfirming(false)
-              onDelete()
-            }}
-            onCancel={() => setConfirming(false)}
-          >
-            <span>
-              <Dropdown
-                trigger={['click']}
-                menu={{
-                  items: [
-                    { key: 'rename', label: 'Rename', onClick: () => setEditing(true) },
-                    {
-                      key: 'delete',
-                      label: 'Delete',
-                      danger: true,
-                      onClick: () => setConfirming(true),
-                    },
-                  ],
-                }}
-              >
-                <Button
-                  type="text"
-                  size="small"
-                  aria-label={`More actions for ${title}`}
-                  icon={<MoreOutlined />}
-                />
-              </Dropdown>
-            </span>
-          </Popconfirm>
+          <RowActions
+            name={title}
+            deleteDescription="Its messages are deleted too."
+            onRename={() => setEditing(true)}
+            onDelete={onDelete}
+          />
         </div>
       )}
     </li>

@@ -11,6 +11,7 @@ import { useKnowledgeBases } from '../../hooks/useKnowledgeBases'
 import { useUndoableDelete } from '../../hooks/useUndoableDelete'
 import { parseApiTimestamp } from '../../utils/time'
 import { countLabel, errorMessage } from '../../utils/text'
+import DeleteFeedback from '../DeleteFeedback'
 import DocumentRow from '../knowledgeBases/DocumentRow'
 import { agentsUsing, fileProblem } from '../knowledgeBases/knowledgeBases'
 
@@ -173,35 +174,7 @@ function KnowledgeBasePage({ knowledgeBase }: { knowledgeBase: KnowledgeBase }) 
               ))}
             </ul>
           )}
-          {deletes.pending && (
-            <div
-              role="status"
-              className="flex items-center justify-between gap-3 rounded-ui bg-ink px-3.5 py-2.5 text-white"
-            >
-              <span>{deletes.pending.name} deleted</span>
-              <button
-                type="button"
-                onClick={deletes.undo}
-                className="cursor-pointer font-semibold text-think-wash underline"
-              >
-                Undo
-              </button>
-            </div>
-          )}
-          {deletes.failure && (
-            <div role="alert" className="flex items-start justify-between gap-3 text-danger">
-              <span>
-                Couldn't delete {deletes.failure.name}. {errorMessage(deletes.failure.error)}
-              </span>
-              <Button
-                type="text"
-                size="small"
-                aria-label="Dismiss"
-                icon={<CloseOutlined />}
-                onClick={deletes.dismissFailure}
-              />
-            </div>
-          )}
+          <DeleteFeedback deletes={deletes} />
         </section>
       </div>
     </>
