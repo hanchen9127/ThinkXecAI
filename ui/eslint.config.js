@@ -32,24 +32,19 @@ export default defineConfig(
           message: 'Use a theme name from index.css instead of a bracketed Tailwind value.',
         },
       ],
-      // katex and mermaid carry advisories without a fix in Ant Design X's ranges; neither is
-      // bundled unless one of these is imported (ADR 051).
+      // katex and mermaid carry advisories without a fix in X Markdown's range; katex is
+      // bundled only if one of these is imported, mermaid is not installed (ADR 051).
       'no-restricted-imports': [
         'error',
         {
           paths: [
             { name: 'katex', message: 'Not used: open advisories (ADR 051).' },
             { name: 'mermaid', message: 'Not used: open advisories (ADR 051).' },
-            {
-              name: '@ant-design/x',
-              importNames: ['Mermaid'],
-              message: 'Not used: mermaid has open advisories (ADR 051).',
-            },
           ],
           patterns: [
             {
-              group: ['@ant-design/x-markdown/plugins/*', '@ant-design/x/*/mermaid*'],
-              message: 'Not used: katex and mermaid have open advisories (ADR 051).',
+              group: ['@ant-design/x-markdown/plugins/*'],
+              message: 'Not used: katex has open advisories (ADR 051).',
             },
           ],
         },
