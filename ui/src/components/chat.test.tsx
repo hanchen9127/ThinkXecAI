@@ -288,6 +288,34 @@ describe('a chat', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Chat session has no agent')
     expect(box).toHaveValue('Hi')
   })
+
+  it('reloads the chats and agents after that refusal, so the chat shows its agent is gone', async () => {
+    let agentDeleted = false
+    const api = backend({
+      'GET /chat-sessions': () => [
+        session('s1', 'Out-of-stock products', agentDeleted ? null : 'a1', '2026-11-01T23:00:00'),
+      ],
+      'GET /agents': () => (agentDeleted ? [supportDesk] : [storeAnalyst, supportDesk]),
+      'POST /chat-messages': () => {
+        agentDeleted = true
+        throw { code: 409, message: 'Chat session has no agent' }
+      },
+    })
+    renderApp('/chat/s1')
+    const box = await screen.findByRole('textbox', { name: 'Message' })
+    const loads = (path: string) => api.calls.filter((c) => c.method === 'GET' && c.path === path)
+    await waitFor(() => expect(loads('/agents')).toHaveLength(1))
+    const sessionLoads = loads('/chat-sessions').length
+
+    await userEvent.type(box, 'Hi{Enter}')
+
+    expect(
+      await screen.findByText('Its agent was deleted. You can read this chat but not continue it.'),
+    ).toBeInTheDocument()
+    expect(loads('/agents')).toHaveLength(2)
+    expect(loads('/chat-sessions').length).toBeGreaterThan(sessionLoads)
+    expect(box).toBeDisabled()
+  })
 })
 
 describe('the chat list', () => {
