@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import type { ChatMessage } from '../../api/api'
-import { chatTitle, decodeToolResult, formatArguments, groupHistory, titleFrom } from './messages'
+import {
+  chatTitle,
+  decodeToolResult,
+  formatArguments,
+  formatDuration,
+  groupHistory,
+  summarizeResult,
+  titleFrom,
+} from './messages'
 
 let clock = 0
 function message(
@@ -41,22 +49,26 @@ describe('groupHistory', () => {
     expect(items.map((i) => i.kind)).toEqual(['user', 'agent', 'user'])
     const run = items[1]
     if (run.kind !== 'agent') throw new Error('expected a run')
+    // One second between messages: a Think counts from the message before it, a call to its result.
     expect(run.steps).toEqual([
       {
         id: step1.id,
         think: 'I will look it up.',
-        calls: [{ call: call('c1', 'dataBaseTool'), result: '"| sku |"' }],
+        thinkMs: 1000,
+        calls: [{ call: call('c1', 'dataBaseTool'), result: '"| sku |"', ms: 1000 }],
       },
       {
         id: step2.id,
         think: null,
+        thinkMs: 1000,
         calls: [
-          { call: call('c2', 'knowledgeSearch'), result: undefined },
-          { call: call('c3', 'dateTool'), result: '"2026-11-02"' },
+          { call: call('c2', 'knowledgeSearch'), result: undefined, ms: undefined },
+          { call: call('c3', 'dateTool'), result: '"2026-11-02"', ms: 1000 },
         ],
       },
     ])
     expect(run.answers).toEqual([answer])
+    expect(run.ms).toBe(5000)
   })
 
   it('orders by creation time and leaves out system messages and empty answers', () => {
@@ -70,7 +82,7 @@ describe('groupHistory', () => {
 
     expect(items).toEqual([
       { kind: 'user', message: question },
-      { kind: 'agent', id: empty.id, steps: [], answers: [answer] },
+      { kind: 'agent', id: empty.id, steps: [], answers: [answer], ms: 3000 },
     ])
   })
 
@@ -82,6 +94,31 @@ describe('groupHistory', () => {
 
     const [, run] = groupHistory([question, step, notice])
     expect(run.kind === 'agent' && run.answers).toEqual([notice])
+  })
+})
+
+describe('summarizeResult', () => {
+  it('counts the rows of a table, ignoring the row note under it', () => {
+    const table = '| sku |\n| --- |\n| SP-1 |\n| SP-2 |\n\n(2 rows)'
+    expect(summarizeResult(JSON.stringify(table))).toBe('2 rows')
+    expect(summarizeResult(JSON.stringify('| sku |\n| --- |\n| SP-1 |\n'))).toBe('1 row')
+  })
+
+  it('counts a list, and shows an object or text by its start', () => {
+    expect(summarizeResult('[1,2,3]')).toBe('3 items')
+    expect(summarizeResult('{"city": "Sydney"}')).toBe('{"city":"Sydney"}')
+    expect(summarizeResult(JSON.stringify('\nReturns within 30 days.\nMore text.'))).toBe(
+      'Returns within 30 days.',
+    )
+    expect(summarizeResult('x'.repeat(100))).toBe(`${'x'.repeat(80)}…`)
+  })
+})
+
+describe('formatDuration', () => {
+  it('shows seconds with one decimal, minutes from 60 s', () => {
+    expect(formatDuration(400)).toBe('0.4 s')
+    expect(formatDuration(12_000)).toBe('12.0 s')
+    expect(formatDuration(65_000)).toBe('1 min 5 s')
   })
 })
 

@@ -7,7 +7,7 @@ import { useAgents } from '../../hooks/useAgents'
 import { useChatMessages } from '../../hooks/useChatMessages'
 import { useChatSessions } from '../../hooks/useChatSessions'
 import { useChatStream } from '../../hooks/useChatStream'
-import { useWorking } from '../../hooks/useWorking'
+import { newestMessage, useWorking } from '../../hooks/useWorking'
 import { errorMessage } from '../../utils/text'
 import AgentRun from '../chat/AgentRun'
 import Composer from '../chat/Composer'
@@ -130,6 +130,7 @@ function Chat({ sessionId }: { sessionId: string }) {
   const [sendError, setSendError] = useState<unknown>()
   const history = useMemo(() => groupHistory(messages), [messages])
   const working = useWorking(messages)
+  const since = useMemo(() => newestMessage(messages)?.createdAt, [messages])
 
   const session = chatSessions.chatSessions.find((s) => s.id === sessionId)
   const stream = useChatStream(
@@ -238,7 +239,7 @@ function Chat({ sessionId }: { sessionId: string }) {
 
       <section
         aria-label="Messages"
-        className="box-border flex w-full max-w-230 flex-1 flex-col gap-7 px-12 py-9"
+        className="box-border flex w-full max-w-230 flex-1 flex-col gap-3 px-12 py-9"
       >
         {error !== undefined && (
           <div role="alert" className="flex flex-col items-start gap-2 text-muted">
@@ -254,11 +255,15 @@ function Chat({ sessionId }: { sessionId: string }) {
         )}
         {history.map((item, i) =>
           item.kind === 'user' ? (
+            // The user's message as a prompt line on a band, not a bubble (ADR 059).
             <div
               key={item.message.id}
-              className="max-w-130 self-end rounded-2xl rounded-br-sm bg-ink px-4 py-3 break-words whitespace-pre-wrap text-white"
+              className="flex gap-2.5 rounded-ui border border-line bg-surface px-3 py-2.5 not-first:mt-5"
             >
-              {item.message.content}
+              <span aria-hidden="true" className="font-mono text-sm text-muted">
+                &gt;
+              </span>
+              <p className="m-0 min-w-0 break-words whitespace-pre-wrap">{item.message.content}</p>
             </div>
           ) : (
             <AgentRun
@@ -266,13 +271,15 @@ function Chat({ sessionId }: { sessionId: string }) {
               agentName={agentName}
               steps={item.steps}
               answers={item.answers}
+              ms={item.ms}
               working={working && i === history.length - 1}
+              since={since}
             />
           ),
         )}
-        {/* Nothing from the agent yet: its card starts with the dots. */}
+        {/* Nothing from the agent yet: its trace starts with the waiting row. */}
         {working && history.at(-1)?.kind === 'user' && (
-          <AgentRun agentName={agentName} steps={[]} answers={[]} working />
+          <AgentRun agentName={agentName} steps={[]} answers={[]} working since={since} />
         )}
       </section>
 

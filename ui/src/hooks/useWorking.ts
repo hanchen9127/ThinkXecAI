@@ -47,13 +47,7 @@ function endsRun(reply: ChatMessage | undefined) {
  * nothing when its chat is opened. Display only: the input stays enabled (ADR 042).
  */
 export function useWorking(messages: ChatMessage[]): boolean {
-  const last = useMemo(() => {
-    let newest: ChatMessage | undefined
-    for (const message of messages) {
-      if (!newest || time(message) >= time(newest)) newest = message
-    }
-    return newest
-  }, [messages])
+  const last = useMemo(() => newestMessage(messages), [messages])
   const [expired, setExpired] = useState<string>()
 
   const waiting = awaitsAgent(last, messages)
@@ -66,6 +60,15 @@ export function useWorking(messages: ChatMessage[]): boolean {
   }, [waiting, id, deadline])
 
   return waiting && expired !== id
+}
+
+/** The newest of `messages` by creation time; the working timer counts from it (ADR 059). */
+export function newestMessage(messages: ChatMessage[]): ChatMessage | undefined {
+  let newest: ChatMessage | undefined
+  for (const message of messages) {
+    if (!newest || time(message) >= time(newest)) newest = message
+  }
+  return newest
 }
 
 function time(message: ChatMessage) {

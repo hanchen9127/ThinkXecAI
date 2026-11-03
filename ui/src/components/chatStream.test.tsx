@@ -277,10 +277,13 @@ describe('the working indicator', () => {
     })
     renderApp('/chat/s1')
 
+    // Every step shows while it works (its Think and its Execute), then the waiting row's timer,
+    // counted from the newest message a minute ago.
     const run = await screen.findByRole('article', { name: 'Store analyst' })
-    expect(await within(run).findByRole('status')).toHaveTextContent(
-      'Store analyst is working, 1 step so far',
-    )
+    const status = await within(run).findByRole('status')
+    expect(status).toHaveTextContent('Store analyst is working, 2 steps so far')
+    expect(within(status).getByText(/^1:0\d$/)).toBeInTheDocument()
+    expect(within(run).getByText('No result yet')).toBeInTheDocument()
   })
 
   it('shows nothing for a run that died long ago', async () => {

@@ -203,45 +203,62 @@ describe('a new chat', () => {
 })
 
 describe('a chat', () => {
-  it('shows the question, the last step, and the answer', async () => {
+  it('shows the question on a band, and the answer under one line that folds the steps', async () => {
     backend()
     renderApp('/chat/s1')
 
     const heading = await screen.findByRole('heading', { level: 1, name: 'Out-of-stock products' })
     expect(heading.nextElementSibling).toHaveTextContent(/^Store analyst on deepseek-chat$/)
-    expect(
-      await screen.findByText('Which phones are out of stock, and when do they come back?'),
-    ).toBeInTheDocument()
-
-    const run = screen.getByRole('article', { name: 'Store analyst' })
-    const steps = within(run).getByRole('list', { name: 'Agent steps' })
-    expect(within(steps).getByText('knowledgeSearch').closest('p')).toHaveTextContent(
-      /^Step 3, Execute: knowledgeSearch$/,
+    const question = await screen.findByText(
+      'Which phones are out of stock, and when do they come back?',
     )
-    expect(within(steps).queryByText('Step 1, Think')).toBeNull()
+    expect(question.previousElementSibling).toHaveTextContent('>')
+
+    // Six rows (three Think, three Execute), from the question at :01 to the answer at :08.
+    const run = screen.getByRole('article', { name: 'Store analyst' })
+    expect(within(run).getByText('6 steps in 7.0 s')).toBeInTheDocument()
+    for (const tool of ['dataBaseTool', 'dateTool', 'knowledgeSearch']) {
+      expect(within(run).getByText(tool)).toBeInTheDocument()
+    }
+    expect(within(run).queryByRole('list', { name: 'Agent steps' })).toBeNull()
     expect(within(run).getByText('Nova X12 Lite').tagName).toBe('STRONG')
 
-    await userEvent.click(within(steps).getByRole('button', { name: 'Show 2 earlier steps' }))
-    expect(within(steps).getByText('Step 1, Think')).toBeInTheDocument()
-    expect(within(steps).getByText('sql: SELECT sku FROM t_product;')).toBeInTheDocument()
+    await userEvent.click(within(run).getByRole('button', { name: 'Show steps' }))
+    const steps = within(run).getByRole('list', { name: 'Agent steps' })
+    expect(within(steps).getAllByText('Think')).toHaveLength(3)
+    expect(within(steps).getAllByText('Execute')).toHaveLength(3)
+    expect(within(steps).getByText('Step 1, 1.0 s')).toBeInTheDocument()
+    expect(within(steps).getByText('Step 6, 1.0 s')).toBeInTheDocument()
+    expect(
+      within(steps).getByText('I will find the phones that are out of stock.'),
+    ).toBeInTheDocument()
+
+    await userEvent.click(within(run).getByRole('button', { name: 'Hide steps' }))
+    expect(within(run).queryByRole('list', { name: 'Agent steps' })).toBeNull()
   })
 
-  it('opens each tool result only when asked, decoded', async () => {
+  it('sums up each tool result in a line and opens it in place, decoded', async () => {
     backend()
     renderApp('/chat/s1')
 
-    const steps = await screen.findByRole('list', { name: 'Agent steps' })
-    await userEvent.click(within(steps).getByRole('button', { name: 'Show 2 earlier steps' }))
+    const run = await screen.findByRole('article', { name: 'Store analyst' })
+    await userEvent.click(within(run).getByRole('button', { name: 'Show steps' }))
+    const steps = within(run).getByRole('list', { name: 'Agent steps' })
+    expect(within(steps).getByText('1 row')).toBeInTheDocument()
+    expect(within(steps).getByText('{"date":"2026-11-02"}')).toBeInTheDocument()
+    expect(within(steps).getByText('not json at all')).toBeInTheDocument()
     expect(within(steps).queryByRole('table')).toBeNull()
 
-    const [table, json, raw] = within(steps).getAllByRole('button', { name: 'Show the result' })
-    await userEvent.click(table)
+    await userEvent.click(within(steps).getByRole('button', { name: 'Show dataBaseTool' }))
+    expect(within(steps).getByText('sql: SELECT sku FROM t_product;')).toBeInTheDocument()
     expect(within(steps).getByRole('cell', { name: 'Nova X12 Lite' })).toBeInTheDocument()
-    await userEvent.click(json)
+    await userEvent.click(within(steps).getByRole('button', { name: 'Show dateTool' }))
     expect(within(steps).getByText(/"date": "2026-11-02"/)).toBeInTheDocument()
-    await userEvent.click(raw)
-    expect(within(steps).getByText('not json at all')).toBeInTheDocument()
-    expect(within(steps).getAllByRole('button', { name: 'Hide the result' })).toHaveLength(3)
+    await userEvent.click(within(steps).getByRole('button', { name: 'Show knowledgeSearch' }))
+    expect(within(steps).getAllByText('not json at all')).toHaveLength(2)
+
+    await userEvent.click(within(steps).getByRole('button', { name: 'Hide dataBaseTool' }))
+    expect(within(steps).queryByRole('table')).toBeNull()
   })
 
   it('sends a message and moves the chat up the list', async () => {
