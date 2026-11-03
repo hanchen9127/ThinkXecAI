@@ -104,6 +104,12 @@ async function openMenuItem(name: string, item: string) {
   await userEvent.click(await screen.findByRole('menuitem', { name: item }))
 }
 
+async function confirmDocumentDelete(name: string) {
+  await openMenuItem(name, 'Delete')
+  const confirmation = await screen.findByRole('tooltip')
+  await userEvent.click(within(confirmation).getByRole('button', { name: 'Delete' }))
+}
+
 describe('the knowledge-base list', () => {
   it('says which agents use each one, on demand', async () => {
     backend()
@@ -301,6 +307,36 @@ describe('uploading', () => {
     expect(await screen.findByRole('heading', { name: '2 documents' })).toBeInTheDocument()
     expect(screen.queryByText('Reading its sections and indexing them…')).toBeNull()
     expect(screen.getAllByText('price-list.md')).toHaveLength(1)
+  })
+
+  it('does not bring the file back once its document is deleted', async () => {
+    const priceList = doc('d3', 'price-list.md', '2026-11-02T04:00:00')
+    const returnsPolicy = doc('d2', 'returns-policy.md', '2026-11-02T03:05:00')
+    let documents = [returnsPolicy]
+    const api = backend({
+      'GET /documents/kb/k1': () => documents,
+      'POST /documents/upload': () => {
+        documents = [priceList, returnsPolicy]
+        return priceList
+      },
+      'DELETE /documents/d3': () => {
+        documents = [returnsPolicy]
+        return null
+      },
+    })
+    renderApp('/knowledge-base/k1')
+    await screen.findByRole('heading', { name: '1 document' })
+    await user().upload(fileInput(), new File(['# Prices\n'], 'price-list.md'))
+    await screen.findByRole('heading', { name: '2 documents' })
+
+    await confirmDocumentDelete('price-list.md')
+    // Confirming another delete sends the waiting one at once.
+    await confirmDocumentDelete('returns-policy.md')
+
+    await waitFor(() => expect(sent(api, 'DELETE')).toHaveLength(1))
+    await waitFor(() => expect(sent(api, 'GET', '/documents/kb/k1')).toHaveLength(3))
+    expect(screen.queryByText('Reading its sections and indexing them…')).toBeNull()
+    expect(screen.queryByText('price-list.md')).toBeNull()
   })
 
   it("keeps the backend's refusal on the file's row", async () => {

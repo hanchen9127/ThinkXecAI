@@ -87,6 +87,9 @@ function KnowledgeBasePage({ knowledgeBase }: { knowledgeBase: KnowledgeBase }) 
   )
   const listed = new Set(documents.map((document) => document.id))
   const rows = uploads.filter((row) => !(row.documentId && listed.has(row.documentId)))
+  // A finished row leaves for good once the list shows its document; kept, it would come back as
+  // "indexing" when that document is deleted.
+  if (rows.length !== uploads.length) setUploads(rows)
 
   function start(file: File) {
     const key = nextKey.current++
