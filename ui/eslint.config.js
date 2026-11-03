@@ -1,3 +1,4 @@
+import { defineConfig } from 'eslint/config'
 import js from '@eslint/js'
 import globals from 'globals'
 import reactHooks from 'eslint-plugin-react-hooks'
@@ -5,10 +6,10 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
 import prettierConfig from 'eslint-config-prettier'
 
-export default tseslint.config(
+export default defineConfig(
   { ignores: ['dist', 'src/api/schema.d.ts'] },
   {
-    extends: [js.configs.recommended, ...tseslint.configs.recommended],
+    extends: [js.configs.recommended, tseslint.configs.recommended],
     files: ['**/*.{ts,tsx}'],
     languageOptions: {
       ecmaVersion: 2023,
@@ -21,6 +22,33 @@ export default tseslint.config(
     rules: {
       ...reactHooks.configs.recommended.rules,
       ...reactRefresh.configs.vite.rules,
+      // Sizes, radii, and spacing come from the @theme names in index.css, not bracketed values
+      // such as `pb-[18px]`, so the V1 look is decided in one place.
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            'Literal[value=/[\\w:]-\\[[^\\]]*\\]/], TemplateElement[value.raw=/[\\w:]-\\[[^\\]]*\\]/]',
+          message: 'Use a theme name from index.css instead of a bracketed Tailwind value.',
+        },
+      ],
+      // katex and mermaid carry advisories without a fix in X Markdown's range; katex is
+      // bundled only if one of these is imported, mermaid is not installed (ADR 051).
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            { name: 'katex', message: 'Not used: open advisories (ADR 051).' },
+            { name: 'mermaid', message: 'Not used: open advisories (ADR 051).' },
+          ],
+          patterns: [
+            {
+              group: ['@ant-design/x-markdown/plugins/*'],
+              message: 'Not used: katex has open advisories (ADR 051).',
+            },
+          ],
+        },
+      ],
     },
   },
   prettierConfig,

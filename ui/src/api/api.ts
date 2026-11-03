@@ -34,6 +34,12 @@ type RequestBody<P extends keyof paths, M extends keyof paths[P]> = paths[P][M] 
 // ---------------------------------------------------------------------------
 
 export type AgentModel = Schemas['AgentVO']['model']
+/** The models an agent can use, in the order a picker shows them (Gemini last: it needs a key, ADR 050). */
+export const AGENT_MODELS = [
+  'deepseek-chat',
+  'qwen3.8-flash',
+  'gemini-3.8-flash',
+] as const satisfies readonly AgentModel[]
 
 /** Chat options as stored and returned: all fields present. */
 export type ChatOptions = Schemas['ChatOptions']
@@ -110,8 +116,8 @@ export function updateChatSession(chatSessionId: string, request: UpdateChatSess
   )
 }
 
-export function deleteChatSession(chatSessionId: string) {
-  return http.delete<null>(path`/chat-sessions/${chatSessionId}`)
+export function deleteChatSession(chatSessionId: string, options?: { keepalive?: boolean }) {
+  return http.delete<null>(path`/chat-sessions/${chatSessionId}`, options)
 }
 
 // ---------------------------------------------------------------------------
@@ -206,8 +212,8 @@ export function updateDocument(documentId: string, request: UpdateDocumentReques
   )
 }
 
-export function deleteDocument(documentId: string) {
-  return http.delete<null>(path`/documents/${documentId}`)
+export function deleteDocument(documentId: string, options?: { keepalive?: boolean }) {
+  return http.delete<null>(path`/documents/${documentId}`, options)
 }
 
 // ---------------------------------------------------------------------------

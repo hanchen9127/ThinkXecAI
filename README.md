@@ -29,8 +29,9 @@ on the frontend, and PostgreSQL + pgvector for storage and retrieval.
 - **Chat history** — every user, assistant, and tool message is persisted in PostgreSQL.
 - **Live updates over SSE** — one Server-Sent Events connection per chat session streams
   generated assistant and tool messages to the frontend as they're produced.
-- **React frontend** — sidebar layout with tabs for agents, chats, and knowledge bases;
-  modals for creating agents/knowledge bases; a chat view with live streaming updates.
+- **React frontend** — an icon rail with lists of agents, chats, and knowledge bases; agent
+  profiles and dialogs to create, edit, and delete; Markdown upload; a chat view that shows each
+  run's steps and tool results, live over SSE, with a sign while the agent is working.
 
 Out of scope by design: authentication/authorization, multi-tenancy, WebSocket transport,
 token-by-token streaming, and document formats other than Markdown.
@@ -43,7 +44,7 @@ token-by-token streaming, and document formats other than Markdown.
 | AI models | Spring AI `ChatClient` over DeepSeek (`deepseek-chat`), Qwen (`qwen3.8-flash`, through its OpenAI-compatible API), and Google Gemini (`gemini-3.8-flash`) |
 | Database  | PostgreSQL (`pgvector/pgvector:pg18`) with the `vector` extension           |
 | Embeddings| Local Ollama, model `bge-m3`, 1024-dim vectors                              |
-| Frontend  | React 19, TypeScript, Vite (`rolldown-vite`), Tailwind CSS, Ant Design + `@ant-design/x` |
+| Frontend  | React 19, TypeScript, Vite 8, React Router 8, Tailwind CSS, Ant Design + `@ant-design/x-markdown` |
 | Realtime  | Server-Sent Events (SSE), one connection per chat session                   |
 ## Project Status
 
@@ -58,24 +59,22 @@ This project is being built phase by phase. Current status:
 - [x] Phase 7 — Facade services and REST APIs (CRUD for five resources, request validation, CI contract check)
 - [x] Phase 8 — Markdown ingestion and RAG (all-or-nothing upload, heading-based sections, local `bge-m3` embeddings, filtered vector search)
 - [x] Phase 9 — Tool system (fixed and optional tools, read-only SQL, Gmail with a recipient allowlist, `GET /tools`)
-- [ ] Phase 10 — Chat model registry
-- [ ] Phase 11 — Agent runtime (Think-Execute loop)
-- [ ] Phase 12 — SSE
-- [ ] Phase 13 — Frontend features (full UI)
+- [x] Phase 10 — Chat model registry
+- [x] Phase 11 — Agent runtime (Think-Execute loop)
+- [x] Phase 12 — SSE (one stream per chat, handed over between tabs)
+- [ ] Phase 13 — Frontend features (built; end-to-end check and review pending)
 - [ ] Phase 14 — End-to-end verification
 
-The REST API is in place except SSE (Phase 12). Uploaded Markdown is split into sections,
-embedded, and searchable per knowledge base, and the tools are ready, but no agent uses them until
-the chat model registry and agent runtime arrive (Phases 10 and 11). Creating a user message stores
-it and emits a chat event, but nothing runs the agent until Phase 11. The frontend has a typed API
-client and still runs as an empty shell.
+The backend is complete: agents run the Think-Execute loop on the chosen model, use their tools
+and knowledge bases, store every message, and stream them over SSE. The frontend covers every
+screen (agents, knowledge bases with upload, chats); Phase 14 checks the whole system end to end.
 
 ## Getting Started
 
 ### Prerequisites
 
 - Java 21 (e.g. Eclipse Temurin) and Maven
-- Node.js 20+ and npm
+- Node.js 22.22+ and npm
 - Docker (for PostgreSQL)
 - [Ollama](https://ollama.com/) running locally with the `bge-m3` model pulled:
   ```bash
@@ -214,8 +213,34 @@ npm install
 npm run dev
 ```
 
-The Vite dev server runs on its default port and talks to the backend at
-`http://localhost:8080/api`.
+Open `http://localhost:5173` (Vite's default port; the backend accepts any `localhost` port).
+The frontend talks to the backend at `http://localhost:8080/api` and `/sse`.
+
+Start things in this order: PostgreSQL, Ollama, the backend, then the frontend. The frontend
+shows an error with Try again while the backend is not up, and uploads and knowledge searches fail
+while Ollama is not running.
+
+## Using the app
+
+The icon rail on the left switches between three lists:
+
+- **Agents** — New agent opens a dialog with sections (basics, model, tools, knowledge bases, chat
+  options). Clicking an agent opens its profile; Start chat begins a chat with it.
+- **Knowledge bases** — create one, then drop Markdown files (`.md` / `.markdown`, up to 1 MB)
+  onto its page. A file waits in the list while its sections are indexed. Deleting a knowledge base
+  removes it from every agent that used it, and the dialog names those agents first.
+- **Chats** — the newest first, with search by title or agent. A new chat asks what the chosen
+  agent should look into; sending starts the agent, whose steps (what it thought, which tool it
+  called with what arguments, and the result on request) and answer appear as they are produced.
+
+Deleting a chat or a document waits 5 seconds for Undo before it is sent; leaving the page or
+closing the tab sends it at once. Messages keep arriving if you close the tab mid-run: they are
+stored, and the chat shows them all when it is opened again.
+
+One chat can be live in one tab at a time. Opening it in a second tab moves the live stream there;
+the first tab says the chat is open in another tab and offers Use it here, which takes it back. A
+chat deleted in another tab is closed with a notice. A chat whose agent was deleted stays readable
+but cannot continue.
 
 ## Project Structure
 
@@ -264,6 +289,8 @@ optional tools (`dataBaseTool`, `emailTool`); anything else is rejected with `40
 Live agent output streams from `GET /sse/connect/{chatSessionId}` (`text/event-stream`):
 an `init` event on connect, then `message` events carrying JSON of the form
 `{ "type": ..., "payload": { "message", "statusText", "done" }, "metadata": { "chatMessageId" } }`.
+Connecting to a chat that already has a stream sends the old one a `replaced` event and closes it;
+an unknown or deleted chat gets a real HTTP 404, so the browser stops reconnecting.
 
 ### API contract
 

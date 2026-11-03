@@ -19,7 +19,12 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.ResourceAccessException;
 
+import java.io.IOException;
+import java.net.ConnectException;
+import java.net.http.HttpConnectTimeoutException;
+import java.net.http.HttpTimeoutException;
 import java.util.List;
 import java.util.UUID;
 
@@ -119,6 +124,30 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void aServiceThatAnswersTooLateIs503SayingToTryAgain() throws Exception {
+        mockMvc.perform(get("/test/errors/service/read-timeout"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(503))
+                .andExpect(jsonPath("$.message").value(GlobalExceptionHandler.SERVICE_TIMED_OUT_MESSAGE));
+    }
+
+    @Test
+    void aServiceThatCannotBeReachedIs503SayingToCheckIt() throws Exception {
+        for (String failure : new String[] {"refused", "connect-timeout"}) {
+            mockMvc.perform(get("/test/errors/service/" + failure))
+                    .andExpect(jsonPath("$.code").value(503))
+                    .andExpect(jsonPath("$.message").value(GlobalExceptionHandler.SERVICE_UNREACHABLE_MESSAGE));
+        }
+    }
+
+    /** The client's message carries the service's URL; it goes only to the log. */
+    @Test
+    void aServiceFailureDoesNotExposeTheServiceAddress() throws Exception {
+        mockMvc.perform(get("/test/errors/service/refused"))
+                .andExpect(jsonPath("$.message").value(not(containsString("11434"))));
+    }
+
+    @Test
     void bizExceptionWithoutCodeReturnsGeneric500() throws Exception {
         mockMvc.perform(get("/test/errors/internal-biz"))
                 .andExpect(status().isOk())
@@ -183,6 +212,17 @@ class GlobalExceptionHandlerTest {
         @DeleteMapping("/conflict")
         String conflict() {
             throw new BizException(409, "Item is in use");
+        }
+
+        /** The exceptions Spring's HTTP clients throw over the JDK client when a service does not answer. */
+        @GetMapping("/service/{failure}")
+        String service(@PathVariable String failure) {
+            IOException cause = switch (failure) {
+                case "read-timeout" -> new HttpTimeoutException("Request cancelled");
+                case "connect-timeout" -> new HttpConnectTimeoutException("HTTP connect timed out");
+                default -> new ConnectException();
+            };
+            throw new ResourceAccessException("I/O error on POST request for \"http://localhost:11434/api/embed\"", cause);
         }
 
         @GetMapping("/internal-biz")

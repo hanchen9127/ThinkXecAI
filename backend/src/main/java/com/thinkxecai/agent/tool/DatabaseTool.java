@@ -158,7 +158,10 @@ public class DatabaseTool implements Tool {
         return "Query failed: " + e.getMessage();
     }
 
-    /** A Markdown table, followed by the row count or a note on what was cut. */
+    /**
+     * A Markdown table, followed by the row count or a note on what was cut. A blank line comes first:
+     * a line right under a table is read as one more row.
+     */
     private static String toTable(ResultSet rs) throws SQLException {
         ResultSetMetaData meta = rs.getMetaData();
         int columns = meta.getColumnCount();
@@ -171,7 +174,7 @@ public class DatabaseTool implements Tool {
         int rows = 0;
         while (rs.next()) {
             if (rows == MAX_ROWS) {
-                return out.append("(truncated to ").append(MAX_ROWS).append(" rows)").toString();
+                return out.append("\n(truncated to ").append(MAX_ROWS).append(" rows)").toString();
             }
             StringBuilder row = new StringBuilder("|");
             for (int i = 1; i <= columns; i++) {
@@ -179,14 +182,14 @@ public class DatabaseTool implements Tool {
             }
             row.append('\n');
             if (out.length() + row.length() > MAX_ANSWER_CHARS) {
-                return out.append("(truncated after ").append(rows).append(rows == 1 ? " row" : " rows")
+                return out.append("\n(truncated after ").append(rows).append(rows == 1 ? " row" : " rows")
                         .append(" at ").append(String.format(Locale.ROOT, "%,d", MAX_ANSWER_CHARS)).append(" characters)")
                         .toString();
             }
             out.append(row);
             rows++;
         }
-        return out.append('(').append(rows).append(rows == 1 ? " row)" : " rows)").toString();
+        return out.append("\n(").append(rows).append(rows == 1 ? " row)" : " rows)").toString();
     }
 
     /**

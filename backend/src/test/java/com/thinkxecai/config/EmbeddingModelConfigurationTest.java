@@ -15,10 +15,12 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.web.client.ResourceAccessException;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.net.http.HttpTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
@@ -26,6 +28,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Executors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -107,6 +110,23 @@ class EmbeddingModelConfigurationTest {
         assertThat(Duration.between(start, Instant.now())).isLessThan(Duration.ofMillis(3_000));
     }
 
+    /**
+     * What the error handler relies on to answer 503 "did not answer in time" (ADR 057): the real client's
+     * read timeout arrives as a {@link ResourceAccessException} caused by an {@link HttpTimeoutException}.
+     */
+    @Test
+    void aHangingOllamaFailsAsAResourceAccessTimeout() {
+        assertThatThrownBy(() -> embeddingModel.embed(SLOW_INPUT))
+                .isInstanceOf(ResourceAccessException.class)
+                .hasRootCauseInstanceOf(HttpTimeoutException.class);
+    }
+
+    /** An error reply is an answer: it stays a generic 500. */
+    @Test
+    void anOllamaErrorReplyIsNotAResourceAccessFailure() {
+        assertThatThrownBy(() -> embeddingModel.embed(FAILING_INPUT)).isNotInstanceOf(ResourceAccessException.class);
+    }
+
     private static void sleep(Duration duration) {
         try {
             Thread.sleep(duration);
@@ -119,6 +139,8 @@ class EmbeddingModelConfigurationTest {
         try {
             HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
             server.createContext("/", EmbeddingModelConfigurationTest::answer);
+            // A request that timed out keeps its handler sleeping; the next test must not wait behind it.
+            server.setExecutor(Executors.newCachedThreadPool());
             server.start();
             return server;
         } catch (IOException e) {

@@ -1,6 +1,7 @@
 // Compile-time checks, run by `npm run typecheck` (never imported, so never bundled). They pin the
 // types derived from schema.d.ts, so a broken helper cannot silently turn them into `never` or `any`.
 import type {
+  AGENT_MODELS,
   Agent,
   AgentModel,
   ChatMessage,
@@ -35,6 +36,8 @@ export type ApiTypeChecks = [
   Expect<Equal<ToolType, 'FIXED' | 'OPTIONAL'>>,
   Expect<Equal<keyof ToolVO, 'name' | 'description' | 'type'>>,
   Expect<Equal<AgentModel, 'deepseek-chat' | 'gemini-3.8-flash' | 'qwen3.8-flash'>>,
+  // A model added to the backend fails here until the picker lists it.
+  Expect<Equal<(typeof AGENT_MODELS)[number], AgentModel>>,
   Expect<Equal<Agent['id'], string>>,
   Expect<Equal<Agent['description'], string | null>>,
   Expect<Equal<ChatMessage['metadata'], ChatMessageMetadata | null>>,

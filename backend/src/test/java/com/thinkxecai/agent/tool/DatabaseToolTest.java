@@ -66,9 +66,9 @@ class DatabaseToolTest extends MapperTestSupport {
     @Test
     void rowsAreFormattedAsATableWithNullsPipesAndLineBreaksKeptInTheirCell() {
         assertThat(tool.databaseQuery("SELECT 1 AS n, NULL AS empty, 'a|b' AS pipe, E'x\\ny' AS lines"))
-                .isEqualTo("| n | empty | pipe | lines |\n| --- | --- | --- | --- |\n| 1 | NULL | a\\|b | x y |\n(1 row)");
+                .isEqualTo("| n | empty | pipe | lines |\n| --- | --- | --- | --- |\n| 1 | NULL | a\\|b | x y |\n\n(1 row)");
         assertThat(tool.databaseQuery("SELECT k FROM database_tool_probe WHERE false"))
-                .isEqualTo("| k |\n| --- |\n(0 rows)");
+                .isEqualTo("| k |\n| --- |\n\n(0 rows)");
     }
 
     @Test
@@ -198,8 +198,8 @@ class DatabaseToolTest extends MapperTestSupport {
         String full = tool.databaseQuery("SELECT generate_series(1, 200) AS n");
 
         assertThat(truncated.lines().filter(line -> line.matches("\\| \\d+ \\|"))).hasSize(200);
-        assertThat(truncated).endsWith("| 200 |\n(truncated to 200 rows)");
-        assertThat(full).endsWith("| 200 |\n(200 rows)");
+        assertThat(truncated).endsWith("| 200 |\n\n(truncated to 200 rows)");
+        assertThat(full).endsWith("| 200 |\n\n(200 rows)");
     }
 
     @Test
@@ -209,7 +209,7 @@ class DatabaseToolTest extends MapperTestSupport {
 
         assertThat(longValue).contains("| " + "x".repeat(1_000) + "… (5000 characters, shortened) |").endsWith("(1 row)");
         assertThat(longAnswer).hasSizeLessThanOrEqualTo(20_000 + 60)
-                .contains("(truncated after ")
+                .contains("|\n\n(truncated after ")
                 .endsWith(" rows at 20,000 characters)");
     }
 
