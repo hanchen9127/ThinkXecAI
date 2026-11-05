@@ -7,13 +7,14 @@ import { useAgents } from '../../hooks/useAgents'
 import { useChatMessages } from '../../hooks/useChatMessages'
 import { useChatSessions } from '../../hooks/useChatSessions'
 import { useChatStream } from '../../hooks/useChatStream'
+import { useFollowLatest } from '../../hooks/useFollowLatest'
 import { newestMessage, useWorking } from '../../hooks/useWorking'
 import { COLUMN } from '../../layout/column'
 import { cx } from '../../utils/cx'
 import { errorMessage } from '../../utils/text'
 import AgentRun from '../chat/AgentRun'
 import Composer from '../chat/Composer'
-import { type HistoryItem, chatTitle, groupHistory, titleFrom } from '../chat/messages'
+import { type HistoryItem, chatTitle, groupHistory, isNotice, titleFrom } from '../chat/messages'
 
 /** `/`, `/chat` (a new chat, `?agent=<id>` chooses its agent), and `/chat/:chatSessionId`. */
 export default function AgentChatView() {
@@ -135,6 +136,7 @@ function Chat({ sessionId }: { sessionId: string }) {
   if (stopping && !working) setStopping(false)
 
   const session = chatSessions.chatSessions.find((s) => s.id === sessionId)
+  const follow = useFollowLatest(`${session !== undefined}:${messages.length}:${working}`)
   const stream = useChatStream(
     sessionId,
     {
@@ -177,6 +179,7 @@ function Chat({ sessionId }: { sessionId: string }) {
 
   async function submit(content: string) {
     setSendError(undefined)
+    follow()
     try {
       await send(content)
       chatSessions.reload()
@@ -201,13 +204,19 @@ function Chat({ sessionId }: { sessionId: string }) {
 
   /**
    * Try again for the run after `before`: sends that question again as a new message (ADR 060); a
-   * failure shows like any send. None when the chat cannot continue.
+   * failure shows like any send. None when the chat cannot continue. Only the latest stopped or
+   * failed run has it: queued runs' notices all come after the last question, so an earlier
+   * notice cannot tell which question it belongs to.
    */
   function retryFor(before: HistoryItem | undefined) {
     const question = before?.kind === 'user' ? before.message.content : null
     if (agentGone || !question) return undefined
     return () => void submit(question).catch(() => undefined)
   }
+
+  const latestNotice = history.findLast(
+    (item) => item.kind === 'agent' && item.answers.some((answer) => isNotice(answer.content)),
+  )
 
   return (
     <>
@@ -292,7 +301,7 @@ function Chat({ sessionId }: { sessionId: string }) {
               ms={item.ms}
               working={working && i === history.length - 1}
               since={since}
-              onRetry={retryFor(history[i - 1])}
+              onRetry={item === latestNotice ? retryFor(history[i - 1]) : undefined}
             />
           ),
         )}

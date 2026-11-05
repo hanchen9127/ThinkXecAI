@@ -405,4 +405,31 @@ describe('the working indicator', () => {
     ).toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: 'Try again' })).toHaveLength(1)
   })
+
+  it('offers Try again once, after the last notice of the latest stopped run', async () => {
+    const stopped = (id: string, ago: number) => ({
+      ...recent(id, 'assistant', ago),
+      content: 'Stopped.',
+    })
+    backend({
+      'GET /chat-messages/session/s1': () => [
+        recent('m1', 'user', 60_000),
+        stopped('m2', 50_000),
+        recent('m3', 'user', 40_000),
+        recent('m4', 'user', 30_000),
+        stopped('m5', 20_000),
+        stopped('m6', 10_000),
+      ],
+    })
+    renderApp('/chat/s1')
+
+    await waitFor(() => expect(screen.getAllByText('Stopped.')).toHaveLength(3))
+    const retry = screen.getAllByRole('button', { name: 'Try again' })
+    expect(retry).toHaveLength(1)
+    expect(retry[0].parentElement).toHaveTextContent('Stopped.')
+    expect(retry[0].closest('article')?.querySelectorAll('button')).toHaveLength(1)
+    expect(screen.getAllByText('Stopped.').at(-1)?.parentElement?.parentElement).toContainElement(
+      retry[0],
+    )
+  })
 })

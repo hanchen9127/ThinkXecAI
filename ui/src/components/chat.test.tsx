@@ -1,6 +1,6 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { type ApiCall, deferred, fakeApi } from '../test/fakeApi'
 import { renderApp } from '../test/renderApp'
 
@@ -290,6 +290,30 @@ describe('a chat', () => {
       expect(api.calls.filter((c) => c.path === '/chat-sessions')).toHaveLength(2),
     )
     expect(screen.getByRole('textbox', { name: 'Message' })).toHaveValue('')
+  })
+
+  it('follows the chat again once a message is sent from higher up the page', async () => {
+    const scrollTo = vi.fn()
+    vi.stubGlobal('scrollTo', scrollTo)
+    vi.spyOn(document.documentElement, 'scrollHeight', 'get').mockReturnValue(2000)
+    backend({
+      'POST /chat-messages': ({ body }) => ({ ...msg('user', null), ...(body as object) }),
+    })
+    renderApp('/chat/s1')
+    const box = await screen.findByRole('textbox', { name: 'Message' })
+    await waitFor(() => expect(scrollTo).toHaveBeenCalled())
+
+    window.scrollY = 1500
+    fireEvent.scroll(window)
+    window.scrollY = 900
+    fireEvent.scroll(window)
+    scrollTo.mockClear()
+
+    await userEvent.type(box, 'Email it.{Enter}')
+    await waitFor(() => expect(scrollTo).toHaveBeenCalledWith(0, 2000))
+    window.scrollY = 0
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
   })
 
   it('keeps the message box on screen while the page scrolls', async () => {

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ChatMessage } from '../api/api'
+import { endsRun } from '../components/chat/messages'
 import { parseApiTimestamp } from '../utils/time'
 
 /**
@@ -7,9 +8,6 @@ import { parseApiTimestamp } from '../utils/time'
  * is taken to have died without a notice (a backend restart), D4.
  */
 export const WORKING_TIMEOUT_MS = 7 * 60 * 1000
-
-/** The tool that ends a run when called in a reply with text (ADR 045). */
-const TERMINATE = 'terminate'
 
 /**
  * Whether the agent still owes a reply after `last`, the newest of `messages` (D4): a user message,
@@ -33,12 +31,6 @@ function callerOf(result: ChatMessage, messages: ChatMessage[]) {
     if (!caller || time(message) >= time(caller)) caller = message
   }
   return caller
-}
-
-function endsRun(reply: ChatMessage | undefined) {
-  return (
-    !!reply?.content?.trim() && !!reply.metadata?.toolCalls?.some((call) => call.name === TERMINATE)
-  )
 }
 
 /**

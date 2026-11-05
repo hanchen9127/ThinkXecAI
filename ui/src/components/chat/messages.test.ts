@@ -30,6 +30,47 @@ const call = (id: string, name: string, args = '{}') => ({
 const result = (id: string, name: string, data: string) =>
   message('tool', null, { toolResponse: { id, name, responseData: data } })
 
+describe('groupHistory with terminate', () => {
+  const ask = () => message('user', 'Count the products.')
+  const reply = (text: string | null, ...calls: ReturnType<typeof call>[]) =>
+    message('assistant', text, { toolCalls: calls })
+
+  it('makes a reply with text that called terminate the answer, with no step for it', () => {
+    const question = ask()
+    const query = reply(null, call('c1', 'databaseQuery'))
+    const end = reply('There are 20.', call('c2', 'terminate'))
+    const [, run] = groupHistory([
+      question,
+      query,
+      result('c1', 'databaseQuery', '"20"'),
+      end,
+      result('c2', 'terminate', '"Done"'),
+    ])
+
+    expect(run).toMatchObject({ kind: 'agent', answers: [{ id: end.id }] })
+    expect(run.kind === 'agent' && run.steps.map((step) => step.id)).toEqual([query.id])
+  })
+
+  it('keeps the other tools of that reply as a step, without its text as a thought', () => {
+    const question = ask()
+    const end = reply('Sent.', call('c1', 'sendEmail'), call('c2', 'terminate'))
+    const [, run] = groupHistory([question, end])
+
+    expect(run).toMatchObject({ answers: [{ id: end.id }] })
+    expect(run.kind === 'agent' && run.steps).toMatchObject([
+      { think: null, calls: [{ call: { name: 'sendEmail' } }] },
+    ])
+  })
+
+  it('keeps terminate without text as a step: it is refused and the run goes on', () => {
+    const question = ask()
+    const refused = reply(null, call('c1', 'terminate'))
+    const [, run] = groupHistory([question, refused])
+
+    expect(run).toMatchObject({ answers: [], steps: [{ id: refused.id }] })
+  })
+})
+
 describe('groupHistory', () => {
   it('puts everything between two user messages into one run of steps and answers', () => {
     clock = 0

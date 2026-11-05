@@ -53,6 +53,7 @@ export default function AgentRun({
   )
   const fresh = (key: string) => !initial.has(key)
   const folded = answers.length > 0 && !working
+  const lastNotice = answers.findLast((answer) => isNotice(answer.content))
   const tools = [...new Set(steps.flatMap((step) => step.calls.map(({ call }) => call.name)))]
 
   return (
@@ -113,7 +114,7 @@ export default function AgentRun({
         </div>
       )}
       {answers.map((answer) =>
-        onRetry && isNotice(answer.content) ? (
+        onRetry && answer === lastNotice ? (
           <div key={answer.id} className="flex flex-wrap items-baseline gap-2.5">
             <Markdown text={answer.content ?? ''} className="text-base" />
             <button

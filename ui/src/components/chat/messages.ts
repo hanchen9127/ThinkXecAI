@@ -36,6 +36,16 @@ export type HistoryItem =
  * attach by call id), the others are answers or notices (ADR 043). `system` messages are not shown.
  * Times come from consecutive messages' creation times (ADR 059).
  */
+/** The tool that ends a run when called in a reply with text (ADR 045). */
+const TERMINATE = 'terminate'
+
+/** A reply with text that called `terminate`: the run ends with it, and its text is the answer. */
+export function endsRun(reply: ChatMessage | undefined) {
+  return (
+    !!reply?.content?.trim() && !!reply.metadata?.toolCalls?.some((call) => call.name === TERMINATE)
+  )
+}
+
 export function groupHistory(messages: ChatMessage[]): HistoryItem[] {
   const ordered = [...messages].sort(
     (a, b) => parseApiTimestamp(a.createdAt).getTime() - parseApiTimestamp(b.createdAt).getTime(),
@@ -66,17 +76,21 @@ export function groupHistory(messages: ChatMessage[]): HistoryItem[] {
     }
     const at = time(message)
     const toolCalls = message.metadata?.toolCalls ?? []
-    if (toolCalls.length > 0) {
+    const last = endsRun(message)
+    // `terminate` only closes the run; any other tool called with it is still a step.
+    const calls = last ? toolCalls.filter((call) => call.name !== TERMINATE) : toolCalls
+    if (calls.length > 0) {
       run.steps.push({
         id: message.id,
-        think: message.content?.trim() ? message.content : null,
+        think: !last && message.content?.trim() ? message.content : null,
         thinkMs: previous === undefined ? undefined : at - previous,
-        calls: toolCalls.map((call) => {
+        calls: calls.map((call) => {
           const result = results.get(call.id)
           return { call, result: result?.data, ms: result && result.at - at }
         }),
       })
-    } else if (message.content?.trim()) {
+    }
+    if (last || (toolCalls.length === 0 && message.content?.trim())) {
       run.answers.push(message)
       run.ms = question === undefined ? undefined : at - question
     }
