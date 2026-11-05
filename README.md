@@ -47,6 +47,20 @@ token-by-token streaming, and document formats other than Markdown.
 | Embeddings| Local Ollama, model `bge-m3`, 1024-dim vectors                              |
 | Frontend  | React 19, TypeScript, Vite 8, React Router 8, Tailwind CSS, Ant Design + `@ant-design/x-markdown` |
 | Realtime  | Server-Sent Events (SSE), one connection per chat session                   |
+## Run Everything in Docker
+
+The database, backend, and frontend can all run in Docker. Ollama stays on your machine, so start it
+first, and fill in `.env` (see Getting Started). Stop any backend or frontend running on the host: the
+containers use the same ports.
+
+```bash
+docker compose --profile app up -d --build
+```
+
+Then open http://localhost:5173. After changing the code, run the same command again; for daily
+work, the host setup below has hot reload. `docker compose --profile app down` stops it all and
+keeps the data. A plain `docker compose up` starts only PostgreSQL.
+
 ## Project Status
 
 This project is being built phase by phase. Current status:
