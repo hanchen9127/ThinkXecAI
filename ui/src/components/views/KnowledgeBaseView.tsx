@@ -1,20 +1,23 @@
 import { CloseOutlined, UploadOutlined } from '@ant-design/icons'
 import { Button, Spin, Upload } from 'antd'
-import { Fragment, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo } from 'react'
 import { Link, useParams } from 'react-router'
 import type { Agent, KnowledgeBase } from '../../api/api'
 import { path } from '../../api/http'
+import type { UploadRow } from '../../contexts/knowledgeBasesContext'
 import { useAgents } from '../../hooks/useAgents'
 import { useDocuments } from '../../hooks/useDocuments'
 import { useKnowledgeBaseDialogs } from '../../hooks/useKnowledgeBaseDialogs'
 import { useKnowledgeBases } from '../../hooks/useKnowledgeBases'
 import { useUndoableDelete } from '../../hooks/useUndoableDelete'
+import { COLUMN } from '../../layout/column'
+import { cx } from '../../utils/cx'
 import { parseApiTimestamp } from '../../utils/time'
 import { countLabel, errorMessage } from '../../utils/text'
 import DeleteFeedback from '../DeleteFeedback'
 import DeleteMenu from '../DeleteMenu'
 import DocumentRow from '../knowledgeBases/DocumentRow'
-import { agentsUsing, fileProblem } from '../knowledgeBases/knowledgeBases'
+import { agentsUsing } from '../knowledgeBases/knowledgeBases'
 
 /** `/knowledge-base` and `/knowledge-base/:knowledgeBaseId`. */
 export default function KnowledgeBaseView() {
@@ -23,7 +26,7 @@ export default function KnowledgeBaseView() {
 
   if (!knowledgeBaseId) {
     return (
-      <div className="flex flex-col gap-2 px-12 py-9">
+      <div className={cx(COLUMN, 'flex flex-col gap-2 py-9')}>
         <h1 className="m-0 text-xl font-semibold">Knowledge bases</h1>
         <p className="m-0 text-muted">
           Choose a knowledge base from the list to see its documents, or create one with New.
@@ -35,7 +38,7 @@ export default function KnowledgeBaseView() {
   const knowledgeBase = knowledgeBases.find((kb) => kb.id === knowledgeBaseId)
   if (!knowledgeBase) {
     return (
-      <div className="flex flex-col gap-3 px-12 py-9">
+      <div className={cx(COLUMN, 'flex flex-col gap-3 py-9')}>
         {loading ? (
           <p className="m-0 text-muted">Loading the knowledge base…</p>
         ) : error !== undefined ? (
@@ -54,27 +57,16 @@ export default function KnowledgeBaseView() {
       </div>
     )
   }
-  // A new page per knowledge base: uploads, renames, and a waiting delete belong to one.
+  // A new page per knowledge base: renames and a waiting delete belong to one.
   return <KnowledgeBasePage key={knowledgeBase.id} knowledgeBase={knowledgeBase} />
-}
-
-interface UploadRow {
-  key: number
-  name: string
-  /** Set once the server has stored it; the row stays until the list shows the document. */
-  documentId?: string
-  problem?: string
 }
 
 function KnowledgeBasePage({ knowledgeBase }: { knowledgeBase: KnowledgeBase }) {
   const { openEdit, openDelete, dialogs } = useKnowledgeBaseDialogs()
   const users = agentsUsing(useAgents().agents, knowledgeBase.id)
-  const { documents, loading, error, reload, upload, update, remove } = useDocuments(
-    knowledgeBase.id,
-  )
+  const { documents, loading, error, reload, update, remove } = useDocuments(knowledgeBase.id)
+  const { uploads, startUpload, dropUpload } = useKnowledgeBases()
   const deletes = useUndoableDelete(remove)
-  const [uploads, setUploads] = useState<UploadRow[]>([])
-  const nextKey = useRef(0)
 
   // Newest upload first; the backend orders by last change, which a rename would move. A deleted
   // document stays listed while its row folds away (ADR 061).
@@ -88,50 +80,47 @@ function KnowledgeBasePage({ knowledgeBase }: { knowledgeBase: KnowledgeBase }) 
   )
   const shown = listedDocuments.filter((document) => !deletes.hidden.has(document.id))
   const listed = new Set(documents.map((document) => document.id))
-  const rows = uploads.filter((row) => !(row.documentId && listed.has(row.documentId)))
+  const own = uploads.filter((row) => row.kbId === knowledgeBase.id)
+  const isListed = (row: UploadRow) => row.documentId !== undefined && listed.has(row.documentId)
+  const rows = own.filter((row) => !isListed(row))
+
+  // An upload can finish after this page loaded, even one started before it opened.
+  const stored = rows.flatMap((row) => row.documentId ?? []).join()
+  useEffect(() => {
+    if (stored) reload()
+  }, [stored, reload])
+
   // A finished row leaves for good once the list shows its document; kept, it would come back as
   // "indexing" when that document is deleted.
-  if (rows.length !== uploads.length) setUploads(rows)
-
-  function start(file: File) {
-    const key = nextKey.current++
-    const problem = fileProblem(file)
-    setUploads((current) => [{ key, name: file.name, problem: problem ?? undefined }, ...current])
-    if (problem) return
-    upload(file).then(
-      (document) => setRow(key, { documentId: document.id }),
-      (failure: unknown) => setRow(key, { problem: errorMessage(failure) }),
-    )
-  }
-  function setRow(key: number, patch: Partial<UploadRow>) {
-    setUploads((current) => current.map((row) => (row.key === key ? { ...row, ...patch } : row)))
-  }
-  const dismiss = (key: number) => setUploads((current) => current.filter((row) => row.key !== key))
+  const finished = own.filter(isListed).map((row) => row.key)
+  useEffect(() => finished.forEach(dropUpload))
 
   return (
     <>
-      <header className="flex flex-wrap items-start justify-between gap-4 border-b border-line bg-surface px-12 pt-6 pb-5">
-        <div className="min-w-0">
-          <h1 className="m-0 text-xl font-semibold">{knowledgeBase.name}</h1>
-          {knowledgeBase.description && (
-            <p className="m-0 mt-0.5 text-sm text-muted">{knowledgeBase.description}</p>
-          )}
-          <UsedBy agents={users} />
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button onClick={() => openEdit(knowledgeBase)}>Edit</Button>
-          <DeleteMenu onDelete={() => openDelete(knowledgeBase)} />
+      <header className="border-b border-line bg-surface">
+        <div className={cx(COLUMN, 'flex flex-wrap items-start justify-between gap-4 pt-6 pb-5')}>
+          <div className="min-w-0">
+            <h1 className="m-0 text-xl font-semibold">{knowledgeBase.name}</h1>
+            {knowledgeBase.description && (
+              <p className="m-0 mt-0.5 text-sm text-muted">{knowledgeBase.description}</p>
+            )}
+            <UsedBy agents={users} />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={() => openEdit(knowledgeBase)}>Edit</Button>
+            <DeleteMenu onDelete={() => openDelete(knowledgeBase)} />
+          </div>
         </div>
       </header>
       {dialogs}
 
-      <div className="box-border flex w-full max-w-220 flex-col gap-6 px-12 py-8">
+      <div className={cx(COLUMN, 'flex flex-col gap-6 py-8')}>
         <Upload.Dragger
           accept=".md,.markdown"
           multiple={false}
           showUploadList={false}
           beforeUpload={(file) => {
-            start(file)
+            startUpload(knowledgeBase.id, file)
             return Upload.LIST_IGNORE
           }}
         >
@@ -161,7 +150,7 @@ function KnowledgeBasePage({ knowledgeBase }: { knowledgeBase: KnowledgeBase }) 
           {(rows.length > 0 || listedDocuments.length > 0) && (
             <ul className="m-0 list-none border-t border-hairline p-0">
               {rows.map((row) => (
-                <UploadItem key={row.key} row={row} onDismiss={() => dismiss(row.key)} />
+                <UploadItem key={row.key} row={row} onDismiss={() => dropUpload(row.key)} />
               ))}
               {listedDocuments.map((document) => (
                 <DocumentRow

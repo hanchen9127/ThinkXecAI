@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+import css from '../index.css?raw'
 import Expandable from './Expandable'
 
 function view(open: boolean) {
@@ -29,5 +30,16 @@ describe('Expandable', () => {
     expect(root).toHaveAttribute('inert')
     expect(screen.getByText('Inside')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Inside' })).toBeNull()
+  })
+
+  it('never grows wider than its parent', () => {
+    expect(css).toMatch(/\.expandable \{[^}]*grid-template-columns: minmax\(0, 1fr\)/)
+  })
+
+  it('shows nothing of its content once closed', () => {
+    const rules = [...css.matchAll(/([^{}]+)\{([^{}]*overflow-clip-margin[^{}]*)\}/g)]
+    expect(rules.map((rule) => rule[1].replace(/\/\*[^]*\*\//, '').trim())).toEqual([
+      '.expandable[data-open] > div',
+    ])
   })
 })

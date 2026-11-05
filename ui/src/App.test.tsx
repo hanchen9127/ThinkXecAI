@@ -23,6 +23,26 @@ function currentSection() {
   )
 }
 
+describe('moving between pages', () => {
+  const entering = () => document.querySelector('main > [data-entering]')
+
+  it('moves nothing on the first page, then fades in each page the user opens', async () => {
+    renderAt('/agent')
+    await screen.findByRole('heading', { level: 1, name: 'Agents' })
+    expect(entering()).toBeNull()
+
+    await userEvent.click(screen.getByRole('link', { name: 'Knowledge bases' }))
+    await screen.findByRole('heading', { level: 1, name: 'Knowledge bases' })
+    expect(entering()).not.toBeNull()
+  })
+
+  it('puts every page in the centred column', async () => {
+    renderAt('/agent')
+    const heading = await screen.findByRole('heading', { level: 1, name: 'Agents' })
+    expect(heading.parentElement).toHaveClass('mx-auto', 'max-w-230')
+  })
+})
+
 describe('routes', () => {
   it.each([
     ['/', 'New chat', 'Chats'],

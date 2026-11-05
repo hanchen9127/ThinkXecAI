@@ -123,23 +123,6 @@ describe('useDocuments', () => {
     expect(api.calls[0].path).toBe('/documents/kb/k%201')
   })
 
-  it('uploads a file to its knowledge base and reloads the list', async () => {
-    const api = fakeApi({
-      'GET /documents/kb/k1': [],
-      'POST /documents/upload': { id: 'd1', name: 'returns.md' },
-    })
-    const { result } = renderHook(() => useDocuments('k1'))
-    await waitFor(() => expect(result.current.loading).toBe(false))
-    const file = new File(['# Returns'], 'returns.md', { type: 'text/markdown' })
-
-    await act(() => result.current.upload(file))
-
-    const form = api.calls.find((c) => c.method === 'POST')?.body as FormData
-    expect(form.get('kbId')).toBe('k1')
-    expect((form.get('file') as File).name).toBe('returns.md')
-    await waitFor(() => expect(count(api.calls, 'GET', '/documents/kb/k1')).toBe(2))
-  })
-
   it('never shows the previous knowledge base after switching', async () => {
     const slow = deferred<unknown>()
     fakeApi({

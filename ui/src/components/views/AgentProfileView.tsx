@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router'
 import { useAgentDialogs } from '../../hooks/useAgentDialogs'
 import { useAgents } from '../../hooks/useAgents'
 import { useKnowledgeBaseNames } from '../../hooks/useKnowledgeBaseNames'
+import { COLUMN } from '../../layout/column'
 import { cx } from '../../utils/cx'
 import { formatApiTimestamp } from '../../utils/time'
 import { errorMessage } from '../../utils/text'
@@ -20,7 +21,7 @@ export default function AgentProfileView() {
 
   if (!agent) {
     return (
-      <div className="flex flex-col gap-3 px-12 py-9">
+      <div className={cx(COLUMN, 'flex flex-col gap-3 py-9')}>
         {loading ? (
           <p className="m-0 text-muted">Loading the agent…</p>
         ) : error !== undefined ? (
@@ -43,27 +44,29 @@ export default function AgentProfileView() {
   const { chatOptions } = agent
   return (
     <>
-      <header className="flex flex-wrap items-start justify-between gap-4 border-b border-line bg-surface px-12 pt-6 pb-5">
-        <div className="min-w-0">
-          <h1 className="m-0 text-xl font-semibold">{agent.name}</h1>
-          {agent.description && (
-            <p className="m-0 mt-0.5 text-sm text-muted">{agent.description}</p>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button onClick={() => openEdit(agent)}>Edit</Button>
-          <Link
-            to={`/chat?${new URLSearchParams({ agent: agent.id })}`}
-            className="flex h-8 items-center rounded-ui bg-ink px-4 text-sm font-semibold text-white no-underline hover:bg-ink/85"
-          >
-            Start chat
-          </Link>
-          <DeleteMenu onDelete={() => openDelete(agent)} />
+      <header className="border-b border-line bg-surface">
+        <div className={cx(COLUMN, 'flex flex-wrap items-start justify-between gap-4 pt-6 pb-5')}>
+          <div className="min-w-0">
+            <h1 className="m-0 text-xl font-semibold">{agent.name}</h1>
+            {agent.description && (
+              <p className="m-0 mt-0.5 text-sm text-muted">{agent.description}</p>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={() => openEdit(agent)}>Edit</Button>
+            <Link
+              to={`/chat?${new URLSearchParams({ agent: agent.id })}`}
+              className="flex h-8 items-center rounded-ui bg-ink px-4 text-sm font-semibold text-white no-underline hover:bg-ink/85"
+            >
+              Start chat
+            </Link>
+            <DeleteMenu onDelete={() => openDelete(agent)} />
+          </div>
         </div>
       </header>
       {dialogs}
 
-      <section aria-label="Setup" className="box-border w-full max-w-220 px-12 py-8">
+      <section aria-label="Setup" className={cx(COLUMN, 'py-8')}>
         <dl className="m-0 rounded-ui border border-line bg-surface px-7 py-1">
           <Row term="Model">
             <span className="font-mono text-xs text-muted">{agent.model}</span>

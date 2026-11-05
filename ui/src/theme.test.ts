@@ -25,6 +25,11 @@ describe('palette', () => {
     })
   })
 
+  it('marks a selected option with the stone ground, not a grey from the ink primary', () => {
+    expect(theme.token?.controlItemBgActive).toBe(palette.ground)
+    expect(theme.token?.controlItemBgActiveHover).toBe(palette.ground)
+  })
+
   it('declares no color in index.css that theme.ts lacks', () => {
     const declared = [...css.matchAll(/--color-([a-z-]+):/g)].map((m) => m[1])
     expect(declared.sort()).toEqual(Object.keys(palette).map(kebab).sort())

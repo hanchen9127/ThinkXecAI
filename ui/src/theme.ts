@@ -49,6 +49,10 @@ export const theme: ThemeConfig = {
     colorBorderSecondary: palette.hairline,
     colorBgLayout: palette.ground,
     colorBgContainer: palette.surface,
+    // The selected row of selects and menus, which would derive a grey from the ink primary. It
+    // keeps the colour while active too: a select opens with its selected row active.
+    controlItemBgActive: palette.ground,
+    controlItemBgActiveHover: palette.ground,
     borderRadius: radius,
     fontSize: 14,
     fontFamily: "'Instrument Sans', system-ui, sans-serif",

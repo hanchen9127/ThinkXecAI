@@ -132,6 +132,18 @@ describe('a new chat', () => {
       ['/chat-sessions', { agentId: 'a1', title: 'Which phones are out of stock?' }],
       ['/chat-messages', { sessionId: 's9', content: 'Which phones are out of stock?' }],
     ])
+    // The new chat becoming its session is not a move to another page (ADR 061).
+    expect(document.querySelector('[data-entering]')).toBeNull()
+  })
+
+  it('marks the chosen agent with a check', async () => {
+    backend()
+    renderApp('/chat')
+
+    await userEvent.click(await screen.findByRole('combobox', { name: 'Agent' }))
+    const selected = document.querySelector('.ant-select-item-option-selected')
+    expect(selected).toHaveTextContent('Store analyst')
+    expect(selected?.querySelector('.anticon-check')).not.toBeNull()
   })
 
   it('starts with the agent named in the address, and can change it', async () => {
@@ -278,6 +290,14 @@ describe('a chat', () => {
       expect(api.calls.filter((c) => c.path === '/chat-sessions')).toHaveLength(2),
     )
     expect(screen.getByRole('textbox', { name: 'Message' })).toHaveValue('')
+  })
+
+  it('keeps the message box on screen while the page scrolls', async () => {
+    backend()
+    renderApp('/chat/s1')
+
+    const box = await screen.findByRole('textbox', { name: 'Message' })
+    expect(box.closest('.sticky.bottom-0')).not.toBeNull()
   })
 
   it('says a chat whose agent was deleted can be read but not continued', async () => {

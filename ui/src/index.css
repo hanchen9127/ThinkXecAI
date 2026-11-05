@@ -49,9 +49,12 @@
 
 /* Expand and collapse (ADR 061, `Expandable`): the height eases between 0fr and 1fr. "slide" moves
    the content down 12px as it opens (results, steps); "fold" fades a row that leaves (a delete);
-   "rise" fades in the Undo bar from 8px below. A clip margin keeps focus rings inside visible. */
+   "rise" fades in the Undo bar from 8px below. While open, a clip margin keeps focus rings inside
+   visible; closed it would show 4px of the content's box. */
 .expandable {
   display: grid;
+  /* An auto column would grow to the longest word: `overflow: clip` keeps the content's minimum. */
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: 0fr;
   transition-property: grid-template-rows, opacity;
   transition-duration: var(--default-transition-duration);
@@ -65,6 +68,9 @@
 .expandable > div {
   min-height: 0;
   overflow: clip;
+}
+
+.expandable[data-open] > div {
   overflow-clip-margin: 4px;
 }
 
@@ -109,6 +115,21 @@
   }
 }
 
+/* Moving to another page (ADR 061, M7): the content fades in, rising 8px. `AppRoutes` mounts it anew
+   for each page and marks it from the second page on, so nothing moves on page load. */
+[data-entering] {
+  transition-property: opacity, translate;
+  transition-duration: var(--default-transition-duration);
+  transition-timing-function: var(--default-transition-timing-function);
+}
+
+@starting-style {
+  [data-entering] {
+    opacity: 0;
+    translate: 0 8px;
+  }
+}
+
 /* Send turns into Stop (ADR 061): the icon's shape changes from a triangle to a square; both use
    four points so the clip path can ease between them. */
 .shape-icon {
@@ -147,6 +168,17 @@ body {
    table, nearer the cells than X Markdown's own on `.x-markdown`, whose stylesheet loads later. */
 .x-markdown table {
   --td-th-padding: 4px 10px;
+}
+
+/* Code and wide tables scroll inside their own box; they never widen the page. */
+.x-markdown pre,
+.x-markdown table {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.x-markdown table {
+  display: block;
 }
 
 .x-markdown th,

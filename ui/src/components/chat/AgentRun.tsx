@@ -57,58 +57,60 @@ export default function AgentRun({
 
   return (
     <article aria-label={agentName} className="flex flex-col gap-3">
-      {folded && rows.length > 0 && (
-        <div className="flex flex-wrap items-baseline gap-2.5 text-sm text-muted">
-          <span>
-            {countLabel(rows.length, 'step', 'steps')}
-            {ms !== undefined && ` in ${formatDuration(ms)}`}
-          </span>
-          {tools.map((tool) => (
-            <Tag key={tool} kind="tool">
-              {tool}
-            </Tag>
-          ))}
-          <button
-            type="button"
-            aria-expanded={expanded}
-            onClick={() => setExpanded(!expanded)}
-            className="cursor-pointer text-ink underline"
-          >
-            {expanded ? 'Hide steps' : 'Show steps'}
-          </button>
-        </div>
-      )}
       {(rows.length > 0 || working) && (
-        <Expandable open={!folded || expanded} motion="slide">
-          <ol aria-label="Agent steps" className="m-0 list-none p-0">
-            {rows.map((row, i) => (
-              <RailItem
-                key={row.key}
-                dot={row.kind === 'think' ? 'bg-think' : 'bg-execute'}
-                last={i === rows.length - 1 && !working}
-                fresh={fresh(row.key)}
-                grows={fresh(rows[i + 1]?.key ?? (working ? WAITING : ''))}
+        <div>
+          {folded && rows.length > 0 && (
+            <div className="flex flex-wrap items-baseline gap-2.5 text-sm text-muted">
+              <span>
+                {countLabel(rows.length, 'step', 'steps')}
+                {ms !== undefined && ` in ${formatDuration(ms)}`}
+              </span>
+              {tools.map((tool) => (
+                <Tag key={tool} kind="tool">
+                  {tool}
+                </Tag>
+              ))}
+              <button
+                type="button"
+                aria-expanded={expanded}
+                onClick={() => setExpanded(!expanded)}
+                className="cursor-pointer text-ink underline"
               >
-                {row.kind === 'think' ? (
-                  <>
-                    <StepLabel kind="Think" number={i + 1} ms={row.ms} />
-                    <Markdown text={row.text} />
-                  </>
-                ) : (
-                  <>
-                    <StepLabel kind="Execute" number={i + 1} ms={row.toolCall.ms} />
-                    <Call toolCall={row.toolCall} />
-                  </>
-                )}
-              </RailItem>
-            ))}
-            {working && (
-              <RailItem dot="bg-line" last fresh={fresh(WAITING)} grows={false}>
-                <Waiting agentName={agentName} steps={rows.length} since={since} />
-              </RailItem>
-            )}
-          </ol>
-        </Expandable>
+                {expanded ? 'Hide steps' : 'Show steps'}
+              </button>
+            </div>
+          )}
+          <Expandable open={!folded || expanded} motion="slide" className={cx(folded && 'pt-3')}>
+            <ol aria-label="Agent steps" className="m-0 list-none p-0">
+              {rows.map((row, i) => (
+                <RailItem
+                  key={row.key}
+                  dot={row.kind === 'think' ? 'bg-think' : 'bg-execute'}
+                  last={i === rows.length - 1 && !working}
+                  fresh={fresh(row.key)}
+                  grows={fresh(rows[i + 1]?.key ?? (working ? WAITING : ''))}
+                >
+                  {row.kind === 'think' ? (
+                    <>
+                      <StepLabel kind="Think" number={i + 1} ms={row.ms} />
+                      <Markdown text={row.text} />
+                    </>
+                  ) : (
+                    <>
+                      <StepLabel kind="Execute" number={i + 1} ms={row.toolCall.ms} />
+                      <Call toolCall={row.toolCall} />
+                    </>
+                  )}
+                </RailItem>
+              ))}
+              {working && (
+                <RailItem dot="bg-line" last fresh={fresh(WAITING)} grows={false}>
+                  <Waiting agentName={agentName} steps={rows.length} since={since} />
+                </RailItem>
+              )}
+            </ol>
+          </Expandable>
+        </div>
       )}
       {answers.map((answer) =>
         onRetry && isNotice(answer.content) ? (
@@ -242,11 +244,12 @@ function Call({ toolCall }: { toolCall: ToolCall }) {
   const { call, result } = toolCall
   const decoded = result === undefined ? undefined : decodeToolResult(result)
 
+  // One block, with the space above the result inside it: closed, a gap in the step would remain.
   return (
-    <>
+    <div>
       <div className="flex flex-wrap items-baseline gap-2">
         <Tag kind="tool">{call.name}</Tag>
-        <span className="min-w-0 text-sm break-words text-muted">
+        <span className="min-w-0 text-sm wrap-anywhere text-muted">
           {result === undefined ? 'No result yet' : summarizeResult(result)}
         </span>
         <button
@@ -259,19 +262,21 @@ function Call({ toolCall }: { toolCall: ToolCall }) {
           {open ? 'Hide' : 'Show'}
         </button>
       </div>
-      <Expandable open={open} motion="slide">
+      <Expandable open={open} motion="slide" className="pt-1">
         <div className="flex flex-col gap-2 rounded-ui border border-line bg-surface px-3 py-2.5">
-          <pre className="m-0 font-mono text-xs break-words whitespace-pre-wrap text-muted">
+          <pre className="m-0 font-mono text-xs wrap-anywhere whitespace-pre-wrap text-muted">
             {formatArguments(call.arguments)}
           </pre>
           {decoded !== undefined &&
             (decoded.kind === 'markdown' ? (
               <Markdown text={decoded.text} className="text-sm" />
             ) : (
-              <pre className="m-0 font-mono text-xs whitespace-pre-wrap">{decoded.text}</pre>
+              <pre className="m-0 font-mono text-xs wrap-anywhere whitespace-pre-wrap">
+                {decoded.text}
+              </pre>
             ))}
         </div>
       </Expandable>
-    </>
+    </div>
   )
 }

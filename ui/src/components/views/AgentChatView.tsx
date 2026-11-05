@@ -8,6 +8,8 @@ import { useChatMessages } from '../../hooks/useChatMessages'
 import { useChatSessions } from '../../hooks/useChatSessions'
 import { useChatStream } from '../../hooks/useChatStream'
 import { newestMessage, useWorking } from '../../hooks/useWorking'
+import { COLUMN } from '../../layout/column'
+import { cx } from '../../utils/cx'
 import { errorMessage } from '../../utils/text'
 import AgentRun from '../chat/AgentRun'
 import Composer from '../chat/Composer'
@@ -43,7 +45,7 @@ function NewChat() {
 
   if (!agent) {
     return (
-      <div className="flex flex-col gap-2 px-12 py-9">
+      <div className={cx(COLUMN, 'flex flex-col gap-2 py-9')}>
         {loading ? (
           <p className="m-0 text-muted">Loading agents…</p>
         ) : (
@@ -74,7 +76,7 @@ function NewChat() {
       const session = created.current
       await createChatMessage({ sessionId: session.id, content })
       chatSessions.reload()
-      navigate(path`/chat/${session.id}`)
+      navigate(path`/chat/${session.id}`, { state: { quiet: true } })
     } catch (error) {
       setSendError(error)
       throw error
@@ -84,11 +86,8 @@ function NewChat() {
   return (
     <>
       {leftDeleted && (
-        <div
-          role="status"
-          className="border-b border-line bg-surface px-12 py-2.5 text-sm text-muted"
-        >
-          The chat you had open was deleted.
+        <div role="status" className="border-b border-line bg-surface text-sm text-muted">
+          <div className={cx(COLUMN, 'py-2.5')}>The chat you had open was deleted.</div>
         </div>
       )}
       <div className="box-border flex flex-1 flex-col justify-center px-12 py-12">
@@ -150,7 +149,7 @@ function Chat({ sessionId }: { sessionId: string }) {
   )
   if (!session) {
     return (
-      <div className="flex flex-col gap-3 px-12 py-9">
+      <div className={cx(COLUMN, 'flex flex-col gap-3 py-9')}>
         {chatSessions.loading ? (
           <p className="m-0 text-muted">Loading the chat…</p>
         ) : chatSessions.error !== undefined ? (
@@ -212,57 +211,54 @@ function Chat({ sessionId }: { sessionId: string }) {
 
   return (
     <>
-      <header className="border-b border-line bg-surface px-12 pt-6 pb-5">
-        <h1 className="m-0 text-xl font-semibold break-words">{chatTitle(session)}</h1>
-        <p className="m-0 mt-0.5 text-sm text-muted">
-          {agent ? (
-            <>
-              {agent.name} on <span className="font-mono text-xs">{agent.model}</span>
-            </>
-          ) : agentGone ? (
-            'No agent'
-          ) : (
-            '…'
-          )}
-        </p>
+      <header className="border-b border-line bg-surface">
+        <div className={cx(COLUMN, 'pt-6 pb-5')}>
+          <h1 className="m-0 text-xl font-semibold break-words">{chatTitle(session)}</h1>
+          <p className="m-0 mt-0.5 text-sm text-muted">
+            {agent ? (
+              <>
+                {agent.name} on <span className="font-mono text-xs">{agent.model}</span>
+              </>
+            ) : agentGone ? (
+              'No agent'
+            ) : (
+              '…'
+            )}
+          </p>
+        </div>
       </header>
       {stream.status === 'stopped' && (
-        <div
-          role="alert"
-          className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-danger-wash px-12 py-2.5 text-sm text-danger"
-        >
-          <span>
-            Live replies stopped.
-            {stream.problem === undefined
-              ? ' Messages you send are still saved.'
-              : ` ${errorMessage(stream.problem)}`}
-          </span>
-          <Button
-            size="small"
-            onClick={() => {
-              stream.reconnect()
-            }}
-          >
-            Try again
-          </Button>
+        <div role="alert" className="border-b border-line bg-danger-wash text-sm text-danger">
+          <div className={cx(COLUMN, 'flex flex-wrap items-center justify-between gap-3 py-2.5')}>
+            <span>
+              Live replies stopped.
+              {stream.problem === undefined
+                ? ' Messages you send are still saved.'
+                : ` ${errorMessage(stream.problem)}`}
+            </span>
+            <Button
+              size="small"
+              onClick={() => {
+                stream.reconnect()
+              }}
+            >
+              Try again
+            </Button>
+          </div>
         </div>
       )}
       {agentGone && (
-        <div
-          role="status"
-          className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-surface px-12 py-2.5 text-sm text-ink"
-        >
-          <span>Its agent was deleted. You can read this chat but not continue it.</span>
-          <Link to="/chat" className="font-semibold text-ink underline">
-            New chat
-          </Link>
+        <div role="status" className="border-b border-line bg-surface text-sm text-ink">
+          <div className={cx(COLUMN, 'flex flex-wrap items-center justify-between gap-3 py-2.5')}>
+            <span>Its agent was deleted. You can read this chat but not continue it.</span>
+            <Link to="/chat" className="font-semibold text-ink underline">
+              New chat
+            </Link>
+          </div>
         </div>
       )}
 
-      <section
-        aria-label="Messages"
-        className="box-border flex w-full max-w-230 flex-1 flex-col gap-3 px-12 py-9"
-      >
+      <section aria-label="Messages" className={cx(COLUMN, 'flex flex-1 flex-col gap-3 py-9')}>
         {error !== undefined && (
           <div role="alert" className="flex flex-col items-start gap-2 text-muted">
             <p className="m-0">Couldn't load the messages. {errorMessage(error)}</p>
@@ -306,7 +302,8 @@ function Chat({ sessionId }: { sessionId: string }) {
         )}
       </section>
 
-      <div className="box-border flex w-full max-w-230 flex-col gap-3 px-12 pt-2 pb-9">
+      {/* Stays on screen while the steps above it are read (F3). */}
+      <div className={cx(COLUMN, 'sticky bottom-0 z-10 flex flex-col gap-3 bg-ground pt-2 pb-9')}>
         {sendError !== undefined && <Alert type="error" showIcon title={errorMessage(sendError)} />}
         {stream.status === 'replaced' ? (
           // Replies would only reach the other tab, so nothing is sent from here (V4 C4 C).

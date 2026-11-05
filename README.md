@@ -63,7 +63,7 @@ This project is being built phase by phase. Current status:
 - [x] Phase 10 — Chat model registry
 - [x] Phase 11 — Agent runtime (Think-Execute loop)
 - [x] Phase 12 — SSE (one stream per chat, handed over between tabs)
-- [ ] Phase 13 — Frontend features (built; end-to-end check and review pending)
+- [x] Phase 13 — Frontend features (agents, knowledge bases with upload, live chat)
 - [ ] Phase 14 — End-to-end verification
 
 The backend is complete: agents run the Think-Execute loop on the chosen model, use their tools
