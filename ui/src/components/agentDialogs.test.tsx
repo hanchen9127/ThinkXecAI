@@ -198,6 +198,19 @@ describe('editing an agent', () => {
 })
 
 describe('deleting an agent', () => {
+  it('puts the cursor in the name field of the delete dialog', async () => {
+    backend()
+    renderApp('/agent/a1')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'More actions' }))
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Delete Store analyst?' })
+    await waitFor(() =>
+      expect(within(dialog).getByLabelText('Type Store analyst to confirm')).toHaveFocus(),
+    )
+  })
+
   it('says what happens to its chats and asks for its name', async () => {
     backend()
     renderApp('/agent/a1')

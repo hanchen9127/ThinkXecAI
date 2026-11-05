@@ -29,7 +29,7 @@ export default function DeleteFeedback({
           <button
             type="button"
             onClick={deletes.undo}
-            className="cursor-pointer font-semibold text-white underline"
+            className="cursor-pointer font-semibold text-white underline focus-visible:outline-white"
           >
             Undo
           </button>

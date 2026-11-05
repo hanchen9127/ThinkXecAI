@@ -1,5 +1,5 @@
-import { Alert, Input, Modal } from 'antd'
-import { useMemo, useState } from 'react'
+import { Alert, Input, type InputRef, Modal } from 'antd'
+import { useMemo, useRef, useState } from 'react'
 import { type Agent, listChatSessionsByAgent } from '../../api/api'
 import { useRemoteData } from '../../hooks/useRemoteData'
 import { errorMessage } from '../../utils/text'
@@ -20,6 +20,7 @@ export default function DeleteAgentModal({
   const loadChats = useMemo(() => () => listChatSessionsByAgent(agent.id), [agent.id])
   const chats = useRemoteData(loadChats).data
   const [typed, setTyped] = useState('')
+  const nameField = useRef<InputRef>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<unknown>()
 
@@ -44,6 +45,10 @@ export default function DeleteAgentModal({
       onCancel={onClose}
       confirmLoading={deleting}
       destroyOnHidden
+      // The name is the one thing to do here; the dialog would otherwise focus its Close button.
+      afterOpenChange={(open) => {
+        if (open) nameField.current?.focus()
+      }}
     >
       <div className="flex flex-col gap-4">
         <p className="m-0">{effect(chats?.length)} This can't be undone.</p>
@@ -55,6 +60,7 @@ export default function DeleteAgentModal({
             Type {agent.name} to confirm
           </label>
           <Input
+            ref={nameField}
             id="delete-agent-name"
             variant="underlined"
             autoComplete="off"

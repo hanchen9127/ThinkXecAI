@@ -54,6 +54,7 @@ describe('agent list', () => {
       'false',
     )
     expect(within(list).getByRole('button', { name: '1 knowledge base' })).toBeInTheDocument()
+    expect(within(list).getByRole('button', { name: '2 tools' })).toHaveClass('h-6')
     expect(within(list).getByText('no tools')).not.toHaveAttribute('aria-expanded')
     expect(within(list).queryByRole('button', { name: 'no tools' })).toBeNull()
   })

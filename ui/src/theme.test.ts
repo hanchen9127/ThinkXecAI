@@ -30,6 +30,14 @@ describe('palette', () => {
     expect(theme.token?.controlItemBgActiveHover).toBe(palette.ground)
   })
 
+  it('shows placeholders in the muted text colour, and the drop zone as a surface', () => {
+    expect(theme.token?.colorTextPlaceholder).toBe(palette.muted)
+    expect(theme.components?.Upload).toMatchObject({
+      colorFillAlter: palette.surface,
+      colorBorder: palette.field,
+    })
+  })
+
   it('declares no color in index.css that theme.ts lacks', () => {
     const declared = [...css.matchAll(/--color-([a-z-]+):/g)].map((m) => m[1])
     expect(declared.sort()).toEqual(Object.keys(palette).map(kebab).sort())

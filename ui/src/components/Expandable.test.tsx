@@ -32,6 +32,12 @@ describe('Expandable', () => {
     expect(screen.queryByRole('button', { name: 'Inside' })).toBeNull()
   })
 
+  it('gives links and plain buttons one focus ring that a class can still replace', () => {
+    expect(css).toMatch(
+      /@layer base \{\s*a:focus-visible,\s*button:focus-visible \{\s*outline: 2px solid var\(--color-ink\)/,
+    )
+  })
+
   it('never grows wider than its parent', () => {
     expect(css).toMatch(/\.expandable \{[^}]*grid-template-columns: minmax\(0, 1fr\)/)
   })

@@ -45,6 +45,8 @@ export const theme: ThemeConfig = {
     colorError: palette.danger,
     colorText: palette.ink,
     colorTextSecondary: palette.muted,
+    // Muted, not Ant Design's 25% black: that is 1.8:1 on white, and this is what the field asks.
+    colorTextPlaceholder: palette.muted,
     colorBorder: palette.line,
     colorBorderSecondary: palette.hairline,
     colorBgLayout: palette.ground,
@@ -68,5 +70,7 @@ export const theme: ThemeConfig = {
   components: {
     Input: { colorBorder: palette.field },
     Select: { colorBorder: palette.field },
+    // The drop zone is a white surface with a border that can be seen, like an input.
+    Upload: { colorFillAlter: palette.surface, colorBorder: palette.field },
   },
 }

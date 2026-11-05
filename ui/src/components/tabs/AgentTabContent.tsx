@@ -108,8 +108,8 @@ function AgentItem({
           />
         </Dropdown>
       </div>
-      <p className="m-0 text-xs text-muted">
-        <span className="font-mono">{agent.model}</span>,{' '}
+      <p className="m-0 font-mono text-xs text-muted">{agent.model}</p>
+      <p className="m-0 flex flex-wrap gap-x-3 text-xs text-muted">
         <CountToggle
           count={agent.allowedTools.length}
           one="tool"
@@ -117,7 +117,6 @@ function AgentItem({
           expanded={shown === 'tools'}
           onToggle={() => toggle('tools')}
         />
-        ,{' '}
         <CountToggle
           count={agent.allowedKbs.length}
           one="knowledge base"
@@ -149,13 +148,13 @@ function CountToggle(props: {
   onToggle: () => void
 }) {
   const label = countLabel(props.count, props.one, props.many)
-  if (props.count === 0) return <span>{label}</span>
+  if (props.count === 0) return <span className="flex h-6 items-center">{label}</span>
   return (
     <button
       type="button"
       aria-expanded={props.expanded}
       onClick={props.onToggle}
-      className="inline cursor-pointer text-ink underline decoration-dotted"
+      className="flex h-6 cursor-pointer items-center text-ink underline decoration-dotted focus-visible:outline-offset-0"
     >
       {label}
     </button>
