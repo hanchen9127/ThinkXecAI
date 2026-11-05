@@ -38,6 +38,10 @@ describe('Expandable', () => {
     )
   })
 
+  it('keeps the words of a Markdown table whole', () => {
+    expect(css).toMatch(/\.x-markdown table \{[^}]*overflow-wrap: normal/)
+  })
+
   it('never grows wider than its parent', () => {
     expect(css).toMatch(/\.expandable \{[^}]*grid-template-columns: minmax\(0, 1fr\)/)
   })

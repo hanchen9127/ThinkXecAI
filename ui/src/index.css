@@ -187,8 +187,11 @@ body {
   overflow-x: auto;
 }
 
+/* `wrap-anywhere` on the Markdown lets a table shrink a column until its words break, so a table
+   wraps only between words and scrolls when that is too wide. */
 .x-markdown table {
   display: block;
+  overflow-wrap: normal;
 }
 
 .x-markdown th,
