@@ -138,7 +138,7 @@ class ChatSessionFacadeServiceTest extends ServiceTestSupport {
         UUID session = insertChatSession(null, "chat");
         jdbcTemplate.update("INSERT INTO chat_message (session_id, role, content) VALUES (?, 'user', 'hi')", session);
 
-        service.stopChatSession(session);
+        assertThat(service.stopChatSession(session)).isFalse();
 
         assertThat(countRows("chat_message", "session_id = ?", session)).isEqualTo(1);
     }

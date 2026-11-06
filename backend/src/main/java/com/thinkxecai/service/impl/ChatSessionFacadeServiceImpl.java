@@ -74,9 +74,9 @@ public class ChatSessionFacadeServiceImpl implements ChatSessionFacadeService {
     }
 
     @Override
-    public void stopChatSession(UUID chatSessionId) {
+    public boolean stopChatSession(UUID chatSessionId) {
         findExisting(chatSessionId);
-        agentRunScheduler.stop(chatSessionId);
+        return agentRunScheduler.stop(chatSessionId);
     }
 
     @Override

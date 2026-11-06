@@ -285,6 +285,12 @@ export interface components {
             data: components["schemas"]["AgentVO"];
             message: string;
         };
+        ApiResponseBoolean: {
+            /** Format: int32 */
+            code: number;
+            data: boolean;
+            message: string;
+        };
         ApiResponseChatMessageVO: {
             /** Format: int32 */
             code: number;
@@ -807,7 +813,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ApiResponseVoid"];
+                    "application/json": components["schemas"]["ApiResponseBoolean"];
                 };
             };
         };

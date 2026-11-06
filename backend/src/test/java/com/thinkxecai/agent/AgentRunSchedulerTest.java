@@ -175,7 +175,7 @@ class AgentRunSchedulerTest {
         await().atMost(WAIT).until(() -> events.contains("start first"));
         scheduler.submit(second, session, message);
         scheduler.submit(third, session, message);
-        scheduler.stop(session);
+        assertThat(scheduler.stop(session)).isTrue();
         release.countDown();
 
         ArgumentCaptor<BooleanSupplier> stopRequested = ArgumentCaptor.forClass(BooleanSupplier.class);
@@ -211,7 +211,7 @@ class AgentRunSchedulerTest {
     void stoppingASessionWithNothingRunningChangesNothing() {
         AgentRunScheduler scheduler = scheduler(pool);
 
-        scheduler.stop(session);
+        assertThat(scheduler.stop(session)).isFalse();
         scheduler.submit(UUID.randomUUID(), session, message);
 
         ArgumentCaptor<BooleanSupplier> stopRequested = ArgumentCaptor.forClass(BooleanSupplier.class);

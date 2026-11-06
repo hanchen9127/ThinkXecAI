@@ -26,10 +26,12 @@ public interface ChatSessionFacadeService {
 
     /**
      * Stops the session's running run and every run queued behind it (ADR 060). They stop
-     * between steps, so the step in progress finishes first. Runs submitted later run as usual; nothing
-     * running is fine. Unknown id → BizException 404.
+     * between steps, so the step in progress finishes first. Runs submitted later run as usual.
+     * Unknown id → BizException 404.
+     *
+     * @return whether the session had a run to stop; if not, no notice will follow
      */
-    void stopChatSession(UUID chatSessionId);
+    boolean stopChatSession(UUID chatSessionId);
 
     /** Deletes the session and its messages (foreign key cascade). Unknown id → BizException 404. */
     void deleteChatSession(UUID chatSessionId);

@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { getSseUrl } from '../api/api'
-import { type ApiCall, fakeApi } from '../test/fakeApi'
+import { type ApiCall, deferred, fakeApi } from '../test/fakeApi'
 import { FakeEventSource } from '../test/fakeEventSource'
 import { renderApp } from '../test/renderApp'
 
@@ -245,6 +245,15 @@ describe('the working indicator', () => {
     updatedAt: stamp(ago),
   })
   const calls = { toolCalls: [{ id: 'c1', type: 'function', name: 'dateTool', arguments: '{}' }] }
+  const notice = (id: string, ago: number) => ({
+    ...recent(id, 'assistant', ago),
+    content: 'Stopped.',
+  })
+  /** What was posted as new messages. */
+  const sent = (api: { calls: ApiCall[] }) =>
+    api.calls
+      .filter((call) => call.method === 'POST' && call.path === '/chat-messages')
+      .map((call) => (call.body as { content: string }).content)
 
   it('shows the agent working after a message is sent, and stops at the answer', async () => {
     backend({
@@ -342,14 +351,16 @@ describe('the working indicator', () => {
   it('stops the session, says Stopping… until the notice, then offers Try again', async () => {
     const { api } = backend({
       'GET /chat-messages/session/s1': () => [recent('m1', 'user', 1_000)],
-      'POST /chat-sessions/s1/stop': () => null,
+      'POST /chat-sessions/s1/stop': () => true,
       'POST /chat-messages': ({ body }) => ({ ...recent('m3', 'user', 0), ...(body as object) }),
     })
     renderApp('/chat/s1')
 
     await userEvent.click(await screen.findByRole('button', { name: 'Stop' }))
     expect(api.calls.filter((c) => c.path === '/chat-sessions/s1/stop')).toHaveLength(1)
-    expect(screen.getByRole('button', { name: 'Stopping…' })).toBeDisabled()
+    const stopping = screen.getByRole('button', { name: 'Stopping…' })
+    expect(stopping).toBeDisabled()
+    expect(stopping).toHaveClass('opacity-60')
 
     const stopped = { ...recent('m2', 'assistant', 0), content: 'Stopped.' }
     FakeEventSource.latest().emit('message', generated(stopped))
@@ -367,6 +378,27 @@ describe('the working indicator', () => {
         },
       ]),
     )
+    // Used, it goes away, and the new run can be stopped: "Stopping…" ended with the last run.
+    expect(await screen.findByRole('button', { name: 'Stop' })).toBeEnabled()
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull()
+  })
+
+  it('ends the run at once when a stop finds none, as after a backend restart', async () => {
+    backend({
+      'GET /chat-messages/session/s1': () => [recent('m1', 'user', 1_000)],
+      'POST /chat-sessions/s1/stop': () => false,
+    })
+    renderApp('/chat/s1')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Stop' }))
+
+    expect(await screen.findByRole('button', { name: 'Send' })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: /^Stop/ })).toBeNull()
+    expect(screen.queryByText(/is working/)).toBeNull()
+
+    // A later message means a run again.
+    FakeEventSource.latest().emit('message', generated(recent('m2', 'assistant', 0, calls)))
+    expect(await screen.findByRole('button', { name: 'Stop' })).toBeEnabled()
   })
 
   it('shows why a stop failed and offers Stop again', async () => {
@@ -407,29 +439,106 @@ describe('the working indicator', () => {
   })
 
   it('offers Try again once, after the last notice of the latest stopped run', async () => {
-    const stopped = (id: string, ago: number) => ({
-      ...recent(id, 'assistant', ago),
-      content: 'Stopped.',
-    })
-    backend({
+    const { api } = backend({
       'GET /chat-messages/session/s1': () => [
         recent('m1', 'user', 60_000),
-        stopped('m2', 50_000),
+        notice('m2', 50_000),
         recent('m3', 'user', 40_000),
         recent('m4', 'user', 30_000),
-        stopped('m5', 20_000),
-        stopped('m6', 10_000),
+        notice('m5', 20_000),
+        notice('m6', 10_000),
       ],
+      'POST /chat-messages': ({ body }) => ({ ...recent('m7', 'user', 0), ...(body as object) }),
     })
     renderApp('/chat/s1')
 
     await waitFor(() => expect(screen.getAllByText('Stopped.')).toHaveLength(3))
     const retry = screen.getAllByRole('button', { name: 'Try again' })
     expect(retry).toHaveLength(1)
-    expect(retry[0].parentElement).toHaveTextContent('Stopped.')
-    expect(retry[0].closest('article')?.querySelectorAll('button')).toHaveLength(1)
-    expect(screen.getAllByText('Stopped.').at(-1)?.parentElement?.parentElement).toContainElement(
-      retry[0],
+    for (const notice of screen.getAllByText('Stopped.')) {
+      expect(notice.compareDocumentPosition(retry[0])).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+    }
+    expect(retry[0].closest('article')).toContainElement(screen.getAllByText('Stopped.').at(-1)!)
+
+    await userEvent.click(retry[0])
+    await waitFor(() => expect(sent(api)).toEqual(['user m4']))
+  })
+
+  it('sends a question once when Try again is clicked twice', async () => {
+    const stored = deferred<object>()
+    const { api } = backend({
+      'GET /chat-messages/session/s1': () => [recent('m1', 'user', 20_000), notice('m2', 10_000)],
+      'POST /chat-messages': () => stored.promise,
+    })
+    renderApp('/chat/s1')
+
+    // The second click lands while the first is still being sent, with the button still there.
+    const retry = await screen.findByRole('button', { name: 'Try again' })
+    await userEvent.click(retry)
+    await userEvent.click(retry)
+    stored.resolve({ ...recent('m3', 'user', 0), content: 'user m1' })
+
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull())
+    expect(sent(api)).toEqual(['user m1'])
+  })
+
+  it('keeps Try again after a send that failed', async () => {
+    let refused = true
+    const { api } = backend({
+      'GET /chat-messages/session/s1': () => [recent('m1', 'user', 20_000), notice('m2', 10_000)],
+      'POST /chat-messages': ({ body }) => {
+        if (refused) {
+          refused = false
+          throw { code: 500, message: 'Not saved' }
+        }
+        return { ...recent('m3', 'user', 0), ...(body as object) }
+      },
+    })
+    renderApp('/chat/s1')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Try again' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Not saved')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    await waitFor(() => expect(sent(api)).toEqual(['user m1', 'user m1']))
+  })
+
+  it.each([
+    ['the next question is still running', ['m1', 'm3', 'm4']],
+    ['the next question was answered', ['m1', 'm3', 'm4', 'm5']],
+  ])('offers no Try again on a notice when %s', async (_, ids) => {
+    const stored = {
+      m1: recent('m1', 'user', 40_000),
+      m3: recent('m3', 'user', 30_000),
+      m4: notice('m4', 20_000),
+      m5: { ...recent('m5', 'assistant', 10_000), content: 'The price is 20.' },
+    }
+    backend({
+      'GET /chat-messages/session/s1': () => ids.map((id) => stored[id as keyof typeof stored]),
+    })
+    renderApp('/chat/s1')
+
+    expect(await screen.findByText('Stopped.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull()
+  })
+
+  it('offers no Try again once the agent is gone', async () => {
+    backend({
+      'GET /chat-sessions': () => [{ ...chat('s1', 'Pricing'), agentId: null }],
+      'GET /chat-messages/session/s1': () => [recent('m1', 'user', 20_000), notice('m2', 10_000)],
+    })
+    renderApp('/chat/s1')
+
+    expect(await screen.findByText('Stopped.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull()
+  })
+
+  it('presses every button through the shared config, not a class override (ADR 061)', async () => {
+    backend({ 'GET /chat-messages/session/s1': () => [recent('m1', 'user', 1_000)] })
+    renderApp('/chat/s1')
+
+    expect(await screen.findByRole('button', { name: 'Stop' })).toHaveClass(
+      'not-disabled:active:scale-97',
     )
   })
 })

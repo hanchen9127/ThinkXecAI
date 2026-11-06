@@ -145,12 +145,12 @@ class ChatSessionControllerTest {
     }
 
     @Test
-    void stopReturnsNullData() throws Exception {
+    void stopSaysWhetherARunWasThere() throws Exception {
+        when(service.stopChatSession(ID)).thenReturn(true);
+
         mockMvc.perform(post("/api/chat-sessions/" + ID + "/stop"))
                 .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.data").value(nullValue()));
-
-        verify(service).stopChatSession(ID);
+                .andExpect(jsonPath("$.data").value(true));
     }
 
     private ResultActions send(MockHttpServletRequestBuilder request, String json) throws Exception {

@@ -178,6 +178,22 @@ export function isNotice(content: string | null): boolean {
 const NOTICE =
   /^(?:Stopped\.$|The agent could not finish this request: |The agent stopped after \d+ steps )/
 
+/**
+ * The question Try again sends, or null. Only a chat that ends on a notice has one: anything after
+ * the notice means the chat moved on, and sending again could repeat an answered question. Replies to
+ * questions sent together all come after the last of them (ADR 060), so a run with fewer replies than
+ * questions is still working, and its notice is not about the last question.
+ */
+export function retryQuestion(history: HistoryItem[]): string | null {
+  const run = history.at(-1)
+  const question = history.at(-2)
+  if (run?.kind !== 'agent' || question?.kind !== 'user') return null
+  if (!isNotice(run.answers.at(-1)?.content ?? null)) return null
+  const previousRun = history.slice(0, -1).findLastIndex((item) => item.kind === 'agent')
+  const questions = history.length - 2 - previousRun
+  return run.answers.length < questions ? null : question.message.content
+}
+
 /** Chat titles are at most 200 characters (ADR 032); one from a first message is kept short. */
 export const TITLE_LENGTH = 200
 const SHORT_TITLE = 60

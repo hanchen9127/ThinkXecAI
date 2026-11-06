@@ -14,7 +14,7 @@ import { cx } from '../../utils/cx'
 import { errorMessage } from '../../utils/text'
 import AgentRun from '../chat/AgentRun'
 import Composer from '../chat/Composer'
-import { type HistoryItem, chatTitle, groupHistory, isNotice, titleFrom } from '../chat/messages'
+import { chatTitle, groupHistory, retryQuestion, titleFrom } from '../chat/messages'
 
 /** `/`, `/chat` (a new chat, `?agent=<id>` chooses its agent), and `/chat/:chatSessionId`. */
 export default function AgentChatView() {
@@ -129,9 +129,14 @@ function Chat({ sessionId }: { sessionId: string }) {
   const { messages, loading, error, reload, send, receive } = useChatMessages(sessionId)
   const [sendError, setSendError] = useState<unknown>()
   const history = useMemo(() => groupHistory(messages), [messages])
-  const working = useWorking(messages)
-  const since = useMemo(() => newestMessage(messages)?.createdAt, [messages])
+  const newest = useMemo(() => newestMessage(messages), [messages])
+  // The newest message when a stop found no run (a backend restart ended it): nothing will follow.
+  const [abandoned, setAbandoned] = useState<string>()
+  const working = useWorking(messages) && abandoned !== newest?.id
+  const since = newest?.createdAt
   const [stopping, setStopping] = useState(false)
+  // The run Try again was used on: a second click must not send its question twice.
+  const retried = useRef<string>(undefined)
   // "Stopping…" lasts until the run ends with its notice.
   if (stopping && !working) setStopping(false)
 
@@ -196,27 +201,27 @@ function Chat({ sessionId }: { sessionId: string }) {
   function stop() {
     setStopping(true)
     setSendError(undefined)
-    stopChatSession(sessionId).catch((failure: unknown) => {
-      setStopping(false)
-      setSendError(failure)
+    stopChatSession(sessionId).then(
+      (found) => {
+        if (!found) setAbandoned(newest?.id)
+      },
+      (failure: unknown) => {
+        setStopping(false)
+        setSendError(failure)
+      },
+    )
+  }
+
+  /** Sends the question again as a new message (ADR 060); a failure shows like any send. */
+  function retry(run: string, question: string) {
+    if (retried.current === run) return
+    retried.current = run
+    submit(question).catch(() => {
+      retried.current = undefined
     })
   }
 
-  /**
-   * Try again for the run after `before`: sends that question again as a new message (ADR 060); a
-   * failure shows like any send. None when the chat cannot continue. Only the latest stopped or
-   * failed run has it: queued runs' notices all come after the last question, so an earlier
-   * notice cannot tell which question it belongs to.
-   */
-  function retryFor(before: HistoryItem | undefined) {
-    const question = before?.kind === 'user' ? before.message.content : null
-    if (agentGone || !question) return undefined
-    return () => void submit(question).catch(() => undefined)
-  }
-
-  const latestNotice = history.findLast(
-    (item) => item.kind === 'agent' && item.answers.some((answer) => isNotice(answer.content)),
-  )
+  const question = agentGone ? null : retryQuestion(history)
 
   return (
     <>
@@ -301,7 +306,11 @@ function Chat({ sessionId }: { sessionId: string }) {
               ms={item.ms}
               working={working && i === history.length - 1}
               since={since}
-              onRetry={item === latestNotice ? retryFor(history[i - 1]) : undefined}
+              onRetry={
+                question !== null && i === history.length - 1
+                  ? () => retry(item.id, question)
+                  : undefined
+              }
             />
           ),
         )}

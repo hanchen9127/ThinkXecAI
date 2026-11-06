@@ -84,12 +84,16 @@ public class AgentRunScheduler {
                 });
     }
 
-    /** Stops the session's running and queued runs between steps; nothing running is fine (ADR 060). */
-    public void stop(UUID sessionId) {
-        lines.computeIfPresent(sessionId, (id, current) -> {
+    /**
+     * Stops the session's running and queued runs between steps (ADR 060).
+     *
+     * @return whether the session had any; if not, nothing is coming, not even a notice
+     */
+    public boolean stop(UUID sessionId) {
+        return lines.computeIfPresent(sessionId, (id, current) -> {
             current.stopped().set(true);
             return new Line(current.tail(), current.after(), new AtomicBoolean());
-        });
+        }) != null;
     }
 
     private void failed(UUID agentId, UUID sessionId, Throwable failure) {
