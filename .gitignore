@@ -37,4 +37,7 @@ target/
 .env
 .env.*
 !.env.example
-docs/
+docs/*
+!docs/adr/
+
+.impeccable/
