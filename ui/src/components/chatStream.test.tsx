@@ -362,6 +362,16 @@ describe('the working indicator', () => {
     expect(stopping).toBeDisabled()
     expect(stopping).toHaveClass('opacity-60')
 
+    // Typing while it stops gives a plain Send, to queue a message.
+    const box = screen.getByRole('textbox', { name: 'Message' })
+    await userEvent.type(box, 'And the price?')
+    expect(stopping).toHaveAccessibleName('Send')
+    expect(stopping).toBeEnabled()
+    expect(stopping).not.toHaveClass('opacity-60')
+    expect(stopping.querySelector('.shape-icon')).toHaveAttribute('data-shape', 'triangle')
+    await userEvent.clear(box)
+    expect(stopping).toHaveAccessibleName('Stopping…')
+
     const stopped = { ...recent('m2', 'assistant', 0), content: 'Stopped.' }
     FakeEventSource.latest().emit('message', generated(stopped))
     expect(await screen.findByText('Stopped.')).toBeInTheDocument()
@@ -506,12 +516,23 @@ describe('the working indicator', () => {
   it.each([
     ['the next question is still running', ['m1', 'm3', 'm4']],
     ['the next question was answered', ['m1', 'm3', 'm4', 'm5']],
+    ['the stopped run had a step, and the next question is running', ['m1', 'm2', 'm3', 'm4']],
+    ['the next question has taken a step', ['m1', 'm2', 'm3', 'm4', 'm6']],
+    [
+      'an earlier run replied twice, and a question is still running',
+      ['m1', 'm7', 'm8', 'm3', 'm9', 'm4'],
+    ],
   ])('offers no Try again on a notice when %s', async (_, ids) => {
     const stored = {
       m1: recent('m1', 'user', 40_000),
+      m2: recent('m2', 'assistant', 35_000, calls),
       m3: recent('m3', 'user', 30_000),
       m4: notice('m4', 20_000),
       m5: { ...recent('m5', 'assistant', 10_000), content: 'The price is 20.' },
+      m6: recent('m6', 'assistant', 10_000, calls),
+      m7: recent('m7', 'assistant', 38_000),
+      m8: recent('m8', 'assistant', 36_000),
+      m9: recent('m9', 'user', 25_000),
     }
     backend({
       'GET /chat-messages/session/s1': () => ids.map((id) => stored[id as keyof typeof stored]),

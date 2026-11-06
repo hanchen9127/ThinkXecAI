@@ -180,18 +180,22 @@ const NOTICE =
 
 /**
  * The question Try again sends, or null. Only a chat that ends on a notice has one: anything after
- * the notice means the chat moved on, and sending again could repeat an answered question. Replies to
- * questions sent together all come after the last of them (ADR 060), so a run with fewer replies than
- * questions is still working, and its notice is not about the last question.
+ * the notice means the chat moved on, and sending again could repeat an answered question. Every
+ * question gets one reply, but a reply can come after later questions (ADR 060), and a message sent
+ * during a run splits that run in two. So replies are counted against questions over the whole chat:
+ * one still owed means a run is going on, and the notice is not about the last question. A run that
+ * died without a reply stays owed, which only hides Try again.
  */
 export function retryQuestion(history: HistoryItem[]): string | null {
   const run = history.at(-1)
   const question = history.at(-2)
   if (run?.kind !== 'agent' || question?.kind !== 'user') return null
   if (!isNotice(run.answers.at(-1)?.content ?? null)) return null
-  const previousRun = history.slice(0, -1).findLastIndex((item) => item.kind === 'agent')
-  const questions = history.length - 2 - previousRun
-  return run.answers.length < questions ? null : question.message.content
+  let owed = 0
+  for (const item of history) {
+    owed = item.kind === 'user' ? owed + 1 : Math.max(0, owed - item.answers.length)
+  }
+  return owed === 0 ? question.message.content : null
 }
 
 /** Chat titles are at most 200 characters (ADR 032); one from a first message is kept short. */

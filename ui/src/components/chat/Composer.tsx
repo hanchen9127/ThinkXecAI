@@ -8,6 +8,9 @@ const MESSAGE_LENGTH = 20000
 
 const LABELS = ['Send', 'Stop', 'Stopping…'] as const
 
+/** Always a theme: without one Ant Design drops a provider, which would remount the button. */
+const SAME_THEME = {}
+
 /**
  * The message box (V1 element 8 C): Enter sends, Shift+Enter starts a new line. `onSend` gets the
  * trimmed text and throws to keep it; the box empties only once the message is stored. `tools`
@@ -78,14 +81,14 @@ export default function Composer({
           {tools ?? hint}
           {/* One button that changes its icon and label in place (ADR 061, M4); the hidden labels
               keep its width. */}
-          <ConfigProvider theme={waiting ? stoppingTheme : undefined}>
+          <ConfigProvider theme={waiting ? stoppingTheme : SAME_THEME}>
             <Button
               type="primary"
               className={cx('ml-auto', waiting && 'opacity-60')}
               loading={!stopMode && sending}
               disabled={stopMode ? stopping : disabled || blank}
               icon={
-                !stopping && (
+                !waiting && (
                   <span
                     aria-hidden="true"
                     className="shape-icon"
