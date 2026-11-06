@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import css from './index.css?raw'
 import { palette } from './theme'
 
 // ADR 058's rules, checked against the source so a later change cannot quietly undo them.
@@ -30,6 +31,10 @@ describe('the look (ADR 058)', () => {
       )
       .map(([path]) => path)
     expect(outside).toEqual([])
+  })
+
+  it('styles Ant Design with tokens, not by overriding its classes', () => {
+    expect(css).not.toMatch(/\.ant-/)
   })
 
   it('draws no pill tags and no robot icon', () => {

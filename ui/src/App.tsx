@@ -14,7 +14,7 @@ import { COLUMN } from './layout/column'
 import Layout from './layout/Layout'
 import Sidebar from './layout/Sidebar'
 import { sectionOf } from './layout/sections'
-import { theme } from './theme'
+import { buttonConfig, theme } from './theme'
 import { cx } from './utils/cx'
 
 // Each page is its own chunk, loaded when first opened: the chat brings a Markdown parser and
@@ -65,7 +65,11 @@ export function AppRoutes() {
 /** The shared lists every screen reads. */
 export function AppProviders({ children }: { children: ReactNode }) {
   return (
-    <ConfigProvider theme={theme} select={{ menuItemSelectedIcon: <CheckOutlined /> }}>
+    <ConfigProvider
+      theme={theme}
+      button={buttonConfig}
+      select={{ menuItemSelectedIcon: <CheckOutlined /> }}
+    >
       <KnowledgeBasesProvider>
         <AgentsProvider>
           <ChatSessionsProvider>{children}</ChatSessionsProvider>

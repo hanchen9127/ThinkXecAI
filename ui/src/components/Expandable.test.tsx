@@ -42,6 +42,10 @@ describe('Expandable', () => {
     expect(css).toMatch(/\.x-markdown table \{[^}]*overflow-wrap: normal/)
   })
 
+  it("leaves its content's own transition class in force", () => {
+    expect(css).toMatch(/@layer base \{\s*\.expandable > div > div \{\s*transition: translate/)
+  })
+
   it('never grows wider than its parent', () => {
     expect(css).toMatch(/\.expandable \{[^}]*grid-template-columns: minmax\(0, 1fr\)/)
   })

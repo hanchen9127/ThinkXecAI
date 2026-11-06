@@ -14,10 +14,8 @@ export const palette = {
   field: '#8D9197',
   think: '#4453C4',
   thinkInk: '#2F3A93',
-  thinkWash: '#E3E7FA',
   execute: '#B4560A',
   executeInk: '#8A4108',
-  executeWash: '#FBEBDD',
   danger: '#A0331B',
   /** Behind a failure that stays on screen (an upload that was refused). */
   dangerWash: '#FBEDE9',
@@ -74,3 +72,17 @@ export const theme: ThemeConfig = {
     Upload: { colorFillAlter: palette.surface, colorBorder: palette.field },
   },
 }
+
+/** "Stopping…" stays the ink button, not Ant Design's grey disabled one; the Composer dims it. */
+export const stoppingTheme: ThemeConfig = {
+  components: {
+    Button: {
+      colorBgContainerDisabled: palette.ink,
+      colorTextDisabled: palette.surface,
+      borderColorDisabled: palette.ink,
+    },
+  },
+}
+
+/** A slight press on every button (ADR 061, M6); list rows press with `active:scale-98`. */
+export const buttonConfig = { className: 'not-disabled:active:scale-97' }

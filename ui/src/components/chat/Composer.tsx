@@ -1,5 +1,6 @@
-import { Button, Input } from 'antd'
+import { Button, ConfigProvider, Input } from 'antd'
 import { type ReactNode, useState } from 'react'
+import { stoppingTheme } from '../../theme'
 import { cx } from '../../utils/cx'
 
 /** Chat messages are at most 20,000 characters (ADR 032). */
@@ -34,7 +35,8 @@ export default function Composer({
   const [sending, setSending] = useState(false)
   const blank = text.trim() === ''
   const stopMode = onStop !== undefined && blank && !disabled
-  const shown = stopMode ? (stopping ? 'Stopping…' : 'Stop') : 'Send'
+  const waiting = stopMode && stopping
+  const shown = waiting ? 'Stopping…' : stopMode ? 'Stop' : 'Send'
   // How to send means nothing in a chat that cannot be continued.
   const hint = !disabled && (
     <span className="text-xs text-muted">Enter to send, Shift+Enter for a new line</span>
@@ -76,37 +78,39 @@ export default function Composer({
           {tools ?? hint}
           {/* One button that changes its icon and label in place (ADR 061, M4); the hidden labels
               keep its width. */}
-          <Button
-            type="primary"
-            className={cx('ml-auto', stopping && 'stopping')}
-            loading={!stopMode && sending}
-            disabled={stopMode ? stopping : disabled || blank}
-            icon={
-              !stopping && (
-                <span
-                  aria-hidden="true"
-                  className="shape-icon"
-                  data-shape={stopMode ? 'square' : 'triangle'}
-                />
-              )
-            }
-            onClick={stopMode ? onStop : () => void send()}
-          >
-            <span className="grid">
-              {LABELS.map((label) => (
-                <span
-                  key={label}
-                  aria-hidden={label === shown ? undefined : true}
-                  className={cx(
-                    'col-start-1 row-start-1 transition-opacity',
-                    label !== shown && 'opacity-0',
-                  )}
-                >
-                  {label}
-                </span>
-              ))}
-            </span>
-          </Button>
+          <ConfigProvider theme={waiting ? stoppingTheme : undefined}>
+            <Button
+              type="primary"
+              className={cx('ml-auto', waiting && 'opacity-60')}
+              loading={!stopMode && sending}
+              disabled={stopMode ? stopping : disabled || blank}
+              icon={
+                !stopping && (
+                  <span
+                    aria-hidden="true"
+                    className="shape-icon"
+                    data-shape={stopMode ? 'square' : 'triangle'}
+                  />
+                )
+              }
+              onClick={stopMode ? onStop : () => void send()}
+            >
+              <span className="grid">
+                {LABELS.map((label) => (
+                  <span
+                    key={label}
+                    aria-hidden={label === shown ? undefined : true}
+                    className={cx(
+                      'col-start-1 row-start-1 transition-opacity',
+                      label !== shown && 'opacity-0',
+                    )}
+                  >
+                    {label}
+                  </span>
+                ))}
+              </span>
+            </Button>
+          </ConfigProvider>
         </div>
       </div>
       {tools && hint}

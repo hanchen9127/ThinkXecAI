@@ -12,10 +12,8 @@
   --color-field: #8d9197;
   --color-think: #4453c4;
   --color-think-ink: #2f3a93;
-  --color-think-wash: #e3e7fa;
   --color-execute: #b4560a;
   --color-execute-ink: #8a4108;
-  --color-execute-wash: #fbebdd;
   --color-danger: #a0331b;
   --color-danger-wash: #fbede9;
   --color-rail: #2a2d31;
@@ -74,8 +72,13 @@
   overflow-clip-margin: 4px;
 }
 
-.expandable > div > div {
-  transition: translate var(--default-transition-duration) var(--default-transition-timing-function);
+/* In the base layer, so content with its own `transition` class (a list row's hover and press) keeps
+   it; that class also covers `translate`. */
+@layer base {
+  .expandable > div > div {
+    transition: translate var(--default-transition-duration)
+      var(--default-transition-timing-function);
+  }
 }
 
 .expandable[data-motion='slide']:not([data-open]) > div > div {
@@ -142,18 +145,6 @@
 
 .shape-icon[data-shape='square'] {
   clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
-}
-
-/* Stopping… keeps the ink button, dimmed, instead of Ant Design's grey disabled look. */
-.ant-btn.stopping:disabled {
-  background: var(--color-ink);
-  color: #ffffff;
-  opacity: 0.6;
-}
-
-/* A slight press on buttons (ADR 061, M6); list rows press with `active:scale-98`. */
-.ant-btn:not(:disabled):active {
-  scale: 0.97;
 }
 
 /* Links and plain buttons share one focus ring. In the base layer, so a class on the element, like
