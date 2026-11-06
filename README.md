@@ -47,11 +47,19 @@ token-by-token streaming, and document formats other than Markdown.
 | Embeddings| Local Ollama, model `bge-m3`, 1024-dim vectors                              |
 | Frontend  | React 19, TypeScript, Vite 8, React Router 8, Tailwind CSS, Ant Design + `@ant-design/x-markdown` |
 | Realtime  | Server-Sent Events (SSE), one connection per chat session                   |
+
 ## Run Everything in Docker
 
 The database, backend, and frontend can all run in Docker. Ollama stays on your machine, so start it
 first, and fill in `.env` (see Getting Started). Stop any backend or frontend running on the host: the
 containers use the same ports.
+
+On Linux, two more things are needed, which Docker Desktop handles elsewhere:
+
+- Create the document folder for the backend's user, or Docker creates it for root and uploads fail:
+  `mkdir -p backend/data && sudo chown 1000:1000 backend/data`.
+- Ollama listens on `127.0.0.1`, which containers cannot reach. Set `OLLAMA_HOST` to the Docker bridge
+  address (usually `172.17.0.1:11434`). `0.0.0.0` works too, but opens Ollama to your network.
 
 ```bash
 docker compose --profile app up -d --build
@@ -255,7 +263,8 @@ While the agent works and the message box is empty, Send turns into **Stop**. St
 between steps, so a model call or tool already running finishes first; the button reads
 Stopping… until the run ends with "Stopped.". Stop also ends the messages queued behind it. Typing
 turns the button back into Send, so you can still queue a message. "Stopped." and a run that could
-not finish end with **Try again**, which sends the same question again.
+not finish end with **Try again**, which sends the same question again. It shows only while that
+notice is the last thing in the chat; to repeat an earlier question, send it again yourself.
 
 Deleting a chat or a document waits 5 seconds for Undo before it is sent; leaving the page or
 closing the tab sends it at once. Messages keep arriving if you close the tab mid-run: they are
