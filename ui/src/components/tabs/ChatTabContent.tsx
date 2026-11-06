@@ -43,6 +43,10 @@ export default function ChatTabContent() {
   // A deleted chat stays in the list while its row folds away (ADR 061).
   const listed = chatSessions.filter(matches)
 
+  // A new chat from an open one keeps its agent: the first agent could be one with other tools.
+  const openAgentId = chatSessions.find((session) => session.id === openId)?.agentId
+  const newChat = openAgentId ? path`/chat?agent=${openAgentId}` : '/chat'
+
   function closeSearch() {
     setSearching(false)
     setQuery('')
@@ -60,7 +64,7 @@ export default function ChatTabContent() {
               icon={<SearchOutlined />}
               onClick={() => (searching ? closeSearch() : setSearching(true))}
             />
-            <Button type="primary" onClick={() => navigate('/chat')}>
+            <Button type="primary" onClick={() => navigate(newChat)}>
               New chat
             </Button>
           </div>

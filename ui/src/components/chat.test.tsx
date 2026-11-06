@@ -165,6 +165,23 @@ describe('a new chat', () => {
     )
   })
 
+  it.each([
+    ['keeps the agent of the open chat', 'a2', 'Support desk'],
+    ['falls back to the first agent when the open chat has none', null, 'Store analyst'],
+  ])('New chat %s', async (_, agentId, name) => {
+    backend({
+      'GET /chat-sessions': () => [session('s9', 'Refunds', agentId, '2026-11-02T03:00:00')],
+      'GET /chat-messages/session/s9': () => [],
+    })
+    renderApp('/chat/s9')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'New chat' }))
+
+    expect(
+      await screen.findByRole('heading', { name: `What should ${name} look into?` }),
+    ).toBeInTheDocument()
+  })
+
   it('keeps the text and reuses the new chat when the message fails', async () => {
     let fail = true
     const api = backend({
