@@ -1,28 +1,45 @@
-import { Button, Input } from 'antd'
+import { Button, ConfigProvider, Input } from 'antd'
 import { type ReactNode, useState } from 'react'
+import { stoppingTheme } from '../../theme'
+import { cx } from '../../utils/cx'
 
 /** Chat messages are at most 20,000 characters (ADR 032). */
 const MESSAGE_LENGTH = 20000
+
+const LABELS = ['Send', 'Stop', 'Stopping…'] as const
+
+/** Always a theme: without one Ant Design drops a provider, which would remount the button. */
+const SAME_THEME = {}
 
 /**
  * The message box (V1 element 8 C): Enter sends, Shift+Enter starts a new line. `onSend` gets the
  * trimmed text and throws to keep it; the box empties only once the message is stored. `tools`
  * sits left of Send (the agent picker of a new chat, V4 C1 C), else the keyboard hint.
+ * <p>
+ * With `onStop` (the agent is working), an empty box turns Send into Stop; typing turns it back, so a
+ * message can still be queued. `stopping` shows "Stopping…" until the run ends (ADR 060).
  */
 export default function Composer({
   placeholder,
   disabled,
   tools,
   onSend,
+  onStop,
+  stopping = false,
 }: {
   placeholder?: string
   disabled?: boolean
   tools?: ReactNode
   onSend: (content: string) => Promise<void>
+  onStop?: () => void
+  stopping?: boolean
 }) {
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
   const blank = text.trim() === ''
+  const stopMode = onStop !== undefined && blank && !disabled
+  const waiting = stopMode && stopping
+  const shown = waiting ? 'Stopping…' : stopMode ? 'Stop' : 'Send'
   // How to send means nothing in a chat that cannot be continued.
   const hint = !disabled && (
     <span className="text-xs text-muted">Enter to send, Shift+Enter for a new line</span>
@@ -62,15 +79,41 @@ export default function Composer({
         />
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline py-2.5 pr-3 pl-4">
           {tools ?? hint}
-          <Button
-            type="primary"
-            className="ml-auto"
-            loading={sending}
-            disabled={disabled || blank}
-            onClick={() => void send()}
-          >
-            Send
-          </Button>
+          {/* One button that changes its icon and label in place (ADR 061, M4); the hidden labels
+              keep its width. */}
+          <ConfigProvider theme={waiting ? stoppingTheme : SAME_THEME}>
+            <Button
+              type="primary"
+              className={cx('ml-auto', waiting && 'opacity-60')}
+              loading={!stopMode && sending}
+              disabled={stopMode ? stopping : disabled || blank}
+              icon={
+                !waiting && (
+                  <span
+                    aria-hidden="true"
+                    className="shape-icon"
+                    data-shape={stopMode ? 'square' : 'triangle'}
+                  />
+                )
+              }
+              onClick={stopMode ? onStop : () => void send()}
+            >
+              <span className="grid">
+                {LABELS.map((label) => (
+                  <span
+                    key={label}
+                    aria-hidden={label === shown ? undefined : true}
+                    className={cx(
+                      'col-start-1 row-start-1 transition-opacity',
+                      label !== shown && 'opacity-0',
+                    )}
+                  >
+                    {label}
+                  </span>
+                ))}
+              </span>
+            </Button>
+          </ConfigProvider>
         </div>
       </div>
       {tools && hint}

@@ -38,6 +38,7 @@ class OpenApiExportTest {
             Map.entry("/api/agents/{agentId}", List.of("delete", "patch")),
             Map.entry("/api/chat-sessions", List.of("get", "post")),
             Map.entry("/api/chat-sessions/{chatSessionId}", List.of("delete", "get", "patch")),
+            Map.entry("/api/chat-sessions/{chatSessionId}/stop", List.of("post")),
             Map.entry("/api/chat-sessions/agent/{agentId}", List.of("get")),
             Map.entry("/api/chat-messages", List.of("post")),
             Map.entry("/api/chat-messages/{chatMessageId}", List.of("delete")),

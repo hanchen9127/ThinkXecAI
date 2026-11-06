@@ -1,6 +1,6 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { type ApiCall, deferred, fakeApi } from '../test/fakeApi'
 import { renderApp } from '../test/renderApp'
 
@@ -132,6 +132,18 @@ describe('a new chat', () => {
       ['/chat-sessions', { agentId: 'a1', title: 'Which phones are out of stock?' }],
       ['/chat-messages', { sessionId: 's9', content: 'Which phones are out of stock?' }],
     ])
+    // The new chat becoming its session is not a move to another page (ADR 061).
+    expect(document.querySelector('[data-entering]')).toBeNull()
+  })
+
+  it('marks the chosen agent with a check', async () => {
+    backend()
+    renderApp('/chat')
+
+    await userEvent.click(await screen.findByRole('combobox', { name: 'Agent' }))
+    const selected = document.querySelector('.ant-select-item-option-selected')
+    expect(selected).toHaveTextContent('Store analyst')
+    expect(selected?.querySelector('.anticon-check')).not.toBeNull()
   })
 
   it('starts with the agent named in the address, and can change it', async () => {
@@ -203,45 +215,62 @@ describe('a new chat', () => {
 })
 
 describe('a chat', () => {
-  it('shows the question, the last step, and the answer', async () => {
+  it('shows the question on a band, and the answer under one line that folds the steps', async () => {
     backend()
     renderApp('/chat/s1')
 
-    expect(
-      await screen.findByRole('heading', { level: 1, name: 'Out-of-stock products' }),
-    ).toBeInTheDocument()
-    expect(screen.getByText('Store analyst on deepseek-chat')).toBeInTheDocument()
-    expect(
-      await screen.findByText('Which phones are out of stock, and when do they come back?'),
-    ).toBeInTheDocument()
+    const heading = await screen.findByRole('heading', { level: 1, name: 'Out-of-stock products' })
+    expect(heading.nextElementSibling).toHaveTextContent(/^Store analyst on deepseek-chat$/)
+    const question = await screen.findByText(
+      'Which phones are out of stock, and when do they come back?',
+    )
+    expect(question.previousElementSibling).toHaveTextContent('>')
 
+    // Six rows (three Think, three Execute), from the question at :01 to the answer at :08.
     const run = screen.getByRole('article', { name: 'Store analyst' })
-    const steps = within(run).getByRole('list', { name: 'Agent steps' })
-    expect(within(steps).getByText('Step 3, Execute: knowledgeSearch')).toBeInTheDocument()
-    expect(within(steps).queryByText('Step 1, Think')).toBeNull()
+    expect(within(run).getByText('6 steps in 7.0 s')).toBeInTheDocument()
+    for (const tool of ['dataBaseTool', 'dateTool', 'knowledgeSearch']) {
+      expect(within(run).getByText(tool)).toBeInTheDocument()
+    }
+    expect(within(run).queryByRole('list', { name: 'Agent steps' })).toBeNull()
     expect(within(run).getByText('Nova X12 Lite').tagName).toBe('STRONG')
 
-    await userEvent.click(within(steps).getByRole('button', { name: 'Show 2 earlier steps' }))
-    expect(within(steps).getByText('Step 1, Think')).toBeInTheDocument()
-    expect(within(steps).getByText('sql: SELECT sku FROM t_product;')).toBeInTheDocument()
+    await userEvent.click(within(run).getByRole('button', { name: 'Show steps' }))
+    const steps = within(run).getByRole('list', { name: 'Agent steps' })
+    expect(within(steps).getAllByText('Think')).toHaveLength(3)
+    expect(within(steps).getAllByText('Execute')).toHaveLength(3)
+    expect(within(steps).getByText('Step 1, 1.0 s')).toBeInTheDocument()
+    expect(within(steps).getByText('Step 6, 1.0 s')).toBeInTheDocument()
+    expect(
+      within(steps).getByText('I will find the phones that are out of stock.'),
+    ).toBeInTheDocument()
+
+    await userEvent.click(within(run).getByRole('button', { name: 'Hide steps' }))
+    expect(within(run).queryByRole('list', { name: 'Agent steps' })).toBeNull()
   })
 
-  it('opens each tool result only when asked, decoded', async () => {
+  it('sums up each tool result in a line and opens it in place, decoded', async () => {
     backend()
     renderApp('/chat/s1')
 
-    const steps = await screen.findByRole('list', { name: 'Agent steps' })
-    await userEvent.click(within(steps).getByRole('button', { name: 'Show 2 earlier steps' }))
+    const run = await screen.findByRole('article', { name: 'Store analyst' })
+    await userEvent.click(within(run).getByRole('button', { name: 'Show steps' }))
+    const steps = within(run).getByRole('list', { name: 'Agent steps' })
+    expect(within(steps).getByText('1 row')).toBeInTheDocument()
+    expect(within(steps).getByText('{"date":"2026-11-02"}')).toBeInTheDocument()
+    expect(within(steps).getByText('not json at all')).toBeInTheDocument()
     expect(within(steps).queryByRole('table')).toBeNull()
 
-    const [table, json, raw] = within(steps).getAllByRole('button', { name: 'Show the result' })
-    await userEvent.click(table)
+    await userEvent.click(within(steps).getByRole('button', { name: 'Show dataBaseTool' }))
+    expect(within(steps).getByText('sql: SELECT sku FROM t_product;')).toBeInTheDocument()
     expect(within(steps).getByRole('cell', { name: 'Nova X12 Lite' })).toBeInTheDocument()
-    await userEvent.click(json)
+    await userEvent.click(within(steps).getByRole('button', { name: 'Show dateTool' }))
     expect(within(steps).getByText(/"date": "2026-11-02"/)).toBeInTheDocument()
-    await userEvent.click(raw)
-    expect(within(steps).getByText('not json at all')).toBeInTheDocument()
-    expect(within(steps).getAllByRole('button', { name: 'Hide the result' })).toHaveLength(3)
+    await userEvent.click(within(steps).getByRole('button', { name: 'Show knowledgeSearch' }))
+    expect(within(steps).getAllByText('not json at all')).toHaveLength(2)
+
+    await userEvent.click(within(steps).getByRole('button', { name: 'Hide dataBaseTool' }))
+    expect(within(steps).queryByRole('table')).toBeNull()
   })
 
   it('sends a message and moves the chat up the list', async () => {
@@ -261,6 +290,38 @@ describe('a chat', () => {
       expect(api.calls.filter((c) => c.path === '/chat-sessions')).toHaveLength(2),
     )
     expect(screen.getByRole('textbox', { name: 'Message' })).toHaveValue('')
+  })
+
+  it('follows the chat again once a message is sent from higher up the page', async () => {
+    const scrollTo = vi.fn()
+    vi.stubGlobal('scrollTo', scrollTo)
+    vi.spyOn(document.documentElement, 'scrollHeight', 'get').mockReturnValue(2000)
+    backend({
+      'POST /chat-messages': ({ body }) => ({ ...msg('user', null), ...(body as object) }),
+    })
+    renderApp('/chat/s1')
+    const box = await screen.findByRole('textbox', { name: 'Message' })
+    await waitFor(() => expect(scrollTo).toHaveBeenCalled())
+
+    window.scrollY = 1500
+    fireEvent.scroll(window)
+    window.scrollY = 900
+    fireEvent.scroll(window)
+    scrollTo.mockClear()
+
+    await userEvent.type(box, 'Email it.{Enter}')
+    await waitFor(() => expect(scrollTo).toHaveBeenCalledWith(0, 2000))
+    window.scrollY = 0
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  it('keeps the message box on screen while the page scrolls', async () => {
+    backend()
+    renderApp('/chat/s1')
+
+    const box = await screen.findByRole('textbox', { name: 'Message' })
+    expect(box.closest('.sticky.bottom-0')).not.toBeNull()
   })
 
   it('says a chat whose agent was deleted can be read but not continued', async () => {

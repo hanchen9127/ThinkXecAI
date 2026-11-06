@@ -22,5 +22,61 @@ services:
       timeout: 3s
       retries: 60
 
+  # The whole application (ADR 062): `docker compose --profile app up -d --build`. A plain
+  # `docker compose up`, which CI runs, still starts only PostgreSQL.
+  backend:
+    profiles: [app]
+    build: ./backend
+    container_name: thinkxecai-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Every interface of the container, so the published port reaches it; `ports` keeps the
+      # backend on the host's loopback (ADR 033), and the Host check still applies.
+      SERVER_ADDRESS: 0.0.0.0
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/thinkxecai
+      # Ollama stays on the host, with its model and hardware.
+      SPRING_AI_OLLAMA_BASE_URL: http://host.docker.internal:11434
+      THINKXECAI_DB_PASSWORD: ${THINKXECAI_DB_PASSWORD:-}
+      THINKXECAI_DEEPSEEK_API_KEY: ${THINKXECAI_DEEPSEEK_API_KEY:-}
+      THINKXECAI_QWEN_API_KEY: ${THINKXECAI_QWEN_API_KEY:-}
+      THINKXECAI_GEMINI_API_KEY: ${THINKXECAI_GEMINI_API_KEY:-}
+      THINKXECAI_GMAIL_SENDER: ${THINKXECAI_GMAIL_SENDER:-}
+      THINKXECAI_GMAIL_CLIENT_ID: ${THINKXECAI_GMAIL_CLIENT_ID:-}
+      THINKXECAI_GMAIL_CLIENT_SECRET: ${THINKXECAI_GMAIL_CLIENT_SECRET:-}
+      THINKXECAI_GMAIL_REFRESH_TOKEN: ${THINKXECAI_GMAIL_REFRESH_TOKEN:-}
+      THINKXECAI_MAIL_ALLOWED_RECIPIENTS: ${THINKXECAI_MAIL_ALLOWED_RECIPIENTS:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      # The same files as a backend run on the host, which shares this database.
+      - ./backend/data:/app/data
+    healthcheck:
+      # The image has no curl; the Host check needs a Host of localhost.
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /health HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && grep -q '^ok' <&3"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+
+  frontend:
+    profiles: [app]
+    build: ./ui
+    container_name: thinkxecai-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:5173:80"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
 volumes:
   thinkxecai-postgres-data:

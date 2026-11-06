@@ -184,7 +184,8 @@ describe('deleting a knowledge base', () => {
     const api = backend()
     renderApp('/knowledge-base/k1')
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Delete' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'More actions' }))
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }))
     const dialog = await screen.findByRole('dialog', { name: 'Delete Store policies?' })
     expect(
       await within(dialog).findByText(
@@ -213,7 +214,8 @@ describe('deleting a knowledge base', () => {
     backend({ 'GET /agents': () => [] })
     renderApp('/knowledge-base/k1')
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Delete' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'More actions' }))
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }))
     const dialog = await screen.findByRole('dialog', { name: 'Delete Store policies?' })
     expect(
       await within(dialog).findByText('This deletes its 2 documents. No agent uses it.'),
@@ -224,7 +226,8 @@ describe('deleting a knowledge base', () => {
     backend()
     renderApp('/knowledge-base/k2')
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Delete' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'More actions' }))
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }))
     const dialog = await screen.findByRole('dialog', { name: 'Delete Product manuals?' })
     expect(
       await within(dialog).findByText('This removes it from these agents:'),
@@ -304,6 +307,50 @@ describe('uploading', () => {
     expect((call.body as FormData).get('kbId')).toBe('k1')
 
     answer.resolve()
+    expect(await screen.findByRole('heading', { name: '2 documents' })).toBeInTheDocument()
+    expect(screen.queryByText('Reading its sections and indexing them…')).toBeNull()
+    expect(screen.getAllByText('price-list.md')).toHaveLength(1)
+  })
+
+  it.each([
+    ['finishes after coming back', false],
+    ['finished while away', true],
+  ])('keeps an upload that %s when the page is left', async (_, finishAway) => {
+    const answer = deferred<void>()
+    let created: object | undefined
+    backend({
+      'POST /documents/upload': async () => {
+        await answer.promise
+        created = doc('d3', 'price-list.md', '2026-11-02T04:00:00')
+        return created
+      },
+      'GET /documents/kb/k1': () => [
+        ...(created ? [created] : []),
+        doc('d2', 'returns-policy.md', '2026-11-02T03:05:00'),
+      ],
+      'GET /documents/kb/k2': () => [],
+    })
+    renderApp('/knowledge-base/k1')
+    await screen.findByRole('heading', { name: '1 document' })
+    await user().upload(fileInput(), new File(['# Prices\n'], 'price-list.md'))
+    await screen.findByText('Reading its sections and indexing them…')
+
+    await user().click(screen.getByRole('link', { name: /Product manuals/ }))
+    await screen.findByRole('heading', { name: 'Product manuals' })
+    expect(screen.queryByText('price-list.md')).toBeNull()
+    if (finishAway) {
+      answer.resolve()
+      await waitFor(() => expect(created).toBeDefined())
+    }
+
+    await user().click(screen.getByRole('link', { name: /Store policies/ }))
+    await screen.findByRole('heading', { name: 'Store policies' })
+    if (!finishAway) {
+      expect(await screen.findByText('price-list.md')).toBeInTheDocument()
+      expect(screen.getByText('Reading its sections and indexing them…')).toBeInTheDocument()
+      answer.resolve()
+    }
+
     expect(await screen.findByRole('heading', { name: '2 documents' })).toBeInTheDocument()
     expect(screen.queryByText('Reading its sections and indexing them…')).toBeNull()
     expect(screen.getAllByText('price-list.md')).toHaveLength(1)
@@ -430,12 +477,13 @@ describe('deleting a document', () => {
     await confirmDelete()
 
     expect(await screen.findByRole('status')).toHaveTextContent('opening-hours.md deleted')
-    expect(screen.queryByText('opening-hours.md')).toBeNull()
+    // The row folds away: still in the page while it moves, but hidden from assistive technology.
+    expect(screen.getByText('opening-hours.md').closest('[aria-hidden="true"]')).not.toBeNull()
     expect(screen.getByRole('heading', { name: '1 document' })).toBeInTheDocument()
     expect(sent(api, 'DELETE')).toEqual([])
 
     await userEvent.click(screen.getByRole('button', { name: 'Undo' }))
-    expect(screen.getByText('opening-hours.md')).toBeInTheDocument()
+    expect(screen.getByText('opening-hours.md').closest('[aria-hidden="true"]')).toBeNull()
     expect(screen.queryByRole('status')).toBeNull()
     expect(sent(api, 'DELETE')).toEqual([])
   })

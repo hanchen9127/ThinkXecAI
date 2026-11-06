@@ -33,7 +33,7 @@ export default function Markdown({ text, className }: { text: string; className?
       escapeRawHtml
       openLinksInNewTab
       config={imagesAsLinks}
-      className={cx('min-w-0 break-words', className)}
+      className={cx('min-w-0 wrap-anywhere', className)}
     />
   )
 }

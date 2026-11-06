@@ -1,17 +1,20 @@
 import { Alert, Button, Select } from 'antd'
 import { useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
-import { type ChatSession, createChatMessage } from '../../api/api'
+import { type ChatSession, createChatMessage, stopChatSession } from '../../api/api'
 import { ApiError, path } from '../../api/http'
 import { useAgents } from '../../hooks/useAgents'
 import { useChatMessages } from '../../hooks/useChatMessages'
 import { useChatSessions } from '../../hooks/useChatSessions'
 import { useChatStream } from '../../hooks/useChatStream'
-import { useWorking } from '../../hooks/useWorking'
+import { useFollowLatest } from '../../hooks/useFollowLatest'
+import { newestMessage, useWorking } from '../../hooks/useWorking'
+import { COLUMN } from '../../layout/column'
+import { cx } from '../../utils/cx'
 import { errorMessage } from '../../utils/text'
 import AgentRun from '../chat/AgentRun'
 import Composer from '../chat/Composer'
-import { chatTitle, groupHistory, titleFrom } from '../chat/messages'
+import { chatTitle, groupHistory, retryQuestion, titleFrom } from '../chat/messages'
 
 /** `/`, `/chat` (a new chat, `?agent=<id>` chooses its agent), and `/chat/:chatSessionId`. */
 export default function AgentChatView() {
@@ -43,7 +46,7 @@ function NewChat() {
 
   if (!agent) {
     return (
-      <div className="flex flex-col gap-2 px-12 py-9">
+      <div className={cx(COLUMN, 'flex flex-col gap-2 py-9')}>
         {loading ? (
           <p className="m-0 text-muted">Loading agents…</p>
         ) : (
@@ -52,7 +55,7 @@ function NewChat() {
             <p className="m-0 text-muted">
               A chat needs an agent to answer, and there is none yet.
             </p>
-            <Link to="/agent" className="text-think">
+            <Link to="/agent" className="text-ink underline">
               Create an agent
             </Link>
           </>
@@ -74,7 +77,7 @@ function NewChat() {
       const session = created.current
       await createChatMessage({ sessionId: session.id, content })
       chatSessions.reload()
-      navigate(path`/chat/${session.id}`)
+      navigate(path`/chat/${session.id}`, { state: { quiet: true } })
     } catch (error) {
       setSendError(error)
       throw error
@@ -84,11 +87,8 @@ function NewChat() {
   return (
     <>
       {leftDeleted && (
-        <div
-          role="status"
-          className="border-b border-line bg-think-wash px-12 py-2.5 text-sm text-think-ink"
-        >
-          The chat you had open was deleted.
+        <div role="status" className="border-b border-line bg-surface text-sm text-muted">
+          <div className={cx(COLUMN, 'py-2.5')}>The chat you had open was deleted.</div>
         </div>
       )}
       <div className="box-border flex flex-1 flex-col justify-center px-12 py-12">
@@ -129,9 +129,19 @@ function Chat({ sessionId }: { sessionId: string }) {
   const { messages, loading, error, reload, send, receive } = useChatMessages(sessionId)
   const [sendError, setSendError] = useState<unknown>()
   const history = useMemo(() => groupHistory(messages), [messages])
-  const working = useWorking(messages)
+  const newest = useMemo(() => newestMessage(messages), [messages])
+  // The newest message when a stop found no run (a backend restart ended it): nothing will follow.
+  const [abandoned, setAbandoned] = useState<string>()
+  const working = useWorking(messages) && abandoned !== newest?.id
+  const since = newest?.createdAt
+  const [stopping, setStopping] = useState(false)
+  // The run Try again was used on: a second click must not send its question twice.
+  const retried = useRef<string>(undefined)
+  // "Stopping…" lasts until the run ends with its notice.
+  if (stopping && !working) setStopping(false)
 
   const session = chatSessions.chatSessions.find((s) => s.id === sessionId)
+  const follow = useFollowLatest(`${session !== undefined}:${messages.length}:${working}`)
   const stream = useChatStream(
     sessionId,
     {
@@ -146,7 +156,7 @@ function Chat({ sessionId }: { sessionId: string }) {
   )
   if (!session) {
     return (
-      <div className="flex flex-col gap-3 px-12 py-9">
+      <div className={cx(COLUMN, 'flex flex-col gap-3 py-9')}>
         {chatSessions.loading ? (
           <p className="m-0 text-muted">Loading the chat…</p>
         ) : chatSessions.error !== undefined ? (
@@ -157,7 +167,7 @@ function Chat({ sessionId }: { sessionId: string }) {
           <>
             <h1 className="m-0 text-xl font-semibold">Chat not found</h1>
             <p className="m-0 text-muted">It may have been deleted.</p>
-            <Link to="/chat" className="text-think">
+            <Link to="/chat" className="text-ink underline">
               Start a new chat
             </Link>
           </>
@@ -174,6 +184,7 @@ function Chat({ sessionId }: { sessionId: string }) {
 
   async function submit(content: string) {
     setSendError(undefined)
+    follow()
     try {
       await send(content)
       chatSessions.reload()
@@ -187,55 +198,85 @@ function Chat({ sessionId }: { sessionId: string }) {
     }
   }
 
+  function stop() {
+    setStopping(true)
+    setSendError(undefined)
+    stopChatSession(sessionId).then(
+      (found) => {
+        if (!found) setAbandoned(newest?.id)
+      },
+      (failure: unknown) => {
+        setStopping(false)
+        setSendError(failure)
+      },
+    )
+  }
+
+  /** Sends the question again as a new message (ADR 060); a failure shows like any send. */
+  function retry(run: string, question: string) {
+    if (retried.current === run) return
+    retried.current = run
+    submit(question).catch(() => {
+      retried.current = undefined
+    })
+  }
+
+  const question = agentGone ? null : retryQuestion(history)
+
   return (
     <>
-      <header className="border-b border-line bg-surface px-12 pt-6 pb-5">
-        <h1 className="m-0 text-xl font-semibold break-words">{chatTitle(session)}</h1>
-        <p className="m-0 mt-0.5 text-sm text-muted">
-          {agent ? `${agent.name} on ${agent.model}` : agentGone ? 'No agent' : '…'}
-        </p>
+      <header className="border-b border-line bg-surface">
+        <div className={cx(COLUMN, 'pt-6 pb-5')}>
+          <h1 className="m-0 text-xl font-semibold break-words">{chatTitle(session)}</h1>
+          <p className="m-0 mt-0.5 text-sm text-muted">
+            {agent ? (
+              <>
+                {agent.name} on <span className="font-mono text-xs">{agent.model}</span>
+              </>
+            ) : agentGone ? (
+              'No agent'
+            ) : (
+              '…'
+            )}
+          </p>
+        </div>
       </header>
       {stream.status === 'stopped' && (
-        <div
-          role="alert"
-          className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-danger-wash px-12 py-2.5 text-sm text-danger"
-        >
-          <span>
-            Live replies stopped.
-            {stream.problem === undefined
-              ? ' Messages you send are still saved.'
-              : ` ${errorMessage(stream.problem)}`}
-          </span>
-          <Button
-            size="small"
-            onClick={() => {
-              stream.reconnect()
-            }}
-          >
-            Try again
-          </Button>
+        <div role="alert" className="border-b border-line bg-danger-wash text-sm text-danger">
+          <div className={cx(COLUMN, 'flex flex-wrap items-center justify-between gap-3 py-2.5')}>
+            <span>
+              Live replies stopped.
+              {stream.problem === undefined
+                ? ' Messages you send are still saved.'
+                : ` ${errorMessage(stream.problem)}`}
+            </span>
+            <Button
+              size="small"
+              onClick={() => {
+                stream.reconnect()
+              }}
+            >
+              Try again
+            </Button>
+          </div>
         </div>
       )}
       {agentGone && (
-        <div
-          role="status"
-          className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-execute-wash px-12 py-2.5 text-sm text-execute-ink"
-        >
-          <span>Its agent was deleted. You can read this chat but not continue it.</span>
-          <Link to="/chat" className="font-semibold text-execute-ink">
-            New chat
-          </Link>
+        <div role="status" className="border-b border-line bg-surface text-sm text-ink">
+          <div className={cx(COLUMN, 'flex flex-wrap items-center justify-between gap-3 py-2.5')}>
+            <span>Its agent was deleted. You can read this chat but not continue it.</span>
+            <Link to="/chat" className="font-semibold text-ink underline">
+              New chat
+            </Link>
+          </div>
         </div>
       )}
 
-      <section
-        aria-label="Messages"
-        className="box-border flex w-full max-w-230 flex-1 flex-col gap-7 px-12 py-9"
-      >
+      <section aria-label="Messages" className={cx(COLUMN, 'flex flex-1 flex-col gap-3 py-9')}>
         {error !== undefined && (
           <div role="alert" className="flex flex-col items-start gap-2 text-muted">
             <p className="m-0">Couldn't load the messages. {errorMessage(error)}</p>
-            <button type="button" onClick={reload} className="text-think underline">
+            <button type="button" onClick={reload} className="cursor-pointer text-ink underline">
               Try again
             </button>
           </div>
@@ -246,11 +287,15 @@ function Chat({ sessionId }: { sessionId: string }) {
         )}
         {history.map((item, i) =>
           item.kind === 'user' ? (
+            // The user's message as a prompt line on a band, not a bubble (ADR 059).
             <div
               key={item.message.id}
-              className="max-w-130 self-end rounded-2xl rounded-br-sm bg-ink px-4 py-3 break-words whitespace-pre-wrap text-white"
+              className="flex gap-2.5 rounded-ui border border-line bg-surface px-3 py-2.5 not-first:mt-5"
             >
-              {item.message.content}
+              <span aria-hidden="true" className="font-mono text-sm text-muted">
+                &gt;
+              </span>
+              <p className="m-0 min-w-0 break-words whitespace-pre-wrap">{item.message.content}</p>
             </div>
           ) : (
             <AgentRun
@@ -258,17 +303,25 @@ function Chat({ sessionId }: { sessionId: string }) {
               agentName={agentName}
               steps={item.steps}
               answers={item.answers}
+              ms={item.ms}
               working={working && i === history.length - 1}
+              since={since}
+              onRetry={
+                question !== null && i === history.length - 1
+                  ? () => retry(item.id, question)
+                  : undefined
+              }
             />
           ),
         )}
-        {/* Nothing from the agent yet: its card starts with the dots. */}
+        {/* Nothing from the agent yet: its trace starts with the waiting row. */}
         {working && history.at(-1)?.kind === 'user' && (
-          <AgentRun agentName={agentName} steps={[]} answers={[]} working />
+          <AgentRun agentName={agentName} steps={[]} answers={[]} working since={since} />
         )}
       </section>
 
-      <div className="box-border flex w-full max-w-230 flex-col gap-3 px-12 pt-2 pb-9">
+      {/* Stays on screen while the steps above it are read (F3). */}
+      <div className={cx(COLUMN, 'sticky bottom-0 z-10 flex flex-col gap-3 bg-ground pt-2 pb-9')}>
         {sendError !== undefined && <Alert type="error" showIcon title={errorMessage(sendError)} />}
         {stream.status === 'replaced' ? (
           // Replies would only reach the other tab, so nothing is sent from here (V4 C4 C).
@@ -289,6 +342,8 @@ function Chat({ sessionId }: { sessionId: string }) {
             disabled={agentGone}
             placeholder={agentGone ? "This chat can't continue" : `Ask ${agentName}`}
             onSend={submit}
+            onStop={working ? stop : undefined}
+            stopping={stopping}
           />
         )}
       </div>

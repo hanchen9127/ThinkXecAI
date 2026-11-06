@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ChatMessage } from '../api/api'
+import { endsRun } from '../components/chat/messages'
 import { parseApiTimestamp } from '../utils/time'
 
 /**
@@ -7,9 +8,6 @@ import { parseApiTimestamp } from '../utils/time'
  * is taken to have died without a notice (a backend restart), D4.
  */
 export const WORKING_TIMEOUT_MS = 7 * 60 * 1000
-
-/** The tool that ends a run when called in a reply with text (ADR 045). */
-const TERMINATE = 'terminate'
 
 /**
  * Whether the agent still owes a reply after `last`, the newest of `messages` (D4): a user message,
@@ -35,25 +33,13 @@ function callerOf(result: ChatMessage, messages: ChatMessage[]) {
   return caller
 }
 
-function endsRun(reply: ChatMessage | undefined) {
-  return (
-    !!reply?.content?.trim() && !!reply.metadata?.toolCalls?.some((call) => call.name === TERMINATE)
-  )
-}
-
 /**
  * Whether to show that the agent is working (ADR 055): inferred from the newest message, and off
  * once that message is 7 minutes old, counted from its own time, so a run that died long ago shows
  * nothing when its chat is opened. Display only: the input stays enabled (ADR 042).
  */
 export function useWorking(messages: ChatMessage[]): boolean {
-  const last = useMemo(() => {
-    let newest: ChatMessage | undefined
-    for (const message of messages) {
-      if (!newest || time(message) >= time(newest)) newest = message
-    }
-    return newest
-  }, [messages])
+  const last = useMemo(() => newestMessage(messages), [messages])
   const [expired, setExpired] = useState<string>()
 
   const waiting = awaitsAgent(last, messages)
@@ -66,6 +52,15 @@ export function useWorking(messages: ChatMessage[]): boolean {
   }, [waiting, id, deadline])
 
   return waiting && expired !== id
+}
+
+/** The newest of `messages` by creation time; the working timer counts from it (ADR 059). */
+export function newestMessage(messages: ChatMessage[]): ChatMessage | undefined {
+  let newest: ChatMessage | undefined
+  for (const message of messages) {
+    if (!newest || time(message) >= time(newest)) newest = message
+  }
+  return newest
 }
 
 function time(message: ChatMessage) {

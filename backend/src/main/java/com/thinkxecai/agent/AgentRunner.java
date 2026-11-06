@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.function.BooleanSupplier;
 
 /**
  * Runs an agent for a session once and makes sure the session learns how it ended: a run that cannot
@@ -23,14 +24,20 @@ public class AgentRunner {
     private final GeneratedMessageService generatedMessageService;
     private final GeneratedMessagePublisher publisher;
 
-    /** @param messageId the user message the run answers (ADR 046) */
-    public void run(UUID agentId, UUID sessionId, UUID messageId) {
+    /**
+     * @param messageId     the user message the run answers (ADR 046)
+     * @param stopRequested true once the user stopped the session's runs (ADR 060)
+     */
+    public void run(UUID agentId, UUID sessionId, UUID messageId, BooleanSupplier stopRequested) {
         log.info("Agent {} runs for session {}", agentId, sessionId);
         try {
-            AgentRuntime.Outcome outcome = agentRuntimeFactory.create(agentId, sessionId, messageId).run();
+            AgentRuntime.Outcome outcome = agentRuntimeFactory.create(agentId, sessionId, messageId).run(stopRequested);
             log.info("Agent {} in session {} ended: {}", agentId, sessionId, outcome);
-            if (outcome == AgentRuntime.Outcome.MAX_STEPS) {
-                notify(sessionId, AgentNotices.MAX_STEPS);
+            switch (outcome) {
+                case MAX_STEPS -> notify(sessionId, AgentNotices.MAX_STEPS);
+                case STOPPED -> notify(sessionId, AgentNotices.STOPPED);
+                case ANSWERED, TERMINATED -> {
+                }
             }
         } catch (ChatSessionGoneException e) {
             log.info("Agent {} stopped: session {} was deleted", agentId, sessionId);

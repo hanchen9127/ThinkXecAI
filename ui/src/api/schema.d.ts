@@ -132,6 +132,22 @@ export interface paths {
         patch: operations["updateChatSession"];
         trace?: never;
     };
+    "/api/chat-sessions/{chatSessionId}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["stopChatSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/documents": {
         parameters: {
             query?: never;
@@ -267,6 +283,12 @@ export interface components {
             /** Format: int32 */
             code: number;
             data: components["schemas"]["AgentVO"];
+            message: string;
+        };
+        ApiResponseBoolean: {
+            /** Format: int32 */
+            code: number;
+            data: boolean;
             message: string;
         };
         ApiResponseChatMessageVO: {
@@ -770,6 +792,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiResponseChatSessionVO"];
+                };
+            };
+        };
+    };
+    stopChatSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chatSessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponseBoolean"];
                 };
             };
         };

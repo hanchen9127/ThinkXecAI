@@ -1,5 +1,6 @@
 package com.thinkxecai.service.impl;
 
+import com.thinkxecai.agent.AgentRunScheduler;
 import com.thinkxecai.converter.ChatSessionConverter;
 import com.thinkxecai.exception.BizException;
 import com.thinkxecai.mapper.AgentMapper;
@@ -28,6 +29,7 @@ public class ChatSessionFacadeServiceImpl implements ChatSessionFacadeService {
     private final AgentMapper agentMapper;
     private final ChatSessionConverter chatSessionConverter;
     private final SseService sseService;
+    private final AgentRunScheduler agentRunScheduler;
 
     @Override
     public List<ChatSessionVO> listChatSessions() {
@@ -69,6 +71,12 @@ public class ChatSessionFacadeServiceImpl implements ChatSessionFacadeService {
         changes.setAgentId(null);
         chatSessionMapper.update(changes);
         return toVO(findExisting(chatSessionId));
+    }
+
+    @Override
+    public boolean stopChatSession(UUID chatSessionId) {
+        findExisting(chatSessionId);
+        return agentRunScheduler.stop(chatSessionId);
     }
 
     @Override

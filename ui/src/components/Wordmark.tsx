@@ -1,8 +1,4 @@
-/** The product name; "Xec" in the accent colour, after Think-Execute. */
+/** The product name at the top of the list panel, smaller than a page heading (ADR 058). */
 export default function Wordmark() {
-  return (
-    <p className="m-0 border-b border-hairline pb-4.5 text-wordmark font-bold text-ink">
-      Think<span className="text-think">Xec</span>AI
-    </p>
-  )
+  return <p className="m-0 text-sm font-semibold text-ink">ThinkXecAI</p>
 }

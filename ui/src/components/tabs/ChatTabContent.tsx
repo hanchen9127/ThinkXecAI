@@ -11,6 +11,7 @@ import { cx } from '../../utils/cx'
 import { errorMessage } from '../../utils/text'
 import { formatListTime } from '../../utils/time'
 import DeleteFeedback from '../DeleteFeedback'
+import Expandable from '../Expandable'
 import RenameField from '../RenameField'
 import RowActions from '../RowActions'
 import { TITLE_LENGTH, chatTitle } from '../chat/messages'
@@ -34,13 +35,13 @@ export default function ChatTabContent() {
   const agentName = (session: ChatSession) =>
     session.agentId ? (agentNames.get(session.agentId) ?? 'Unknown agent') : 'No agent'
 
-  const visible = chatSessions.filter((session) => !deletes.hidden.has(session.id))
   const needle = query.trim().toLowerCase()
-  const shown = needle
-    ? visible.filter((session) =>
-        `${chatTitle(session)} ${agentName(session)}`.toLowerCase().includes(needle),
-      )
-    : visible
+  const matches = (session: ChatSession) =>
+    !needle || `${chatTitle(session)} ${agentName(session)}`.toLowerCase().includes(needle)
+  const visible = chatSessions.filter((session) => !deletes.hidden.has(session.id))
+  const shown = visible.filter(matches)
+  // A deleted chat stays in the list while its row folds away (ADR 061).
+  const listed = chatSessions.filter(matches)
 
   function closeSearch() {
     setSearching(false)
@@ -89,7 +90,7 @@ export default function ChatTabContent() {
       {error !== undefined && (
         <div role="alert" className="flex flex-col items-start gap-2 text-muted">
           <p className="m-0">Couldn't load chats. {errorMessage(error)}</p>
-          <button type="button" onClick={reload} className="text-think underline">
+          <button type="button" onClick={reload} className="cursor-pointer text-ink underline">
             Try again
           </button>
         </div>
@@ -98,12 +99,13 @@ export default function ChatTabContent() {
       {!loading && error === undefined && visible.length === 0 && (
         <p className="m-0 text-muted">No chats yet.</p>
       )}
-      {shown.length > 0 && (
+      {listed.length > 0 && (
         <ul className="m-0 list-none p-0">
-          {shown.map((session) => (
+          {listed.map((session) => (
             <ChatItem
               key={session.id}
               session={session}
+              leaving={deletes.hidden.has(session.id)}
               agentName={agentName(session)}
               open={session.id === openId}
               onRename={(title) => update(session.id, { title }).then(() => undefined)}
@@ -122,12 +124,15 @@ export default function ChatTabContent() {
 
 function ChatItem({
   session,
+  leaving,
   agentName,
   open,
   onRename,
   onDelete,
 }: {
   session: ChatSession
+  /** Deleted, waiting for Undo: the row folds away. */
+  leaving: boolean
   agentName: string
   open: boolean
   onRename: (title: string) => Promise<void>
@@ -137,7 +142,15 @@ function ChatItem({
   const title = chatTitle(session)
 
   return (
-    <li className={cx('border-b border-hairline py-3 pl-3', open && 'shadow-current')}>
+    <Expandable
+      as="li"
+      open={!leaving}
+      motion="fold"
+      className={cx(
+        'border-b border-hairline py-3 pl-3 transition active:scale-98',
+        open ? 'bg-ground' : 'hover:bg-ground',
+      )}
+    >
       {editing ? (
         <RenameField
           label={`Title of ${title}`}
@@ -151,7 +164,7 @@ function ChatItem({
           <Link
             to={path`/chat/${session.id}`}
             aria-current={open ? 'page' : undefined}
-            className="min-w-0 flex-1 text-ink no-underline hover:text-think"
+            className="min-w-0 flex-1 text-ink no-underline hover:underline"
           >
             <span className={cx('block break-words', open && 'font-semibold')}>{title}</span>
             <span className="block text-xs text-muted">
@@ -166,6 +179,6 @@ function ChatItem({
           />
         </div>
       )}
-    </li>
+    </Expandable>
   )
 }

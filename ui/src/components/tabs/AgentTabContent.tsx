@@ -31,7 +31,7 @@ export default function AgentTabContent() {
       {error !== undefined && (
         <div role="alert" className="flex flex-col items-start gap-2 text-muted">
           <p className="m-0">Couldn't load agents. {errorMessage(error)}</p>
-          <button type="button" onClick={reload} className="text-think underline">
+          <button type="button" onClick={reload} className="cursor-pointer text-ink underline">
             Try again
           </button>
         </div>
@@ -74,13 +74,18 @@ function AgentItem({
   const toggle = (part: 'tools' | 'knowledge') => setShown(shown === part ? null : part)
 
   return (
-    <li className={cx('border-b border-hairline py-3.5 pl-3', open && 'shadow-current')}>
+    <li
+      className={cx(
+        'border-b border-hairline py-3.5 pl-3 transition active:scale-98',
+        open ? 'bg-ground' : 'hover:bg-ground',
+      )}
+    >
       <div className="flex items-center gap-2">
         <Link
           to={path`/agent/${agent.id}`}
           aria-current={open ? 'page' : undefined}
           className={cx(
-            'min-w-0 flex-1 text-ink no-underline hover:text-think',
+            'min-w-0 flex-1 text-ink no-underline hover:underline',
             open && 'font-semibold',
           )}
         >
@@ -103,8 +108,8 @@ function AgentItem({
           />
         </Dropdown>
       </div>
-      <p className="m-0 text-xs text-muted">
-        {agent.model},{' '}
+      <p className="m-0 font-mono text-xs text-muted">{agent.model}</p>
+      <p className="m-0 flex flex-wrap gap-x-3 text-xs text-muted">
         <CountToggle
           count={agent.allowedTools.length}
           one="tool"
@@ -112,7 +117,6 @@ function AgentItem({
           expanded={shown === 'tools'}
           onToggle={() => toggle('tools')}
         />
-        ,{' '}
         <CountToggle
           count={agent.allowedKbs.length}
           one="knowledge base"
@@ -144,13 +148,13 @@ function CountToggle(props: {
   onToggle: () => void
 }) {
   const label = countLabel(props.count, props.one, props.many)
-  if (props.count === 0) return <span>{label}</span>
+  if (props.count === 0) return <span className="flex h-6 items-center">{label}</span>
   return (
     <button
       type="button"
       aria-expanded={props.expanded}
       onClick={props.onToggle}
-      className="inline cursor-pointer text-think-ink underline decoration-dotted"
+      className="flex h-6 cursor-pointer items-center text-ink underline decoration-dotted focus-visible:outline-offset-0"
     >
       {label}
     </button>

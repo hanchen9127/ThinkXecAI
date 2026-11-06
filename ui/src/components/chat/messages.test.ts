@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import type { ChatMessage } from '../../api/api'
-import { chatTitle, decodeToolResult, formatArguments, groupHistory, titleFrom } from './messages'
+import {
+  chatTitle,
+  decodeToolResult,
+  formatArguments,
+  formatDuration,
+  groupHistory,
+  isNotice,
+  summarizeResult,
+  titleFrom,
+} from './messages'
 
 let clock = 0
 function message(
@@ -20,6 +29,47 @@ const call = (id: string, name: string, args = '{}') => ({
 })
 const result = (id: string, name: string, data: string) =>
   message('tool', null, { toolResponse: { id, name, responseData: data } })
+
+describe('groupHistory with terminate', () => {
+  const ask = () => message('user', 'Count the products.')
+  const reply = (text: string | null, ...calls: ReturnType<typeof call>[]) =>
+    message('assistant', text, { toolCalls: calls })
+
+  it('makes a reply with text that called terminate the answer, with no step for it', () => {
+    const question = ask()
+    const query = reply(null, call('c1', 'databaseQuery'))
+    const end = reply('There are 20.', call('c2', 'terminate'))
+    const [, run] = groupHistory([
+      question,
+      query,
+      result('c1', 'databaseQuery', '"20"'),
+      end,
+      result('c2', 'terminate', '"Done"'),
+    ])
+
+    expect(run).toMatchObject({ kind: 'agent', answers: [{ id: end.id }] })
+    expect(run.kind === 'agent' && run.steps.map((step) => step.id)).toEqual([query.id])
+  })
+
+  it('keeps the other tools of that reply as a step, without its text as a thought', () => {
+    const question = ask()
+    const end = reply('Sent.', call('c1', 'sendEmail'), call('c2', 'terminate'))
+    const [, run] = groupHistory([question, end])
+
+    expect(run).toMatchObject({ answers: [{ id: end.id }] })
+    expect(run.kind === 'agent' && run.steps).toMatchObject([
+      { think: null, calls: [{ call: { name: 'sendEmail' } }] },
+    ])
+  })
+
+  it('keeps terminate without text as a step: it is refused and the run goes on', () => {
+    const question = ask()
+    const refused = reply(null, call('c1', 'terminate'))
+    const [, run] = groupHistory([question, refused])
+
+    expect(run).toMatchObject({ answers: [], steps: [{ id: refused.id }] })
+  })
+})
 
 describe('groupHistory', () => {
   it('puts everything between two user messages into one run of steps and answers', () => {
@@ -41,22 +91,26 @@ describe('groupHistory', () => {
     expect(items.map((i) => i.kind)).toEqual(['user', 'agent', 'user'])
     const run = items[1]
     if (run.kind !== 'agent') throw new Error('expected a run')
+    // One second between messages: a Think counts from the message before it, a call to its result.
     expect(run.steps).toEqual([
       {
         id: step1.id,
         think: 'I will look it up.',
-        calls: [{ call: call('c1', 'dataBaseTool'), result: '"| sku |"' }],
+        thinkMs: 1000,
+        calls: [{ call: call('c1', 'dataBaseTool'), result: '"| sku |"', ms: 1000 }],
       },
       {
         id: step2.id,
         think: null,
+        thinkMs: 1000,
         calls: [
-          { call: call('c2', 'knowledgeSearch'), result: undefined },
-          { call: call('c3', 'dateTool'), result: '"2026-11-02"' },
+          { call: call('c2', 'knowledgeSearch'), result: undefined, ms: undefined },
+          { call: call('c3', 'dateTool'), result: '"2026-11-02"', ms: 1000 },
         ],
       },
     ])
     expect(run.answers).toEqual([answer])
+    expect(run.ms).toBe(5000)
   })
 
   it('orders by creation time and leaves out system messages and empty answers', () => {
@@ -70,7 +124,7 @@ describe('groupHistory', () => {
 
     expect(items).toEqual([
       { kind: 'user', message: question },
-      { kind: 'agent', id: empty.id, steps: [], answers: [answer] },
+      { kind: 'agent', id: empty.id, steps: [], answers: [answer], ms: 3000 },
     ])
   })
 
@@ -82,6 +136,44 @@ describe('groupHistory', () => {
 
     const [, run] = groupHistory([question, step, notice])
     expect(run.kind === 'agent' && run.answers).toEqual([notice])
+  })
+})
+
+describe('summarizeResult', () => {
+  it('counts the rows of a table, ignoring the row note under it', () => {
+    const table = '| sku |\n| --- |\n| SP-1 |\n| SP-2 |\n\n(2 rows)'
+    expect(summarizeResult(JSON.stringify(table))).toBe('2 rows')
+    expect(summarizeResult(JSON.stringify('| sku |\n| --- |\n| SP-1 |\n'))).toBe('1 row')
+  })
+
+  it('counts a list, and shows an object or text by its start', () => {
+    expect(summarizeResult('[1,2,3]')).toBe('3 items')
+    expect(summarizeResult('{"city": "Sydney"}')).toBe('{"city":"Sydney"}')
+    expect(summarizeResult(JSON.stringify('\nReturns within 30 days.\nMore text.'))).toBe(
+      'Returns within 30 days.',
+    )
+    expect(summarizeResult('x'.repeat(100))).toBe(`${'x'.repeat(80)}…`)
+  })
+})
+
+describe('isNotice', () => {
+  it('knows the notices a run ends with, and nothing else', () => {
+    expect(isNotice('Stopped.')).toBe(true)
+    expect(isNotice('The agent could not finish this request: the agent no longer exists.')).toBe(
+      true,
+    )
+    expect(isNotice('The agent stopped after 20 steps without finishing the request.')).toBe(true)
+    expect(isNotice('Stopped. Then the stock was checked.')).toBe(false)
+    expect(isNotice('One phone is out of stock.')).toBe(false)
+    expect(isNotice(null)).toBe(false)
+  })
+})
+
+describe('formatDuration', () => {
+  it('shows seconds with one decimal, minutes from 60 s', () => {
+    expect(formatDuration(400)).toBe('0.4 s')
+    expect(formatDuration(12_000)).toBe('12.0 s')
+    expect(formatDuration(65_000)).toBe('1 min 5 s')
   })
 })
 

@@ -23,11 +23,13 @@ if (!window.ResizeObserver) {
   }
 }
 
-// jsdom has no matchMedia; Ant Design reads it for responsive layouts. Nothing matches.
+// jsdom has no matchMedia; Ant Design reads it for responsive layouts. Nothing matches, except a
+// wish for reduced motion: tests check states, not motion (ADR 061), and without motion Ant Design
+// removes a closed menu or dialog at once.
 if (!window.matchMedia) {
   window.matchMedia = (query: string) =>
     ({
-      matches: false,
+      matches: query === '(prefers-reduced-motion: reduce)',
       media: query,
       onchange: null,
       addEventListener: () => {},
