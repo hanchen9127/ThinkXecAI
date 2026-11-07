@@ -21,6 +21,8 @@ The user's message is a surface-coloured band with a muted mono `>` before it, n
 
 **Amended 2026-11-06.** A reply with text that called `terminate` is the run's answer and folds the run like any answer; `terminate` itself is not shown (found against the running stack: half of the finished runs ended this way and never folded). A chat opens at its end and follows new messages while the reader is at the end (owner).
 
+**Amended 2026-11-08 (owner, from the design critique of 2026-11-06).** The trace says when something went wrong. A tool call whose result records a failure (ADR 064) gets a danger `×` on the rail in place of its dot, and its summary starts with the kind in words ("Refused:", "Wrong arguments:", "Unknown tool:", "Failed:"); the folded line adds "× N refused" when every failure is a refusal, else "× N failed". A shape, not only a colour, because the danger red and the Execute orange are close in hue; a danger dot with "failed" and a chip per kind (a tag style ADR 058 had removed) were not chosen. A run that ends with a notice (Stopped., a failure, out of steps) stays open instead of folding, so the step where it ended is in view. Notices no longer look like answers: a muted line after a small mark (a square for Stopped., a circled "!" for a failure), Try again still a text button; a bordered box and a tinted block for failures were not chosen. Not taken: one time per step for calls made in parallel; each call keeps its own time, so their times can add up to more than the step's. Tools with outside effects, such as sending email, get no mark of their own (owner, 2026-11-06).
+
 ## Trade-offs
 
 - Summaries are derived on the client from stored tool results; a result the summary does not understand shows only the tool name.

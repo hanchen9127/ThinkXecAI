@@ -302,6 +302,63 @@ describe('a chat', () => {
     expect(within(steps).queryByRole('table')).toBeNull()
   })
 
+  it('marks a failed call with a cross and its kind, and counts it in the folded line', async () => {
+    clock = 0
+    backend({
+      'GET /chat-messages/session/s1': () => [
+        msg('user', 'Clear the old orders.'),
+        msg('assistant', 'Deleting them.', toolCall('c1', 'databaseQuery', '{"sql":"DELETE"}')),
+        msg('tool', null, {
+          toolResponse: {
+            id: 'c1',
+            name: 'databaseQuery',
+            responseData: '"Only SELECT statements are allowed."',
+            failure: 'REFUSED',
+          },
+        }),
+        msg('assistant', 'I can only read the database.'),
+      ],
+    })
+    renderApp('/chat/s1')
+
+    const run = await screen.findByRole('article', { name: 'Store analyst' })
+    expect(within(run).getByText('1 refused')).toBeInTheDocument()
+    await userEvent.click(within(run).getByRole('button', { name: 'Show steps' }))
+    const steps = within(run).getByRole('list', { name: 'Agent steps' })
+    const [think, execute] = within(steps).getAllByRole('listitem')
+    expect(within(execute).getByText('Refused:')).toHaveClass('text-danger')
+    expect(execute).toHaveTextContent('Refused: Only SELECT statements are allowed.')
+    // a shape, not only a colour: the cross takes the dot's place on the rail
+    expect(execute.querySelector('.rail-mark [data-mark="failed"]')).not.toBeNull()
+    expect(think.querySelector('.rail-mark [data-mark="failed"]')).toBeNull()
+  })
+
+  it.each([
+    ['Stopped.', 'stopped'],
+    ['The agent could not finish this request: the model did not answer.', 'failed'],
+  ])(
+    'keeps a run that ended with %j open, its notice a quiet line after a mark',
+    async (notice, mark) => {
+      clock = 0
+      backend({
+        'GET /chat-messages/session/s1': () => [
+          msg('user', 'What is the date?'),
+          msg('assistant', 'Checking.', toolCall('c1', 'dateTool', '{}')),
+          toolResult('c1', 'dateTool', '"2026-11-02"'),
+          msg('assistant', notice),
+        ],
+      })
+      renderApp('/chat/s1')
+
+      const run = await screen.findByRole('article', { name: 'Store analyst' })
+      expect(within(run).getByRole('list', { name: 'Agent steps' })).toBeInTheDocument()
+      expect(within(run).queryByRole('button', { name: 'Show steps' })).toBeNull()
+      const line = within(run).getByText(notice).closest('p')!
+      expect(line).toHaveClass('text-muted')
+      expect(line.querySelector(`[data-mark="${mark}"]`)).not.toBeNull()
+    },
+  )
+
   it('sends a message and moves the chat up the list', async () => {
     const api = backend({
       'POST /chat-messages': ({ body }) => ({ ...msg('user', null), ...(body as object) }),

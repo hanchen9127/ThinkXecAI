@@ -1,14 +1,37 @@
-import type { ChatMessage, ToolCallMetadata } from '../../api/api'
+import type { ChatMessage, ToolCallMetadata, ToolResponseMetadata } from '../../api/api'
 import { parseApiTimestamp } from '../../utils/time'
+
+/** Why a tool call failed, as the backend recorded it (ADR 064); null when it succeeded. */
+export type ToolFailure = ToolResponseMetadata['failure']
 
 /**
  * One tool call of a step, with its result once the tool message is stored; `ms` is the time from
- * the call to its result (ADR 059).
+ * the call to its result (ADR 059), `failure` why it failed, if it did (ADR 064).
  */
 export interface ToolCall {
   call: ToolCallMetadata
   result: string | undefined
   ms: number | undefined
+  failure: ToolFailure
+}
+
+/** A failure kind as the trace says it, before the result's own text (ADR 059, amended 2026-11-08). */
+export const FAILURE_WORDS: Record<NonNullable<ToolFailure>, string> = {
+  REFUSED: 'Refused',
+  INVALID_ARGUMENTS: 'Wrong arguments',
+  UNKNOWN_TOOL: 'Unknown tool',
+  TOOL_ERROR: 'Failed',
+}
+
+/**
+ * The folded line's count of failed calls: "2 refused" when every failure was a rule declining the
+ * call, "2 failed" otherwise; null when none failed.
+ */
+export function failedLabel(calls: ToolCall[]): string | null {
+  const failures = calls.flatMap(({ failure }) => (failure ? [failure] : []))
+  if (failures.length === 0) return null
+  const refused = failures.every((failure) => failure === 'REFUSED')
+  return `${failures.length} ${refused ? 'refused' : 'failed'}`
 }
 
 /**
@@ -51,10 +74,17 @@ export function groupHistory(messages: ChatMessage[]): HistoryItem[] {
     (a, b) => parseApiTimestamp(a.createdAt).getTime() - parseApiTimestamp(b.createdAt).getTime(),
   )
   const time = (message: ChatMessage) => parseApiTimestamp(message.createdAt).getTime()
-  const results = new Map<string, { data: string; at: number }>()
+  const results = new Map<string, { data: string; at: number; failure: ToolFailure }>()
   for (const message of ordered) {
     const response = message.role === 'tool' ? message.metadata?.toolResponse : undefined
-    if (response) results.set(response.id, { data: response.responseData, at: time(message) })
+    // Tool messages saved before ADR 064 have no failure: they read as successes.
+    if (response) {
+      results.set(response.id, {
+        data: response.responseData,
+        at: time(message),
+        failure: response.failure ?? null,
+      })
+    }
   }
 
   const items: HistoryItem[] = []
@@ -86,7 +116,12 @@ export function groupHistory(messages: ChatMessage[]): HistoryItem[] {
         thinkMs: previous === undefined ? undefined : at - previous,
         calls: calls.map((call) => {
           const result = results.get(call.id)
-          return { call, result: result?.data, ms: result && result.at - at }
+          return {
+            call,
+            result: result?.data,
+            ms: result && result.at - at,
+            failure: result?.failure ?? null,
+          }
         }),
       })
     }
@@ -174,6 +209,9 @@ export function formatArguments(args: string): string {
 export function isNotice(content: string | null): boolean {
   return NOTICE.test(content ?? '')
 }
+
+/** The notice of a run the user stopped (ADR 060), unlike the ones of a run that failed. */
+export const STOPPED = 'Stopped.'
 
 const NOTICE =
   /^(?:Stopped\.$|The agent could not finish this request: |The agent stopped after \d+ steps )/

@@ -6,9 +6,12 @@ import Expandable from '../Expandable'
 import Tag from '../Tag'
 import Markdown from './Markdown'
 import {
+  FAILURE_WORDS,
+  STOPPED,
   type Step,
   type ToolCall,
   decodeToolResult,
+  failedLabel,
   formatArguments,
   formatDuration,
   isNotice,
@@ -24,8 +27,11 @@ type Row =
  * What the agent did for one user message, as a trace (ADR 059): no card, its steps on one rail,
  * then its answers. While it works every step shows, and a skeleton row with a timer counts from
  * `since`, its newest message; once it has answered, the steps fold into one line above the answer
- * ("4 steps in 6.8 s" and the tools used), opened with Show steps. With `onRetry`, a notice that
- * ends the run ("Stopped.", a failure) is followed by Try again (ADR 060).
+ * ("4 steps in 6.8 s" and the tools used), opened with Show steps. A failed tool call has a cross on
+ * the rail and its kind before its summary, and the folded line counts the failures. A run that ends
+ * with a notice ("Stopped.", a failure) stays open, and its notices are a quiet line after a mark,
+ * not an answer (ADR 059, amended 2026-11-08). With `onRetry`, the last notice is followed by Try
+ * again (ADR 060).
  */
 export default function AgentRun({
   agentName,
@@ -52,9 +58,13 @@ export default function AgentRun({
     () => new Set([...rows.map((row) => row.key), ...(working ? [WAITING] : [])]),
   )
   const fresh = (key: string) => !initial.has(key)
-  const folded = answers.length > 0 && !working
+  // A run that ended with a notice never got to an answer: its steps show where it ended.
+  const endedWithNotice = isNotice(answers.at(-1)?.content ?? null)
+  const folded = answers.length > 0 && !working && !endedWithNotice
   const lastNotice = answers.findLast((answer) => isNotice(answer.content))
-  const tools = [...new Set(steps.flatMap((step) => step.calls.map(({ call }) => call.name)))]
+  const calls = steps.flatMap((step) => step.calls)
+  const tools = [...new Set(calls.map(({ call }) => call.name))]
+  const failed = failedLabel(calls)
 
   return (
     <article aria-label={agentName} className="flex flex-col gap-3">
@@ -71,6 +81,12 @@ export default function AgentRun({
                   {tool}
                 </Tag>
               ))}
+              {failed && (
+                <span className="inline-flex items-center gap-1 text-danger">
+                  <Cross className="size-2.5" />
+                  {failed}
+                </span>
+              )}
               <button
                 type="button"
                 aria-expanded={expanded}
@@ -87,6 +103,7 @@ export default function AgentRun({
                 <RailItem
                   key={row.key}
                   dot={row.kind === 'think' ? 'bg-think' : 'bg-execute'}
+                  failed={row.kind === 'execute' && row.toolCall.failure !== null}
                   last={i === rows.length - 1 && !working}
                   fresh={fresh(row.key)}
                   grows={fresh(rows[i + 1]?.key ?? (working ? WAITING : ''))}
@@ -114,17 +131,12 @@ export default function AgentRun({
         </div>
       )}
       {answers.map((answer) =>
-        onRetry && answer === lastNotice ? (
-          <div key={answer.id} className="flex flex-wrap items-baseline gap-2.5">
-            <Markdown text={answer.content ?? ''} className="text-base" />
-            <button
-              type="button"
-              onClick={onRetry}
-              className="cursor-pointer text-sm text-ink underline"
-            >
-              Try again
-            </button>
-          </div>
+        isNotice(answer.content) ? (
+          <Notice
+            key={answer.id}
+            text={answer.content ?? ''}
+            onRetry={answer === lastNotice ? onRetry : undefined}
+          />
         ) : (
           <Markdown key={answer.id} text={answer.content ?? ''} className="max-w-prose text-base" />
         ),
@@ -149,18 +161,93 @@ function toRows(steps: Step[]): Row[] {
 }
 
 /**
- * A rail row: the dot, the line down to the next row, and the row's content. A `fresh` row arrived
- * while the run was watched and fades in; `grows` marks the line under it, drawn when the next row
- * arrives (index.css).
+ * A notice a run ended with, as a quiet line after a mark: a square for a stop, a circled "!" for a
+ * failure (ADR 059, amended 2026-11-08). Plain text: the notices are the backend's fixed sentences.
+ */
+function Notice({ text, onRetry }: { text: string; onRetry: (() => void) | undefined }) {
+  return (
+    <p className="m-0 flex items-start gap-2 text-sm text-muted">
+      {text === STOPPED ? <StopMark /> : <FailureMark />}
+      <span className="min-w-0">
+        <span>{text}</span>
+        {onRetry && (
+          <button
+            type="button"
+            onClick={onRetry}
+            className="ml-2.5 cursor-pointer text-sm text-ink underline"
+          >
+            Try again
+          </button>
+        )}
+      </span>
+    </p>
+  )
+}
+
+function StopMark() {
+  return (
+    <svg
+      aria-hidden="true"
+      data-mark="stopped"
+      viewBox="0 0 12 12"
+      className="mt-1 size-3 shrink-0 text-muted"
+    >
+      <rect x="2" y="2" width="8" height="8" rx="1" fill="currentColor" />
+    </svg>
+  )
+}
+
+function FailureMark() {
+  return (
+    <svg
+      aria-hidden="true"
+      data-mark="failed"
+      viewBox="0 0 12 12"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      className="mt-1 size-3 shrink-0 text-danger"
+    >
+      <circle cx="6" cy="6" r="4.8" />
+      <path d="M6 3.4v3.2M6 8.4v.2" />
+    </svg>
+  )
+}
+
+/** The danger cross of a failed tool call: a shape, as the danger red is close to Execute's orange. */
+function Cross({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      data-mark="failed"
+      viewBox="0 0 12 12"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      className={cx('shrink-0 text-danger', className)}
+    >
+      <path d="M2.5 2.5l7 7M9.5 2.5l-7 7" />
+    </svg>
+  )
+}
+
+/**
+ * A rail row: the dot (a cross for a failed tool call), the line down to the next row, and the row's
+ * content. A `fresh` row arrived while the run was watched and fades in; `grows` marks the line
+ * under it, drawn when the next row arrives (index.css).
  */
 function RailItem({
   dot,
+  failed = false,
   last,
   fresh,
   grows,
   children,
 }: {
   dot: string
+  failed?: boolean
   last: boolean
   fresh: boolean
   grows: boolean
@@ -169,8 +256,17 @@ function RailItem({
   return (
     <li className="flex gap-3" data-fresh={fresh || undefined} data-grows={grows || undefined}>
       <div aria-hidden="true" className="rail-mark flex w-3.5 shrink-0 flex-col items-center">
-        <span className="h-1.5 shrink-0" />
-        <span className={cx('rail-dot size-2 shrink-0 rounded-full', dot)} />
+        {failed ? (
+          <>
+            <span className="h-0.75 shrink-0" />
+            <Cross className="rail-dot size-3" />
+          </>
+        ) : (
+          <>
+            <span className="h-1.5 shrink-0" />
+            <span className={cx('rail-dot size-2 shrink-0 rounded-full', dot)} />
+          </>
+        )}
         {!last && <span className="rail-line w-px flex-1 bg-line" />}
       </div>
       <div className="rail-content flex min-w-0 flex-1 flex-col gap-1 pb-3">{children}</div>
@@ -242,7 +338,7 @@ function Elapsed({ since }: { since: string }) {
 /** A tool call: the tool, a one-line summary of its result, and Show, which opens both in place. */
 function Call({ toolCall }: { toolCall: ToolCall }) {
   const [open, setOpen] = useState(false)
-  const { call, result } = toolCall
+  const { call, result, failure } = toolCall
   const decoded = result === undefined ? undefined : decodeToolResult(result)
 
   // One block, with the space above the result inside it: closed, a gap in the step would remain.
@@ -250,7 +346,8 @@ function Call({ toolCall }: { toolCall: ToolCall }) {
     <div>
       <div className="flex flex-wrap items-baseline gap-2">
         <Tag kind="tool">{call.name}</Tag>
-        <span className="min-w-0 text-sm wrap-anywhere text-muted">
+        <span className={cx('min-w-0 text-sm wrap-anywhere', failure ? 'text-ink' : 'text-muted')}>
+          {failure && <span className="font-semibold text-danger">{FAILURE_WORDS[failure]}: </span>}
           {result === undefined ? 'No result yet' : summarizeResult(result)}
         </span>
         <button
