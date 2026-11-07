@@ -39,5 +39,3 @@ target/
 !.env.example
 docs/*
 !docs/adr/
-
-.impeccable/
