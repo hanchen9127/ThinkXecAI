@@ -3,6 +3,7 @@ import { useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
 import { type ChatSession, createChatMessage, stopChatSession } from '../../api/api'
 import { ApiError, path } from '../../api/http'
+import { useAgentDialogs } from '../../hooks/useAgentDialogs'
 import { useAgents } from '../../hooks/useAgents'
 import { useChatMessages } from '../../hooks/useChatMessages'
 import { useChatSessions } from '../../hooks/useChatSessions'
@@ -13,7 +14,7 @@ import { COLUMN } from '../../layout/column'
 import BackToList from '../BackToList'
 import { cx } from '../../utils/cx'
 import { errorMessage } from '../../utils/text'
-import AgentRun from '../chat/AgentRun'
+import AgentRun, { StepsExplained } from '../chat/AgentRun'
 import Composer from '../chat/Composer'
 import { chatTitle, groupHistory, retryQuestion, titleFrom } from '../chat/messages'
 
@@ -30,7 +31,9 @@ export default function AgentChatView() {
  * opens the chat; the starting design navigated first and lost the message.
  */
 function NewChat() {
-  const { agents, loading } = useAgents()
+  const { agents, loading, error: agentsError, reload: reloadAgents } = useAgents()
+  // Without an agent, "Create an agent" opens the form here: a first run needs no detour (Phase 14).
+  const { openCreate, dialogs } = useAgentDialogs()
   const chatSessions = useChatSessions()
   const navigate = useNavigate()
   const [params] = useSearchParams()
@@ -51,17 +54,35 @@ function NewChat() {
         <BackToList className="-mt-5 -ml-3" />
         {loading ? (
           <p className="m-0 text-muted">Loading agents…</p>
+        ) : agentsError !== undefined ? (
+          // An outage is not "none yet": say so, and let the user try again (Phase 14, D5).
+          <>
+            <h1 className="m-0 text-xl font-semibold">New chat</h1>
+            <div role="alert" className="flex flex-col items-start gap-2 text-muted">
+              <p className="m-0">Couldn't load agents. {errorMessage(agentsError)}</p>
+              <button
+                type="button"
+                onClick={reloadAgents}
+                className="cursor-pointer text-ink underline"
+              >
+                Try again
+              </button>
+            </div>
+          </>
         ) : (
           <>
             <h1 className="m-0 text-xl font-semibold">New chat</h1>
             <p className="m-0 text-muted">
               A chat needs an agent to answer, and there is none yet.
             </p>
-            <Link to="/agent" className="text-ink underline">
-              Create an agent
-            </Link>
+            <div>
+              <Button type="primary" onClick={openCreate}>
+                Create an agent
+              </Button>
+            </div>
           </>
         )}
+        {dialogs}
       </div>
     )
   }
@@ -98,9 +119,12 @@ function NewChat() {
       </div>
       <div className="box-border flex flex-1 flex-col justify-center px-4 py-12 wide:px-12">
         <div className="mx-auto flex w-full max-w-180 flex-col gap-4">
-          <h1 className="m-0 text-3xl font-semibold tracking-tight">
-            What should {agent.name} look into?
-          </h1>
+          <div className="flex flex-col gap-2">
+            <h1 className="m-0 text-3xl font-semibold tracking-tight">
+              What should {agent.name} look into?
+            </h1>
+            <StepsExplained />
+          </div>
           {sendError !== undefined && (
             <Alert type="error" showIcon title={errorMessage(sendError)} />
           )}

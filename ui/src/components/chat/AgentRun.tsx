@@ -145,6 +145,21 @@ export default function AgentRun({
   )
 }
 
+/**
+ * One line naming the trace's two kinds of step in their colours, for a new chat, where a first-time
+ * user has not met them yet (Phase 14, D5 A). It lives here because the step colours belong to the
+ * trace (ADR 058).
+ */
+export function StepsExplained() {
+  return (
+    <p className="m-0 text-sm text-muted">
+      Each reply shows its work: <span className="font-semibold text-think-ink">Think</span> is the
+      agent deciding what to do, <span className="font-semibold text-execute-ink">Execute</span> is
+      a tool it runs.
+    </p>
+  )
+}
+
 const WAITING = 'waiting'
 
 function toRows(steps: Step[]): Row[] {

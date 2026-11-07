@@ -219,14 +219,46 @@ describe('a new chat', () => {
     ])
   })
 
-  it('points to creating an agent when there is none', async () => {
+  it('opens the agent form right here when there is no agent yet', async () => {
     fakeApi({ 'GET /agents': [], 'GET /knowledge-bases': [], 'GET /chat-sessions': [] })
     renderApp('/chat')
-    expect(await screen.findByRole('link', { name: 'Create an agent' })).toHaveAttribute(
-      'href',
-      '/agent',
-    )
+    await userEvent.click(await screen.findByRole('button', { name: 'Create an agent' }))
+    expect(await screen.findByRole('dialog', { name: 'New agent' })).toBeInTheDocument()
     expect(screen.queryByRole('textbox', { name: 'Message' })).toBeNull()
+  })
+
+  it('tells an outage from having no agents, and tries again', async () => {
+    let fail = true
+    fakeApi({
+      'GET /agents': () => {
+        if (fail) throw { code: 503, message: 'The service is not answering. Try again shortly.' }
+        return [storeAnalyst]
+      },
+      'GET /knowledge-bases': [],
+      'GET /chat-sessions': [],
+    })
+    renderApp('/chat')
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent("Couldn't load agents.")
+    expect(screen.queryByText(/there is none yet/)).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Create an agent' })).toBeNull()
+
+    fail = false
+    await userEvent.click(within(alert).getByRole('button', { name: 'Try again' }))
+    expect(
+      await screen.findByRole('heading', { name: 'What should Store analyst look into?' }),
+    ).toBeInTheDocument()
+  })
+
+  it('explains Think and Execute under the question of a new chat', async () => {
+    backend()
+    renderApp('/chat/new')
+
+    const question = await screen.findByRole('heading', { name: /look into\?$/ })
+    expect(question.nextElementSibling).toHaveTextContent(
+      'Each reply shows its work: Think is the agent deciding what to do, Execute is a tool it runs.',
+    )
   })
 
   it('sends nothing blank, and Shift+Enter starts a new line', async () => {
