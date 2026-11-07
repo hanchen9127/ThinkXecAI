@@ -10,7 +10,7 @@ import { useChatSessions } from '../../hooks/useChatSessions'
 import { useChatStream } from '../../hooks/useChatStream'
 import { useFollowLatest } from '../../hooks/useFollowLatest'
 import { newestMessage, useWorking } from '../../hooks/useWorking'
-import { COLUMN } from '../../layout/column'
+import { COLUMN, ITEM_HEADER } from '../../layout/column'
 import BackToList from '../BackToList'
 import { cx } from '../../utils/cx'
 import { errorMessage } from '../../utils/text'
@@ -255,7 +255,7 @@ function Chat({ sessionId }: { sessionId: string }) {
 
   return (
     <>
-      <header className="border-b border-line bg-surface">
+      <header className={ITEM_HEADER}>
         <div className={cx(COLUMN, 'flex items-start gap-1 pt-6 pb-5')}>
           <BackToList className="-mt-2 -ml-3" />
           <div className="min-w-0 flex-1">

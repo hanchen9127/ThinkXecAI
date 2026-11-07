@@ -23,6 +23,8 @@ Separate screens reuse the routes the app already has, and the browser's Back wo
 
 This replaces the earlier choice (2026-11-06) to keep the list above the page at phone width.
 
+**Amended 2026-11-08 (owner, from the check against the running stack).** On a narrow screen an item's header stays at the top while the page scrolls: a chat opens at its end, so the back arrow had scrolled out of view before the reader saw it. A wide screen is unchanged, the list being beside the page.
+
 ## Trade-offs
 
 - The browser no longer restores a page's scroll position on Back, because the window does not scroll; the app did not rely on it.

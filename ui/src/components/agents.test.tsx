@@ -157,10 +157,9 @@ describe('agent profile', () => {
     backend()
     renderApp('/agent/a1')
 
-    expect(await screen.findByRole('link', { name: 'Back to agents' })).toHaveAttribute(
-      'href',
-      '/agent',
-    )
+    const back = await screen.findByRole('link', { name: 'Back to agents' })
+    expect(back).toHaveAttribute('href', '/agent')
+    expect(back.closest('header')).toHaveClass('sticky', 'wide:static')
     const label = within(screen.getByRole('region', { name: 'Setup' })).getByText('Model')
     expect(label).toHaveClass('w-full', 'wide:w-50')
   })

@@ -184,14 +184,15 @@ describe('a new chat', () => {
     expect(screen.getByRole('main')).not.toHaveClass('hidden')
   })
 
-  it('leads an open chat back to the list of chats', async () => {
+  it('leads an open chat back to the list of chats, from a header that stays on a narrow screen', async () => {
     backend()
     renderApp('/chat/s1')
 
-    expect(await screen.findByRole('link', { name: 'Back to chats' })).toHaveAttribute(
-      'href',
-      '/chat',
-    )
+    await screen.findByRole('heading', { level: 1, name: 'Out-of-stock products' })
+    const back = screen.getByRole('link', { name: 'Back to chats' })
+    expect(back).toHaveAttribute('href', '/chat')
+    // A chat opens at its end: the header must not scroll away with the messages (Phase 14 check).
+    expect(back.closest('header')).toHaveClass('sticky', 'top-0', 'wide:static')
   })
 
   it('keeps the text and reuses the new chat when the message fails', async () => {

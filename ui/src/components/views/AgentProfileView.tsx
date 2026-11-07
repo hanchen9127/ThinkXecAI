@@ -4,7 +4,7 @@ import { Link, useParams } from 'react-router'
 import { useAgentDialogs } from '../../hooks/useAgentDialogs'
 import { useAgents } from '../../hooks/useAgents'
 import { useKnowledgeBaseNames } from '../../hooks/useKnowledgeBaseNames'
-import { COLUMN } from '../../layout/column'
+import { COLUMN, ITEM_HEADER } from '../../layout/column'
 import BackToList from '../BackToList'
 import { cx } from '../../utils/cx'
 import { formatApiTimestamp } from '../../utils/time'
@@ -45,7 +45,7 @@ export default function AgentProfileView() {
   const { chatOptions } = agent
   return (
     <>
-      <header className="border-b border-line bg-surface">
+      <header className={ITEM_HEADER}>
         <div className={cx(COLUMN, 'flex flex-wrap items-start justify-between gap-4 pt-6 pb-5')}>
           <div className="flex min-w-0 items-start gap-1">
             <BackToList className="-mt-2 -ml-3" />
