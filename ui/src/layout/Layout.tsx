@@ -1,6 +1,14 @@
 import type { ReactNode } from 'react'
 
-/** Side menu and content in one row; at phone width the content wraps below the menu. */
+/**
+ * The shell, as tall as the window and never scrolling itself (ADR 063): the rail, the list panel,
+ * and the page side by side, each scrolling on its own. On a narrow screen the rail is a bar on top
+ * and one of the other two fills the rest.
+ */
 export default function Layout({ children }: { children: ReactNode }) {
-  return <div className="flex min-h-screen flex-wrap bg-ground font-sans text-ink">{children}</div>
+  return (
+    <div className="flex h-dvh flex-col overflow-hidden bg-ground font-sans text-ink wide:flex-row">
+      {children}
+    </div>
+  )
 }

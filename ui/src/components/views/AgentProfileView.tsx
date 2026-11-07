@@ -5,6 +5,7 @@ import { useAgentDialogs } from '../../hooks/useAgentDialogs'
 import { useAgents } from '../../hooks/useAgents'
 import { useKnowledgeBaseNames } from '../../hooks/useKnowledgeBaseNames'
 import { COLUMN } from '../../layout/column'
+import BackToList from '../BackToList'
 import { cx } from '../../utils/cx'
 import { formatApiTimestamp } from '../../utils/time'
 import { errorMessage } from '../../utils/text'
@@ -46,16 +47,19 @@ export default function AgentProfileView() {
     <>
       <header className="border-b border-line bg-surface">
         <div className={cx(COLUMN, 'flex flex-wrap items-start justify-between gap-4 pt-6 pb-5')}>
-          <div className="min-w-0">
-            <h1 className="m-0 text-xl font-semibold">{agent.name}</h1>
-            {agent.description && (
-              <p className="m-0 mt-0.5 text-sm text-muted">{agent.description}</p>
-            )}
+          <div className="flex min-w-0 items-start gap-1">
+            <BackToList className="-mt-2 -ml-3" />
+            <div className="min-w-0">
+              <h1 className="m-0 text-xl font-semibold">{agent.name}</h1>
+              {agent.description && (
+                <p className="m-0 mt-0.5 text-sm text-muted">{agent.description}</p>
+              )}
+            </div>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button onClick={() => openEdit(agent)}>Edit</Button>
             <Link
-              to={`/chat?${new URLSearchParams({ agent: agent.id })}`}
+              to={`/chat/new?${new URLSearchParams({ agent: agent.id })}`}
               className="flex h-8 items-center rounded-ui bg-ink px-4 text-sm font-semibold text-white no-underline hover:bg-ink/85"
             >
               Start chat
@@ -67,7 +71,7 @@ export default function AgentProfileView() {
       {dialogs}
 
       <section aria-label="Setup" className={cx(COLUMN, 'py-8')}>
-        <dl className="m-0 rounded-ui border border-line bg-surface px-7 py-1">
+        <dl className="m-0 rounded-ui border border-line bg-surface px-4 py-1 wide:px-7">
           <Row term="Model">
             <span className="font-mono text-xs text-muted">{agent.model}</span>
           </Row>
@@ -115,8 +119,9 @@ export default function AgentProfileView() {
 
 function Row({ term, last, children }: { term: string; last?: boolean; children: ReactNode }) {
   return (
-    <div className={cx('flex flex-wrap gap-x-4 py-4', !last && 'border-b border-hairline')}>
-      <dt className="w-50 shrink-0 text-muted">{term}</dt>
+    <div className={cx('flex flex-wrap gap-x-4 gap-y-1 py-4', !last && 'border-b border-hairline')}>
+      {/* A narrow screen puts the value under its label instead of squeezing it (ADR 063). */}
+      <dt className="w-full shrink-0 text-muted wide:w-50">{term}</dt>
       <dd className="m-0 flex min-w-0 flex-1 flex-wrap items-center gap-1.5">{children}</dd>
     </div>
   )

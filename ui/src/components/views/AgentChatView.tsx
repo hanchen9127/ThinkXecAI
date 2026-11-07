@@ -10,13 +10,14 @@ import { useChatStream } from '../../hooks/useChatStream'
 import { useFollowLatest } from '../../hooks/useFollowLatest'
 import { newestMessage, useWorking } from '../../hooks/useWorking'
 import { COLUMN } from '../../layout/column'
+import BackToList from '../BackToList'
 import { cx } from '../../utils/cx'
 import { errorMessage } from '../../utils/text'
 import AgentRun from '../chat/AgentRun'
 import Composer from '../chat/Composer'
 import { chatTitle, groupHistory, retryQuestion, titleFrom } from '../chat/messages'
 
-/** `/`, `/chat` (a new chat, `?agent=<id>` chooses its agent), and `/chat/:chatSessionId`. */
+/** `/`, `/chat`, and `/chat/new` (a new chat, `?agent=<id>` chooses its agent), and `/chat/:chatSessionId`. */
 export default function AgentChatView() {
   const { chatSessionId } = useParams()
   if (!chatSessionId) return <NewChat />
@@ -47,6 +48,7 @@ function NewChat() {
   if (!agent) {
     return (
       <div className={cx(COLUMN, 'flex flex-col gap-2 py-9')}>
+        <BackToList className="-mt-5 -ml-3" />
         {loading ? (
           <p className="m-0 text-muted">Loading agents…</p>
         ) : (
@@ -91,7 +93,10 @@ function NewChat() {
           <div className={cx(COLUMN, 'py-2.5')}>The chat you had open was deleted.</div>
         </div>
       )}
-      <div className="box-border flex flex-1 flex-col justify-center px-12 py-12">
+      <div className={cx(COLUMN, 'pt-2 wide:hidden')}>
+        <BackToList className="-ml-3" />
+      </div>
+      <div className="box-border flex flex-1 flex-col justify-center px-4 py-12 wide:px-12">
         <div className="mx-auto flex w-full max-w-180 flex-col gap-4">
           <h1 className="m-0 text-3xl font-semibold tracking-tight">
             What should {agent.name} look into?
@@ -149,7 +154,7 @@ function Chat({ sessionId }: { sessionId: string }) {
       onMessage: receive,
       onGone: () => {
         chatSessions.reload()
-        navigate('/chat', { replace: true, state: { deleted: true } })
+        navigate('/chat/new', { replace: true, state: { deleted: true } })
       },
     },
     session !== undefined,
@@ -157,6 +162,7 @@ function Chat({ sessionId }: { sessionId: string }) {
   if (!session) {
     return (
       <div className={cx(COLUMN, 'flex flex-col gap-3 py-9')}>
+        <BackToList className="-mt-5 -ml-3" />
         {chatSessions.loading ? (
           <p className="m-0 text-muted">Loading the chat…</p>
         ) : chatSessions.error !== undefined ? (
@@ -167,7 +173,7 @@ function Chat({ sessionId }: { sessionId: string }) {
           <>
             <h1 className="m-0 text-xl font-semibold">Chat not found</h1>
             <p className="m-0 text-muted">It may have been deleted.</p>
-            <Link to="/chat" className="text-ink underline">
+            <Link to="/chat/new" className="text-ink underline">
               Start a new chat
             </Link>
           </>
@@ -226,19 +232,22 @@ function Chat({ sessionId }: { sessionId: string }) {
   return (
     <>
       <header className="border-b border-line bg-surface">
-        <div className={cx(COLUMN, 'pt-6 pb-5')}>
-          <h1 className="m-0 text-xl font-semibold break-words">{chatTitle(session)}</h1>
-          <p className="m-0 mt-0.5 text-sm text-muted">
-            {agent ? (
-              <>
-                {agent.name} on <span className="font-mono text-xs">{agent.model}</span>
-              </>
-            ) : agentGone ? (
-              'No agent'
-            ) : (
-              '…'
-            )}
-          </p>
+        <div className={cx(COLUMN, 'flex items-start gap-1 pt-6 pb-5')}>
+          <BackToList className="-mt-2 -ml-3" />
+          <div className="min-w-0 flex-1">
+            <h1 className="m-0 text-xl font-semibold break-words">{chatTitle(session)}</h1>
+            <p className="m-0 mt-0.5 text-sm text-muted">
+              {agent ? (
+                <>
+                  {agent.name} on <span className="font-mono text-xs">{agent.model}</span>
+                </>
+              ) : agentGone ? (
+                'No agent'
+              ) : (
+                '…'
+              )}
+            </p>
+          </div>
         </div>
       </header>
       {stream.status === 'stopped' && (
@@ -265,7 +274,7 @@ function Chat({ sessionId }: { sessionId: string }) {
         <div role="status" className="border-b border-line bg-surface text-sm text-ink">
           <div className={cx(COLUMN, 'flex flex-wrap items-center justify-between gap-3 py-2.5')}>
             <span>Its agent was deleted. You can read this chat but not continue it.</span>
-            <Link to="/chat" className="font-semibold text-ink underline">
+            <Link to="/chat/new" className="font-semibold text-ink underline">
               New chat
             </Link>
           </div>

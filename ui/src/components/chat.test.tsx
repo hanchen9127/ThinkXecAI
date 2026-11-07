@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { type ApiCall, deferred, fakeApi } from '../test/fakeApi'
 import { renderApp } from '../test/renderApp'
 
@@ -180,6 +180,18 @@ describe('a new chat', () => {
     expect(
       await screen.findByRole('heading', { name: `What should ${name} look into?` }),
     ).toBeInTheDocument()
+    // `/chat/new`, so a narrow screen shows the new chat, not the list (ADR 063)
+    expect(screen.getByRole('main')).not.toHaveClass('hidden')
+  })
+
+  it('leads an open chat back to the list of chats', async () => {
+    backend()
+    renderApp('/chat/s1')
+
+    expect(await screen.findByRole('link', { name: 'Back to chats' })).toHaveAttribute(
+      'href',
+      '/chat',
+    )
   })
 
   it('keeps the text and reuses the new chat when the message fails', async () => {
@@ -310,27 +322,30 @@ describe('a chat', () => {
   })
 
   it('follows the chat again once a message is sent from higher up the page', async () => {
-    const scrollTo = vi.fn()
-    vi.stubGlobal('scrollTo', scrollTo)
-    vi.spyOn(document.documentElement, 'scrollHeight', 'get').mockReturnValue(2000)
     backend({
       'POST /chat-messages': ({ body }) => ({ ...msg('user', null), ...(body as object) }),
     })
     renderApp('/chat/s1')
+    // The page scrolls in `main`, not the window (ADR 063).
+    const main = screen.getByRole('main')
+    let top = 0
+    const moves: number[] = []
+    Object.defineProperty(main, 'scrollHeight', { configurable: true, get: () => 2000 })
+    Object.defineProperty(main, 'clientHeight', { configurable: true, get: () => 500 })
+    Object.defineProperty(main, 'scrollTop', { configurable: true, get: () => top })
+    main.scrollTo = ((options: ScrollToOptions) => {
+      moves.push(options.top ?? 0)
+    }) as typeof main.scrollTo
     const box = await screen.findByRole('textbox', { name: 'Message' })
-    await waitFor(() => expect(scrollTo).toHaveBeenCalled())
 
-    window.scrollY = 1500
-    fireEvent.scroll(window)
-    window.scrollY = 900
-    fireEvent.scroll(window)
-    scrollTo.mockClear()
+    top = 1500
+    fireEvent.scroll(main)
+    top = 900
+    fireEvent.scroll(main)
+    moves.length = 0
 
     await userEvent.type(box, 'Email it.{Enter}')
-    await waitFor(() => expect(scrollTo).toHaveBeenCalledWith(0, 2000))
-    window.scrollY = 0
-    vi.restoreAllMocks()
-    vi.unstubAllGlobals()
+    await waitFor(() => expect(moves).toContain(2000))
   })
 
   it('keeps the message box on screen while the page scrolls', async () => {

@@ -153,6 +153,18 @@ describe('agent list', () => {
 })
 
 describe('agent profile', () => {
+  it('leads back to the list of agents, and stacks each value under its label on a narrow screen', async () => {
+    backend()
+    renderApp('/agent/a1')
+
+    expect(await screen.findByRole('link', { name: 'Back to agents' })).toHaveAttribute(
+      'href',
+      '/agent',
+    )
+    const label = within(screen.getByRole('region', { name: 'Setup' })).getByText('Model')
+    expect(label).toHaveClass('w-full', 'wide:w-50')
+  })
+
   it('shows how the agent is set up', async () => {
     backend()
     renderApp('/agent/a1')
@@ -193,7 +205,7 @@ describe('agent profile', () => {
 
     expect(await screen.findByRole('link', { name: 'Start chat' })).toHaveAttribute(
       'href',
-      '/chat?agent=a1',
+      '/chat/new?agent=a1',
     )
   })
 

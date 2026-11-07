@@ -45,7 +45,7 @@ export default function ChatTabContent() {
 
   // A new chat from an open one keeps its agent: the first agent could be one with other tools.
   const openAgentId = chatSessions.find((session) => session.id === openId)?.agentId
-  const newChat = openAgentId ? path`/chat?agent=${openAgentId}` : '/chat'
+  const newChat = openAgentId ? path`/chat/new?agent=${openAgentId}` : '/chat/new'
 
   function closeSearch() {
     setSearching(false)
@@ -115,7 +115,7 @@ export default function ChatTabContent() {
               onRename={(title) => update(session.id, { title }).then(() => undefined)}
               onDelete={() => {
                 deletes.confirm({ id: session.id, name: chatTitle(session) })
-                if (session.id === openId) navigate('/chat')
+                if (session.id === openId) navigate('/chat/new')
               }}
             />
           ))}

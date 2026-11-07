@@ -28,7 +28,10 @@
   --text-icon: 20px;
   --text-label: 11px;
   --container-panel: 300px;
-  --container-content: 560px;
+
+  /* Narrow below this (ADR 063): the rail becomes a top bar and a page shows its list or its item.
+     The rail, the panel, and a 560px page fit from here on. */
+  --breakpoint-wide: 58.5rem;
 
   /* Motion (ADR 061): every transition; theme.ts holds the same as `motion`. */
   --default-transition-duration: 150ms;

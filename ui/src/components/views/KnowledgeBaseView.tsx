@@ -11,6 +11,7 @@ import { useKnowledgeBaseDialogs } from '../../hooks/useKnowledgeBaseDialogs'
 import { useKnowledgeBases } from '../../hooks/useKnowledgeBases'
 import { useUndoableDelete } from '../../hooks/useUndoableDelete'
 import { COLUMN } from '../../layout/column'
+import BackToList from '../BackToList'
 import { cx } from '../../utils/cx'
 import { parseApiTimestamp } from '../../utils/time'
 import { countLabel, errorMessage } from '../../utils/text'
@@ -99,12 +100,15 @@ function KnowledgeBasePage({ knowledgeBase }: { knowledgeBase: KnowledgeBase }) 
     <>
       <header className="border-b border-line bg-surface">
         <div className={cx(COLUMN, 'flex flex-wrap items-start justify-between gap-4 pt-6 pb-5')}>
-          <div className="min-w-0">
-            <h1 className="m-0 text-xl font-semibold">{knowledgeBase.name}</h1>
-            {knowledgeBase.description && (
-              <p className="m-0 mt-0.5 text-sm text-muted">{knowledgeBase.description}</p>
-            )}
-            <UsedBy agents={users} />
+          <div className="flex min-w-0 items-start gap-1">
+            <BackToList className="-mt-2 -ml-3" />
+            <div className="min-w-0">
+              <h1 className="m-0 text-xl font-semibold">{knowledgeBase.name}</h1>
+              {knowledgeBase.description && (
+                <p className="m-0 mt-0.5 text-sm text-muted">{knowledgeBase.description}</p>
+              )}
+              <UsedBy agents={users} />
+            </div>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button onClick={() => openEdit(knowledgeBase)}>Edit</Button>
