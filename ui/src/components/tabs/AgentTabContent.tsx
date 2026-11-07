@@ -5,6 +5,7 @@ import { Link, matchPath, useLocation } from 'react-router'
 import type { Agent } from '../../api/api'
 import { path } from '../../api/http'
 import { useAgentDialogs } from '../../hooks/useAgentDialogs'
+import { useMenuTrigger } from '../../hooks/useMenuTrigger'
 import { useAgents } from '../../hooks/useAgents'
 import { useKnowledgeBaseNames } from '../../hooks/useKnowledgeBaseNames'
 import { cx } from '../../utils/cx'
@@ -71,6 +72,8 @@ function AgentItem({
 }) {
   const kbNames = useKnowledgeBaseNames()
   const [shown, setShown] = useState<'tools' | 'knowledge' | null>(null)
+  // Focus goes back to ⋯ when the dialog an item opens is closed (Phase 14, D6).
+  const { trigger: menuButton, then: focusMenuThen } = useMenuTrigger()
   const toggle = (part: 'tools' | 'knowledge') => setShown(shown === part ? null : part)
 
   return (
@@ -95,12 +98,13 @@ function AgentItem({
           trigger={['click']}
           menu={{
             items: [
-              { key: 'edit', label: 'Edit', onClick: onEdit },
-              { key: 'delete', label: 'Delete', danger: true, onClick: onDelete },
+              { key: 'edit', label: 'Edit', onClick: focusMenuThen(onEdit) },
+              { key: 'delete', label: 'Delete', danger: true, onClick: focusMenuThen(onDelete) },
             ],
           }}
         >
           <Button
+            ref={menuButton}
             type="text"
             size="small"
             aria-label={`More actions for ${agent.name}`}

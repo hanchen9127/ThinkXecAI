@@ -158,6 +158,12 @@
     outline: 2px solid var(--color-ink);
     outline-offset: 2px;
   }
+
+  /* A page's heading takes focus after a page change (Phase 14, D6) so reading starts there; it is
+     not a control, so it draws no ring. */
+  h1[tabindex='-1']:focus {
+    outline: none;
+  }
 }
 
 body {

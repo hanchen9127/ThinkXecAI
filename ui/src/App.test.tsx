@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeApi } from './test/fakeApi'
@@ -73,6 +73,29 @@ describe('routes', () => {
     renderAt('/')
 
     expect(screen.getAllByText('ThinkXecAI')).toHaveLength(2)
+  })
+})
+
+describe('focus (Phase 14, D6)', () => {
+  it('starts the tab order with a link that skips to the page', async () => {
+    renderAt('/agent')
+    await screen.findByRole('heading', { level: 1, name: 'Agents' })
+
+    await userEvent.tab()
+    const skip = screen.getByRole('link', { name: 'Skip to content' })
+    expect(skip).toHaveFocus()
+    await userEvent.click(skip)
+    expect(screen.getByRole('main')).toHaveFocus()
+  })
+
+  it('moves focus to the heading of a page the user opens, not on the first page', async () => {
+    renderAt('/agent')
+    const first = await screen.findByRole('heading', { level: 1, name: 'Agents' })
+    expect(first).not.toHaveFocus()
+
+    await userEvent.click(screen.getByRole('link', { name: 'Knowledge bases' }))
+    const heading = await screen.findByRole('heading', { level: 1, name: 'Knowledge bases' })
+    await waitFor(() => expect(heading).toHaveFocus())
   })
 })
 

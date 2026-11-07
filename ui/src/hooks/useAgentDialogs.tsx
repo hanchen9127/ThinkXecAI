@@ -7,6 +7,7 @@ import AgentFormModal from '../components/modals/AgentFormModal'
 import DeleteAgentModal from '../components/modals/DeleteAgentModal'
 import { useAgents } from './useAgents'
 import { useChatSessions } from './useChatSessions'
+import { useReturnFocus } from './useReturnFocus'
 
 type Open = { kind: 'create' } | { kind: 'edit'; agent: Agent } | { kind: 'delete'; agent: Agent }
 
@@ -21,6 +22,11 @@ export function useAgentDialogs(): {
   dialogs: ReactNode
 } {
   const [open, setOpen] = useState<Open | null>(null)
+  const focus = useReturnFocus(open !== null)
+  const show = (next: Open) => {
+    focus.remember()
+    setOpen(next)
+  }
   const { create, update, remove } = useAgents()
   const chatSessions = useChatSessions()
   const navigate = useNavigate()
@@ -71,9 +77,9 @@ export function useAgentDialogs(): {
   }
 
   return {
-    openCreate: () => setOpen({ kind: 'create' }),
-    openEdit: (agent) => setOpen({ kind: 'edit', agent }),
-    openDelete: (agent) => setOpen({ kind: 'delete', agent }),
+    openCreate: () => show({ kind: 'create' }),
+    openEdit: (agent) => show({ kind: 'edit', agent }),
+    openDelete: (agent) => show({ kind: 'delete', agent }),
     dialogs,
   }
 }

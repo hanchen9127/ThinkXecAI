@@ -13,6 +13,7 @@ import Content from './layout/Content'
 import { COLUMN } from './layout/column'
 import Layout from './layout/Layout'
 import Sidebar from './layout/Sidebar'
+import SkipLink from './layout/SkipLink'
 import { isListRoute, sectionOf } from './layout/sections'
 import { buttonConfig, theme } from './theme'
 import { cx } from './utils/cx'
@@ -40,10 +41,11 @@ export function AppRoutes() {
   const page = usePageCount()
   return (
     <Layout>
+      <SkipLink />
       <Sidebar active={section} hiddenWhenNarrow={!listScreen}>
         {section && TABS[section]}
       </Sidebar>
-      <Content hiddenWhenNarrow={listScreen}>
+      <Content page={page} hiddenWhenNarrow={listScreen}>
         <Suspense fallback={<p className={cx(COLUMN, 'm-0 py-9 text-muted')}>Loading…</p>}>
           <div
             key={page}

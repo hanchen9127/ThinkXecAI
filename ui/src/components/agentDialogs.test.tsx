@@ -64,6 +64,59 @@ async function openMenuItem(agentName: string, item: string) {
   await userEvent.click(await screen.findByRole('menuitem', { name: item }))
 }
 
+describe('focus around the dialogs (Phase 14, D6)', () => {
+  it('goes back to New agent when its dialog closes with Esc', async () => {
+    backend()
+    renderApp('/agent')
+
+    const opener = await screen.findByRole('button', { name: 'New agent' })
+    await userEvent.click(opener)
+    await screen.findByRole('dialog', { name: 'New agent' })
+    await userEvent.keyboard('{Escape}')
+
+    await waitFor(() => expect(opener).toHaveFocus())
+  })
+
+  it('goes back to the menu button after a dialog opened from its menu closes', async () => {
+    backend()
+    renderApp('/agent/a1')
+
+    const opener = await screen.findByRole('button', { name: 'More actions' })
+    await userEvent.click(opener)
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }))
+    const dialog = await screen.findByRole('dialog', { name: /Delete/ })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+
+    await waitFor(() => expect(opener).toHaveFocus())
+  })
+
+  it("goes back to a list row's menu button after its Edit dialog closes", async () => {
+    backend()
+    renderApp('/agent')
+
+    await openMenuItem('Store analyst', 'Edit')
+    const dialog = await screen.findByRole('dialog', { name: 'Edit Store analyst' })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'More actions for Store analyst' })).toHaveFocus(),
+    )
+  })
+
+  it('leaves focus to the new page when saving opened one', async () => {
+    backend()
+    renderApp('/agent')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'New agent' }))
+    const dialog = await screen.findByRole('dialog', { name: 'New agent' })
+    await userEvent.type(within(dialog).getByLabelText('Name'), 'Trip planner')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Create agent' }))
+
+    const heading = await screen.findByRole('heading', { level: 1, name: 'Trip planner' })
+    await waitFor(() => expect(heading).toHaveFocus())
+  })
+})
+
 describe('creating an agent', () => {
   it('sends the whole form and opens the new agent', async () => {
     const api = backend()
