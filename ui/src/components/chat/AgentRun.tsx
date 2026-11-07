@@ -116,7 +116,7 @@ export default function AgentRun({
                   ) : (
                     <>
                       <StepLabel kind="Execute" number={i + 1} ms={row.toolCall.ms} />
-                      <Call toolCall={row.toolCall} />
+                      <Call toolCall={row.toolCall} ended={!working} />
                     </>
                   )}
                 </RailItem>
@@ -350,8 +350,12 @@ function Elapsed({ since }: { since: string }) {
   )
 }
 
-/** A tool call: the tool, a one-line summary of its result, and Show, which opens both in place. */
-function Call({ toolCall }: { toolCall: ToolCall }) {
+/**
+ * A tool call: the tool, a one-line summary of its result, and Show, which opens both in place. A
+ * call without a result in a run that is no longer working never ran (a stop between Think and
+ * Execute, ADR 060): "Not run", not "No result yet" (Phase 14 check).
+ */
+function Call({ toolCall, ended }: { toolCall: ToolCall; ended: boolean }) {
   const [open, setOpen] = useState(false)
   const { call, result, failure } = toolCall
   const decoded = result === undefined ? undefined : decodeToolResult(result)
@@ -363,7 +367,7 @@ function Call({ toolCall }: { toolCall: ToolCall }) {
         <Tag kind="tool">{call.name}</Tag>
         <span className={cx('min-w-0 text-sm wrap-anywhere', failure ? 'text-ink' : 'text-muted')}>
           {failure && <span className="font-semibold text-danger">{FAILURE_WORDS[failure]}: </span>}
-          {result === undefined ? 'No result yet' : summarizeResult(result)}
+          {result !== undefined ? summarizeResult(result) : ended ? 'Not run' : 'No result yet'}
         </span>
         <button
           type="button"

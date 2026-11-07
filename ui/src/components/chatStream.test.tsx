@@ -543,6 +543,33 @@ describe('the working indicator', () => {
     expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull()
   })
 
+  it('says a call stopped before it ran was not run, and one still running has no result yet', async () => {
+    // The stop came between Think and Execute: the call is stored, its result never is (ADR 060).
+    backend({
+      'GET /chat-messages/session/s1': () => [
+        recent('m1', 'user', 20_000),
+        recent('m2', 'assistant', 15_000, calls),
+        notice('m3', 10_000),
+      ],
+    })
+    const { unmount } = renderApp('/chat/s1')
+    expect(await screen.findByText('Stopped.')).toBeInTheDocument()
+    expect(screen.getByText('Not run')).toBeInTheDocument()
+    expect(screen.queryByText('No result yet')).toBeNull()
+    unmount()
+
+    // Still working on that call: its result is on its way.
+    backend({
+      'GET /chat-messages/session/s1': () => [
+        recent('m1', 'user', 20_000),
+        recent('m2', 'assistant', 15_000, calls),
+      ],
+    })
+    renderApp('/chat/s1')
+    expect(await screen.findByText('No result yet')).toBeInTheDocument()
+    expect(screen.queryByText('Not run')).toBeNull()
+  })
+
   it('offers no Try again once the agent is gone', async () => {
     backend({
       'GET /chat-sessions': () => [{ ...chat('s1', 'Pricing'), agentId: null }],
