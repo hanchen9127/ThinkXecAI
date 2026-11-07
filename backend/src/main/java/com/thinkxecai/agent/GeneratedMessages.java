@@ -3,11 +3,13 @@ package com.thinkxecai.agent;
 import com.thinkxecai.model.ChatMessageMetadata;
 import com.thinkxecai.model.ChatMessageRole;
 import com.thinkxecai.model.ToolCallMetadata;
+import com.thinkxecai.model.ToolFailureKind;
 import com.thinkxecai.model.ToolResponseMetadata;
 import com.thinkxecai.model.dto.ChatMessageDTO;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -37,15 +39,28 @@ public final class GeneratedMessages {
                 .build();
     }
 
-    public static List<ChatMessageDTO> toolResults(ToolResponseMessage message) {
-        return message.getResponses().stream()
-                .map(response -> ChatMessageDTO.builder()
-                        .role(ChatMessageRole.TOOL)
-                        .content(response.responseData())
-                        .metadata(new ChatMessageMetadata(null,
-                                new ToolResponseMetadata(response.id(), response.name(), response.responseData())))
-                        .build())
-                .toList();
+    /**
+     * One {@code tool} row per result, each with why it failed, if it did (ADR 064).
+     *
+     * @param failures one per result, in the same order; null where the call succeeded
+     * @throws IllegalArgumentException if there is not one entry per result
+     */
+    public static List<ChatMessageDTO> toolResults(ToolResponseMessage message, List<ToolFailureKind> failures) {
+        List<ToolResponseMessage.ToolResponse> responses = message.getResponses();
+        if (failures.size() != responses.size()) {
+            throw new IllegalArgumentException(failures.size() + " failures for " + responses.size() + " tool results");
+        }
+        List<ChatMessageDTO> rows = new ArrayList<>(responses.size());
+        for (int i = 0; i < responses.size(); i++) {
+            ToolResponseMessage.ToolResponse response = responses.get(i);
+            rows.add(ChatMessageDTO.builder()
+                    .role(ChatMessageRole.TOOL)
+                    .content(response.responseData())
+                    .metadata(new ChatMessageMetadata(null, new ToolResponseMetadata(
+                            response.id(), response.name(), response.responseData(), failures.get(i))))
+                    .build());
+        }
+        return rows;
     }
 
     /** A plain assistant message telling the user why a run stopped (ADR 043). */

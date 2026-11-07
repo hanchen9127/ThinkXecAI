@@ -88,7 +88,7 @@ class ChatMessageFacadeServiceTest extends ServiceTestSupport {
                 .containsExactly(
                         tuple(first, ChatMessageRole.USER, null),
                         tuple(second.toString(), ChatMessageRole.TOOL, new ChatMessageMetadata(
-                                null, new ToolResponseMetadata("call_1", "dateTool", "2026-10-08"))));
+                                null, new ToolResponseMetadata("call_1", "dateTool", "2026-10-08", null))));
     }
 
     @Test

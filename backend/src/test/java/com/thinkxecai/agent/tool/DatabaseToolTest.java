@@ -30,7 +30,7 @@ class DatabaseToolTest extends MapperTestSupport {
 
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String ONE_STATEMENT_ONLY =
-            "Only one SQL statement is allowed; remove the extra statements after the first semicolon.";
+            "REFUSED: Only one SQL statement is allowed; remove the extra statements after the first semicolon.";
 
     @Autowired
     private DatabaseTool tool;
@@ -46,6 +46,11 @@ class DatabaseToolTest extends MapperTestSupport {
         jdbcTemplate.update("INSERT INTO database_tool_probe VALUES ('a', '1'), ('b', '2'), ('c', '3')");
     }
 
+    /** The tool's answer, or its failure kind and text (ADR 064). */
+    private String query(String sql) {
+        return ToolOutcome.of(() -> tool.databaseQuery(sql));
+    }
+
     @AfterEach
     void dropProbeObjects() {
         jdbcTemplate.execute("DROP TABLE IF EXISTS database_tool_probe, database_tool_select_into");
@@ -56,7 +61,7 @@ class DatabaseToolTest extends MapperTestSupport {
     void theSeededSampleTablesCanBeQueried() {
         int products = countRows("t_product", "true");
 
-        String answer = tool.databaseQuery("SELECT sku, name FROM t_product ORDER BY sku LIMIT 3");
+        String answer = query("SELECT sku, name FROM t_product ORDER BY sku LIMIT 3");
 
         assertThat(products).isPositive();
         assertThat(answer).startsWith("| sku | name |\n| --- | --- |\n")
@@ -65,27 +70,27 @@ class DatabaseToolTest extends MapperTestSupport {
 
     @Test
     void rowsAreFormattedAsATableWithNullsPipesAndLineBreaksKeptInTheirCell() {
-        assertThat(tool.databaseQuery("SELECT 1 AS n, NULL AS empty, 'a|b' AS pipe, E'x\\ny' AS lines"))
+        assertThat(query("SELECT 1 AS n, NULL AS empty, 'a|b' AS pipe, E'x\\ny' AS lines"))
                 .isEqualTo("| n | empty | pipe | lines |\n| --- | --- | --- | --- |\n| 1 | NULL | a\\|b | x y |\n\n(1 row)");
-        assertThat(tool.databaseQuery("SELECT k FROM database_tool_probe WHERE false"))
+        assertThat(query("SELECT k FROM database_tool_probe WHERE false"))
                 .isEqualTo("| k |\n| --- |\n\n(0 rows)");
     }
 
     @Test
     void lowercaseAndLeadingWhitespaceAreAccepted() {
-        assertThat(tool.databaseQuery("  \n select count(*) AS n from database_tool_probe")).contains("| 3 |");
+        assertThat(query("  \n select count(*) AS n from database_tool_probe")).contains("| 3 |");
     }
 
     @Test
     void theQueryRunsReadOnlyWithTheTimeout() {
-        assertThat(tool.databaseQuery(
+        assertThat(query(
                 "SELECT current_setting('transaction_read_only') AS ro, current_setting('statement_timeout') AS t"))
                 .contains("| on | 5s |");
     }
 
     @Test
     void theQueryRunsInUtcLikeTheApplication() {
-        assertThat(tool.databaseQuery("SELECT current_setting('TimeZone') AS tz")).contains("| UTC |");
+        assertThat(query("SELECT current_setting('TimeZone') AS tz")).contains("| UTC |");
     }
 
     @ParameterizedTest
@@ -96,7 +101,7 @@ class DatabaseToolTest extends MapperTestSupport {
             "SELECT * FROM (SELECT 1) s; WITH d AS (DELETE FROM database_tool_probe RETURNING *) SELECT * FROM d",
             "SELECT set_config('statement_timeout', '0', true); SELECT pg_sleep(10)"})
     void moreThanOneStatementIsRefusedBeforeTheDatabase(String sql) {
-        assertThat(tool.databaseQuery(sql)).isEqualTo(ONE_STATEMENT_ONLY);
+        assertThat(query(sql)).isEqualTo(ONE_STATEMENT_ONLY);
         assertThat(probeTableExists("database_tool_probe")).isTrue();
         assertThat(countRows("database_tool_probe", "true")).isEqualTo(3);
     }
@@ -105,7 +110,7 @@ class DatabaseToolTest extends MapperTestSupport {
     @ParameterizedTest
     @ValueSource(strings = {"COMMIT", "ROLLBACK", "END", "ABORT"})
     void endingTheTransactionMidStringCannotUnlockWrites(String ending) {
-        String answer = tool.databaseQuery("SELECT 1; " + ending + "; DROP TABLE database_tool_probe");
+        String answer = query("SELECT 1; " + ending + "; DROP TABLE database_tool_probe");
 
         assertThat(answer).isEqualTo(ONE_STATEMENT_ONLY);
         assertThat(probeTableExists("database_tool_probe")).isTrue();
@@ -122,7 +127,7 @@ class DatabaseToolTest extends MapperTestSupport {
             "SELECT {d '}' , '{fn locate(a, b''; COMMIT; DROP TABLE database_tool_probe; --, c)}'",
             "SELECT {d 'x}', '; COMMIT; DROP TABLE database_tool_probe; SELECT 1 --'"})
     void jdbcEscapesCannotSplitOneCountedStatement(String sql) {
-        String answer = tool.databaseQuery(sql);
+        String answer = query(sql);
 
         assertThat(probeTableExists("database_tool_probe")).as(answer).isTrue();
         assertThat(answer).as("no part may run read-write").doesNotStartWith("|");
@@ -130,7 +135,7 @@ class DatabaseToolTest extends MapperTestSupport {
 
     @Test
     void jdbcEscapesAreSentAsWritten() {
-        assertThat(tool.databaseQuery("SELECT {fn ucase('a')} AS v")).startsWith("Query failed:");
+        assertThat(query("SELECT {fn ucase('a')} AS v")).startsWith("INVALID_ARGUMENTS: Query failed:");
     }
 
     /** The driver's own parser decides, so semicolons inside literals and comments are not statement breaks. */
@@ -141,32 +146,32 @@ class DatabaseToolTest extends MapperTestSupport {
             "SELECT 1 AS v -- ; DROP TABLE database_tool_probe",
             "SELECT 1 AS v /* ; DROP TABLE database_tool_probe */"})
     void semicolonsInLiteralsAndCommentsAndATrailingOneAreOneStatement(String sql) {
-        assertThat(tool.databaseQuery(sql)).startsWith("| v |").endsWith("(1 row)");
+        assertThat(query(sql)).startsWith("| v |").endsWith("(1 row)");
         assertThat(probeTableExists("database_tool_probe")).isTrue();
     }
 
     @Test
     void aWriteHiddenInAFunctionIsRejectedByTheDatabase() {
-        String answer = tool.databaseQuery("SELECT nextval('database_tool_probe_seq')");
+        String answer = query("SELECT nextval('database_tool_probe_seq')");
 
-        assertThat(answer).startsWith("Query failed:").contains("read-only transaction");
+        assertThat(answer).startsWith("REFUSED: Query failed:").contains("read-only transaction");
         assertThat(jdbcTemplate.queryForObject("SELECT nextval('database_tool_probe_seq')", Long.class)).isEqualTo(1L);
     }
 
     @Test
     void selectIntoCannotCreateATable() {
-        String answer = tool.databaseQuery("SELECT * INTO database_tool_select_into FROM database_tool_probe");
+        String answer = query("SELECT * INTO database_tool_select_into FROM database_tool_probe");
 
-        assertThat(answer).contains("read-only transaction");
+        assertThat(answer).startsWith("REFUSED: Query failed:").contains("read-only transaction");
         assertThat(probeTableExists("database_tool_select_into")).isFalse();
     }
 
     @Test
     void statementsNotStartingWithSelectAreRefusedBeforeTheDatabase() {
-        assertThat(tool.databaseQuery("UPDATE database_tool_probe SET v = 'x'")).isEqualTo("Only SELECT statements are allowed.");
-        assertThat(tool.databaseQuery("DELETE FROM database_tool_probe")).isEqualTo("Only SELECT statements are allowed.");
-        assertThat(tool.databaseQuery(" ")).isEqualTo("The SQL must not be blank.");
-        assertThat(tool.databaseQuery(null)).isEqualTo("The SQL must not be blank.");
+        assertThat(query("UPDATE database_tool_probe SET v = 'x'")).isEqualTo("REFUSED: Only SELECT statements are allowed.");
+        assertThat(query("DELETE FROM database_tool_probe")).isEqualTo("REFUSED: Only SELECT statements are allowed.");
+        assertThat(query(" ")).isEqualTo("INVALID_ARGUMENTS: The SQL must not be blank.");
+        assertThat(query(null)).isEqualTo("INVALID_ARGUMENTS: The SQL must not be blank.");
         assertThat(countRows("database_tool_probe", "v = 'x'")).isZero();
         assertThat(countRows("database_tool_probe", "true")).isEqualTo(3);
     }
@@ -175,9 +180,9 @@ class DatabaseToolTest extends MapperTestSupport {
     void aSlowQueryIsStoppedAfterFiveSeconds() {
         Instant start = Instant.now();
 
-        String answer = tool.databaseQuery("SELECT pg_sleep(10)");
+        String answer = query("SELECT pg_sleep(10)");
 
-        assertThat(answer).isEqualTo("Query stopped: it ran longer than 5 seconds.");
+        assertThat(answer).isEqualTo("TOOL_ERROR: Query stopped: it ran longer than 5 seconds.");
         assertThat(Duration.between(start, Instant.now())).isLessThan(Duration.ofSeconds(9));
     }
 
@@ -186,16 +191,16 @@ class DatabaseToolTest extends MapperTestSupport {
     void theTimeoutCannotBeSwitchedOffByTheQuery() {
         Instant start = Instant.now();
 
-        String answer = tool.databaseQuery("SELECT set_config('statement_timeout', '0', true), pg_sleep(10)");
+        String answer = query("SELECT set_config('statement_timeout', '0', true), pg_sleep(10)");
 
-        assertThat(answer).isEqualTo("Query stopped: it ran longer than 5 seconds.");
+        assertThat(answer).isEqualTo("TOOL_ERROR: Query stopped: it ran longer than 5 seconds.");
         assertThat(Duration.between(start, Instant.now())).isLessThan(Duration.ofSeconds(9));
     }
 
     @Test
     void resultsAreCappedAt200RowsAndTruncationIsMarked() {
-        String truncated = tool.databaseQuery("SELECT generate_series(1, 1000) AS n");
-        String full = tool.databaseQuery("SELECT generate_series(1, 200) AS n");
+        String truncated = query("SELECT generate_series(1, 1000) AS n");
+        String full = query("SELECT generate_series(1, 200) AS n");
 
         assertThat(truncated.lines().filter(line -> line.matches("\\| \\d+ \\|"))).hasSize(200);
         assertThat(truncated).endsWith("| 200 |\n\n(truncated to 200 rows)");
@@ -204,8 +209,8 @@ class DatabaseToolTest extends MapperTestSupport {
 
     @Test
     void longValuesAndLongAnswersAreShortenedAndMarked() {
-        String longValue = tool.databaseQuery("SELECT repeat('x', 5000) AS v");
-        String longAnswer = tool.databaseQuery("SELECT repeat('y', 500) AS v FROM generate_series(1, 100)");
+        String longValue = query("SELECT repeat('x', 5000) AS v");
+        String longAnswer = query("SELECT repeat('y', 500) AS v FROM generate_series(1, 100)");
 
         assertThat(longValue).contains("| " + "x".repeat(1_000) + "… (5000 characters, shortened) |").endsWith("(1 row)");
         assertThat(longAnswer).hasSizeLessThanOrEqualTo(20_000 + 60)
@@ -216,29 +221,29 @@ class DatabaseToolTest extends MapperTestSupport {
     /** The driver stops reading a result over 16 MB instead of loading it into memory and cutting it afterwards. */
     @Test
     void aResultOverTheBufferLimitIsRefusedByTheDriver() {
-        String tooLarge = tool.databaseQuery("SELECT repeat('x', 20000000) AS v");
-        String belowLimit = tool.databaseQuery("SELECT repeat('x', 5000000) AS v");
+        String tooLarge = query("SELECT repeat('x', 20000000) AS v");
+        String belowLimit = query("SELECT repeat('x', 5000000) AS v");
 
-        assertThat(tooLarge).startsWith("Query failed:").doesNotContain("xxxxxxxxxx");
+        assertThat(tooLarge).startsWith("TOOL_ERROR: Query failed:").doesNotContain("xxxxxxxxxx");
         assertThat(belowLimit).contains("… (5000000 characters, shortened) |").endsWith("(1 row)");
     }
 
     @Test
     void errorsReturnTheDatabaseMessageWithoutJavaDetails() {
-        String answer = tool.databaseQuery("SELECT * FROM no_such_table");
+        String answer = query("SELECT * FROM no_such_table");
 
-        assertThat(answer).startsWith("Query failed: ERROR: relation \"no_such_table\" does not exist");
+        assertThat(answer).startsWith("INVALID_ARGUMENTS: Query failed: ERROR: relation \"no_such_table\" does not exist");
         assertThat(answer).doesNotContain("Exception", "java.", "at org.");
     }
 
     /** Each call has a connection of its own, so nothing a query does to its session outlives the call. */
     @Test
     void sessionSettingsAndAdvisoryLocksEndWithTheCall() throws Exception {
-        String answer = tool.databaseQuery("SELECT set_config('search_path', 'pg_catalog', false) AS a, "
+        String answer = query("SELECT set_config('search_path', 'pg_catalog', false) AS a, "
                 + "set_config('statement_timeout', '1ms', false) AS b, pg_advisory_lock(730001) AS c");
 
         assertThat(answer).endsWith("(1 row)");
-        assertThat(tool.databaseQuery("SELECT count(*) AS n FROM database_tool_probe")).contains("| 3 |");
+        assertThat(query("SELECT count(*) AS n FROM database_tool_probe")).contains("| 3 |");
         for (int i = 0; i < 10; i++) {
             assertThat(jdbcTemplate.queryForObject("SHOW search_path", String.class)).isEqualTo("\"$user\", public");
             assertThat(jdbcTemplate.queryForObject("SHOW statement_timeout", String.class)).isEqualTo("0");
@@ -248,16 +253,16 @@ class DatabaseToolTest extends MapperTestSupport {
 
     @Test
     void theQueryDoesNotRunOnAPooledConnection() {
-        assertThat(tool.databaseQuery("SELECT current_setting('application_name') AS app"))
+        assertThat(query("SELECT current_setting('application_name') AS app"))
                 .contains("| thinkxecai-database-tool |");
     }
 
     @Test
     void failedQueriesLeaveNoReadOnlyOrTimeoutSettingBehind() {
-        tool.databaseQuery("SELECT * INTO database_tool_select_into FROM database_tool_probe");
-        tool.databaseQuery("SELECT pg_sleep(10)");
+        query("SELECT * INTO database_tool_select_into FROM database_tool_probe");
+        query("SELECT pg_sleep(10)");
 
-        assertThat(tool.databaseQuery("SELECT count(*) AS n FROM database_tool_probe")).contains("| 3 |");
+        assertThat(query("SELECT count(*) AS n FROM database_tool_probe")).contains("| 3 |");
         for (int i = 0; i < 10; i++) {
             assertThat(jdbcTemplate.queryForObject("SHOW transaction_read_only", String.class)).isEqualTo("off");
             assertThat(jdbcTemplate.queryForObject("SHOW statement_timeout", String.class)).isEqualTo("0");
@@ -270,7 +275,7 @@ class DatabaseToolTest extends MapperTestSupport {
         transactionTemplate.executeWithoutResult(status -> {
             jdbcTemplate.queryForObject("SELECT 1", Integer.class);
 
-            assertThat(tool.databaseQuery("SELECT current_setting('transaction_read_only') AS ro")).contains("| on |");
+            assertThat(query("SELECT current_setting('transaction_read_only') AS ro")).contains("| on |");
             assertThat(jdbcTemplate.queryForObject("SHOW transaction_read_only", String.class)).isEqualTo("off");
             assertThat(jdbcTemplate.queryForObject("SHOW statement_timeout", String.class)).isEqualTo("0");
             assertThat(jdbcTemplate.update("INSERT INTO database_tool_probe VALUES ('d', '4')")).isEqualTo(1);

@@ -455,6 +455,8 @@ export interface components {
             type: string;
         };
         ToolResponseMetadata: {
+            /** @enum {string|null} */
+            failure: "UNKNOWN_TOOL" | "INVALID_ARGUMENTS" | "REFUSED" | "TOOL_ERROR" | null;
             id: string;
             name: string;
             responseData: string;

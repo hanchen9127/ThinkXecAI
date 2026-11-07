@@ -23,7 +23,7 @@ class MemoryMessagesTest {
     }
 
     private static ChatMessageDTO result(String id, String name, String data) {
-        return row(ChatMessageRole.TOOL, data, new ChatMessageMetadata(null, new ToolResponseMetadata(id, name, data)));
+        return row(ChatMessageRole.TOOL, data, new ChatMessageMetadata(null, new ToolResponseMetadata(id, name, data, null)));
     }
 
     @Test

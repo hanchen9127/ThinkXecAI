@@ -28,7 +28,7 @@ const call = (id: string, name: string, args = '{}') => ({
   arguments: args,
 })
 const result = (id: string, name: string, data: string) =>
-  message('tool', null, { toolResponse: { id, name, responseData: data } })
+  message('tool', null, { toolResponse: { id, name, responseData: data, failure: null } })
 
 describe('groupHistory with terminate', () => {
   const ask = () => message('user', 'Count the products.')

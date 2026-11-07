@@ -2,10 +2,12 @@ package com.thinkxecai.agent.tool;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.thinkxecai.model.ToolFailureKind;
 import com.thinkxecai.service.RagService;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.ToolCallback;
+import org.springframework.ai.tool.execution.ToolExecutionException;
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
 
 import java.util.List;
@@ -34,11 +36,16 @@ class KnowledgeToolTest {
         return new ToolContext(Map.of(KnowledgeTool.ALLOWED_KB_IDS, List.of(kbIds).stream().map(UUID::toString).toList()));
     }
 
+    /** The tool's answer, or its failure kind and text (ADR 064). */
+    private String query(String kbsId, String query, ToolContext context) {
+        return ToolOutcome.of(() -> tool.knowledgeQuery(kbsId, query, context));
+    }
+
     @Test
     void anAllowedKnowledgeBaseIsSearchedAndTheSectionsAreJoined() {
         when(ragService.search(KB_A, "setup")).thenReturn(List.of("first section", "second section"));
 
-        String answer = tool.knowledgeQuery(KB_A.toString(), "setup", allowing(KB_A, KB_B));
+        String answer = query(KB_A.toString(), "setup", allowing(KB_A, KB_B));
 
         assertThat(answer).isEqualTo("first section\n\nsecond section");
     }
@@ -47,39 +54,39 @@ class KnowledgeToolTest {
     void theIdIsComparedAsAUuidSoCaseAndSpacesDoNotMatter() {
         when(ragService.search(KB_A, "setup")).thenReturn(List.of("section"));
 
-        assertThat(tool.knowledgeQuery(" " + KB_A.toString().toUpperCase() + " ", "setup", allowing(KB_A)))
+        assertThat(query(" " + KB_A.toString().toUpperCase() + " ", "setup", allowing(KB_A)))
                 .isEqualTo("section");
     }
 
     @Test
     void aKnowledgeBaseOutsideTheAgentsListIsNotSearched() {
-        String answer = tool.knowledgeQuery(KB_B.toString(), "setup", allowing(KB_A));
+        String answer = query(KB_B.toString(), "setup", allowing(KB_A));
 
-        assertThat(answer).contains(KB_B + " is not available", "Available knowledge bases: " + KB_A);
+        assertThat(answer).startsWith("REFUSED: ").contains(KB_B + " is not available", "Available knowledge bases: " + KB_A);
         verifyNoInteractions(ragService);
     }
 
     @Test
     void aMalformedIdIsNotSearched() {
-        String answer = tool.knowledgeQuery("kb-1; DROP TABLE chunk_bge_m3", "setup", allowing(KB_A));
+        String answer = query("kb-1; DROP TABLE chunk_bge_m3", "setup", allowing(KB_A));
 
-        assertThat(answer).contains("is not available", KB_A.toString());
+        assertThat(answer).startsWith("INVALID_ARGUMENTS: ").contains("is not available", KB_A.toString());
         verifyNoInteractions(ragService);
     }
 
     @Test
     void withoutAllowedIdsNothingIsSearched() {
-        assertThat(tool.knowledgeQuery(KB_A.toString(), "setup", null)).contains("This agent has no knowledge bases.");
-        assertThat(tool.knowledgeQuery(KB_A.toString(), "setup", new ToolContext(Map.of("other", "value"))))
-                .contains("This agent has no knowledge bases.");
-        assertThat(tool.knowledgeQuery(KB_A.toString(), "setup", allowing()))
-                .contains("This agent has no knowledge bases.");
+        assertThat(query(KB_A.toString(), "setup", null)).startsWith("REFUSED: ").contains("This agent has no knowledge bases.");
+        assertThat(query(KB_A.toString(), "setup", new ToolContext(Map.of("other", "value"))))
+                .startsWith("REFUSED: ").contains("This agent has no knowledge bases.");
+        assertThat(query(KB_A.toString(), "setup", allowing()))
+                .startsWith("REFUSED: ").contains("This agent has no knowledge bases.");
         verifyNoInteractions(ragService);
     }
 
     @Test
     void aBlankQueryIsNotEmbedded() {
-        assertThat(tool.knowledgeQuery(KB_A.toString(), " ", allowing(KB_A))).isEqualTo("The query must not be blank.");
+        assertThat(query(KB_A.toString(), " ", allowing(KB_A))).isEqualTo("INVALID_ARGUMENTS: The query must not be blank.");
         verifyNoInteractions(ragService);
     }
 
@@ -87,7 +94,7 @@ class KnowledgeToolTest {
     void noResultsAreReportedExplicitly() {
         when(ragService.search(any(), any())).thenReturn(List.of());
 
-        assertThat(tool.knowledgeQuery(KB_A.toString(), "setup", allowing(KB_A)))
+        assertThat(query(KB_A.toString(), "setup", allowing(KB_A)))
                 .isEqualTo("No matching content found in knowledge base " + KB_A + ".");
     }
 
@@ -106,10 +113,15 @@ class KnowledgeToolTest {
         ToolCallback callback = callback();
 
         String allowed = callback.call(input(KB_A), allowing(KB_A));
-        String foreign = callback.call(input(KB_B), allowing(KB_A));
 
         assertThat(allowed).contains("section");
-        assertThat(foreign).contains("is not available");
+        // Spring AI wraps what the method throws; the runtime reads the kind from the cause (ADR 064).
+        assertThatThrownBy(() -> callback.call(input(KB_B), allowing(KB_A)))
+                .isInstanceOf(ToolExecutionException.class)
+                .cause().isInstanceOfSatisfying(ToolCallFailure.class, failure -> {
+                    assertThat(failure.kind()).isEqualTo(ToolFailureKind.REFUSED);
+                    assertThat(failure.getMessage()).contains("is not available");
+                });
         verify(ragService).search(KB_A, "setup");
     }
 

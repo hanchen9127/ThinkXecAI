@@ -7,6 +7,7 @@ import com.thinkxecai.agent.memory.MemorySanitizer;
 import com.thinkxecai.agent.memory.RunTurn;
 import com.thinkxecai.agent.model.ChatClientRegistry;
 import com.thinkxecai.agent.tool.KnowledgeTool;
+import com.thinkxecai.agent.tool.ToolCallFailure;
 import com.thinkxecai.converter.AgentConverter;
 import com.thinkxecai.converter.ChatMessageConverter;
 import com.thinkxecai.converter.KnowledgeBaseConverter;
@@ -102,8 +103,10 @@ public class AgentRuntimeFactory {
         }
 
         List<KnowledgeBaseDTO> knowledgeBases = knowledgeBases(agent.getAllowedKbs());
+        // Each call records why it failed, if it did, to be stored with its result (ADR 064).
+        ToolOutcomes outcomes = new ToolOutcomes(toolFacadeService.toolCallbacksFor(agent.getAllowedTools()));
         ToolCallingChatOptions options = ToolCallingChatOptions.builder()
-                .toolCallbacks(toolFacadeService.toolCallbacksFor(agent.getAllowedTools()))
+                .toolCallbacks(outcomes.callbacks())
                 // Always set, also when empty: Spring AI refuses to call KnowledgeTool without it (ADR 029).
                 .toolContext(Map.of(KnowledgeTool.ALLOWED_KB_IDS,
                         knowledgeBases.stream().map(kb -> kb.getId().toString()).toList()))
@@ -117,7 +120,7 @@ public class AgentRuntimeFactory {
                 MemoryMessages.toSpringAi(MemorySanitizer.sanitize(storedTurn(sessionId, triggerId, messageLength))),
                 messageLength);
 
-        return new AgentRuntime(agentId, sessionId, chatClient, memory, options, toolCallingManager,
+        return new AgentRuntime(agentId, sessionId, chatClient, memory, options, toolCallingManager, outcomes,
                 generatedMessageService, publisher);
     }
 
@@ -158,12 +161,19 @@ public class AgentRuntimeFactory {
         return ids.stream().filter(found::containsKey).map(found::get).toList();
     }
 
-    /** A failed tool call: the model gets the reason and can correct itself. An {@link Error} still ends the run. */
+    /**
+     * A failed tool call: the model gets the reason and can correct itself. A tool's own {@link ToolCallFailure}
+     * is passed on as it is: its text was written for the model (ADR 064). An {@link Error} still ends the run.
+     */
     static String toolFailed(ToolExecutionException exception) {
         String name = exception.getToolDefinition().name();
         Throwable cause = exception.getCause() != null ? exception.getCause() : exception;
         if (cause instanceof Error error) {
             throw error;
+        }
+        if (cause instanceof ToolCallFailure failure) {
+            log.debug("Tool {} did not succeed: {}", name, failure.kind());
+            return failure.getMessage();
         }
         // The message can quote the model's arguments: only the type at warn level.
         log.warn("Tool {} failed: {}", name, cause.getClass().getSimpleName());

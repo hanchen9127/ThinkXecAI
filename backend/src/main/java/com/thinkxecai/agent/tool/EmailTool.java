@@ -1,5 +1,6 @@
 package com.thinkxecai.agent.tool;
 
+import com.thinkxecai.model.ToolFailureKind;
 import jakarta.mail.internet.AddressException;
 import jakarta.mail.internet.InternetAddress;
 import lombok.extern.slf4j.Slf4j;
@@ -20,8 +21,9 @@ import java.util.stream.Collectors;
  * <p>
  * The allowlist is fail-closed: an empty list refuses every send. The recipient is parsed strictly as
  * exactly one address, and that address (not the raw text) is compared with the list, so a comma
- * list or a display name cannot smuggle in another recipient. Every outcome is text for the model;
- * nothing is thrown into the agent loop, and refusals never reveal which addresses are allowed.
+ * list or a display name cannot smuggle in another recipient. Every outcome is text for the model: a send
+ * that did not happen throws {@link ToolCallFailure} with that text and its kind (ADR 064), which never ends
+ * the agent loop, and refusals never reveal which addresses are allowed.
  */
 @Slf4j
 @Component
@@ -61,26 +63,27 @@ public class EmailTool implements Tool {
                             @ToolParam(description = "Subject, one line") String subject,
                             @ToolParam(description = "Plain-text body") String content) {
         if (isBlank(to) || isBlank(subject) || isBlank(content)) {
-            return "Not sent: to, subject, and content must all be given.";
+            throw new ToolCallFailure(ToolFailureKind.INVALID_ARGUMENTS, "Not sent: to, subject, and content must all be given.");
         }
         if (subject.contains("\r") || subject.contains("\n")) {
-            return "Not sent: the subject must be a single line.";
+            throw new ToolCallFailure(ToolFailureKind.INVALID_ARGUMENTS, "Not sent: the subject must be a single line.");
         }
         InternetAddress recipient = parseOneAddress(to);
         if (recipient == null) {
-            return "Not sent: \"to\" must be exactly one email address.";
+            throw new ToolCallFailure(ToolFailureKind.INVALID_ARGUMENTS, "Not sent: \"to\" must be exactly one email address.");
         }
 
         List<String> missing = gmailSender.missingSettings();
         if (!missing.isEmpty()) {
             log.warn("Email not sent: Gmail is not configured (missing {})", missing);
-            return "Not sent: email is not configured on this server. Missing environment variables: "
-                    + String.join(", ", missing) + ".";
+            throw new ToolCallFailure(ToolFailureKind.TOOL_ERROR,
+                    "Not sent: email is not configured on this server. Missing environment variables: "
+                            + String.join(", ", missing) + ".");
         }
         if (!allowedRecipients.contains(recipient.getAddress().toLowerCase(Locale.ROOT))) {
             log.warn("Email refused: {} is not an allowed recipient{}", recipient.getAddress(),
                     allowedRecipients.isEmpty() ? " (the allowlist is empty)" : "");
-            return "Not sent: " + recipient.getAddress() + " is not an allowed recipient.";
+            throw new ToolCallFailure(ToolFailureKind.REFUSED, "Not sent: " + recipient.getAddress() + " is not an allowed recipient.");
         }
 
         try {
@@ -88,10 +91,10 @@ public class EmailTool implements Tool {
             log.info("Email sent to {} (Gmail message id {})", recipient.getAddress(), messageId);
             return "Sent to " + recipient.getAddress() + " (Gmail message id " + messageId + ").";
         } catch (GmailSender.SendFailure e) {
-            return e.getMessage();
+            throw new ToolCallFailure(ToolFailureKind.TOOL_ERROR, e.getMessage());
         } catch (RuntimeException e) {
             log.warn("Email sending failed", e);
-            return "Not sent: an internal error occurred.";
+            throw new ToolCallFailure(ToolFailureKind.TOOL_ERROR, "Not sent: an internal error occurred.");
         }
     }
 

@@ -37,7 +37,7 @@ const toolCall = (id: string, name: string, args: string) => ({
   toolCalls: [{ id, type: 'function', name, arguments: args }],
 })
 const toolResult = (id: string, name: string, data: string) =>
-  msg('tool', null, { toolResponse: { id, name, responseData: data } })
+  msg('tool', null, { toolResponse: { id, name, responseData: data, failure: null } })
 
 function history() {
   clock = 0

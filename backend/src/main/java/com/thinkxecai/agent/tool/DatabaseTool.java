@@ -1,5 +1,6 @@
 package com.thinkxecai.agent.tool;
 
+import com.thinkxecai.model.ToolFailureKind;
 import lombok.extern.slf4j.Slf4j;
 import org.postgresql.core.BaseConnection;
 import org.postgresql.core.NativeQuery;
@@ -17,6 +18,7 @@ import java.sql.Statement;
 import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
+import java.util.Set;
 
 /**
  * Lets the model read the database with SQL (ISSUE-005, ADR 028, ADR 030). The database does the
@@ -56,6 +58,10 @@ public class DatabaseTool implements Tool {
 
     /** PostgreSQL {@code query_canceled}: statement timeout or a cancel sent by the driver's query timeout. */
     private static final String QUERY_CANCELED = "57014";
+    /** SQLSTATE class 42: syntax error or access rule violation, such as an unknown column. */
+    private static final String MALFORMED_SQL_CLASS = "42";
+    /** A write in the read-only transaction, or a privilege the database user lacks: the rules holding. */
+    private static final Set<String> REFUSED_STATES = Set.of("25006", "42501");
 
     private final String url;
     private final Properties connectionProperties;
@@ -96,14 +102,15 @@ public class DatabaseTool implements Tool {
                     + "and a query is stopped after 5 seconds.")
     public String databaseQuery(@ToolParam(description = "One PostgreSQL SELECT statement") String sql) {
         if (sql == null || sql.isBlank()) {
-            return "The SQL must not be blank.";
+            throw new ToolCallFailure(ToolFailureKind.INVALID_ARGUMENTS, "The SQL must not be blank.");
         }
         if (!sql.trim().toUpperCase(Locale.ROOT).startsWith("SELECT")) {
-            return "Only SELECT statements are allowed.";
+            throw new ToolCallFailure(ToolFailureKind.REFUSED, "Only SELECT statements are allowed.");
         }
         try (Connection connection = DriverManager.getConnection(url, connectionProperties)) {
             if (statementCount(sql, connection) != 1) {
-                return "Only one SQL statement is allowed; remove the extra statements after the first semicolon.";
+                throw new ToolCallFailure(ToolFailureKind.REFUSED,
+                        "Only one SQL statement is allowed; remove the extra statements after the first semicolon.");
             }
             connection.setAutoCommit(false);
             try (Statement statement = connection.createStatement()) {
@@ -123,10 +130,12 @@ public class DatabaseTool implements Tool {
                 rollbackQuietly(connection);
             }
         } catch (SQLException e) {
-            return failure(e);
+            throw failure(e);
+        } catch (ToolCallFailure e) {
+            throw e;
         } catch (RuntimeException e) {
             log.warn("Database tool query failed", e);
-            return "Query failed because of an internal error.";
+            throw new ToolCallFailure(ToolFailureKind.TOOL_ERROR, "Query failed because of an internal error.");
         }
     }
 
@@ -150,12 +159,22 @@ public class DatabaseTool implements Tool {
         }
     }
 
-    /** The database's own message tells the model what to fix; no stack trace or Java class names. */
-    private static String failure(SQLException e) {
+    /**
+     * The database's own message tells the model what to fix; no stack trace or Java class names. SQLSTATE
+     * class 42 (syntax error or access rule violation, such as an unknown column) is the model's SQL being
+     * wrong, except a missing privilege; that and a write in the read-only transaction are the rules refusing;
+     * anything else is the database failing (ADR 064).
+     */
+    private static ToolCallFailure failure(SQLException e) {
         if (QUERY_CANCELED.equals(e.getSQLState())) {
-            return "Query stopped: it ran longer than " + TIMEOUT_SECONDS + " seconds.";
+            return new ToolCallFailure(ToolFailureKind.TOOL_ERROR,
+                    "Query stopped: it ran longer than " + TIMEOUT_SECONDS + " seconds.");
         }
-        return "Query failed: " + e.getMessage();
+        String state = e.getSQLState() == null ? "" : e.getSQLState();
+        ToolFailureKind kind = REFUSED_STATES.contains(state) ? ToolFailureKind.REFUSED
+                : state.startsWith(MALFORMED_SQL_CLASS) ? ToolFailureKind.INVALID_ARGUMENTS
+                : ToolFailureKind.TOOL_ERROR;
+        return new ToolCallFailure(kind, "Query failed: " + e.getMessage());
     }
 
     /**

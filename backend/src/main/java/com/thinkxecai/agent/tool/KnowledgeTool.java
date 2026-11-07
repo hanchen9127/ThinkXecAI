@@ -1,5 +1,6 @@
 package com.thinkxecai.agent.tool;
 
+import com.thinkxecai.model.ToolFailureKind;
 import com.thinkxecai.service.RagService;
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.annotation.ToolParam;
@@ -54,11 +55,13 @@ public class KnowledgeTool implements Tool {
                                  ToolContext toolContext) {
         Set<UUID> allowed = allowedKbIds(toolContext);
         UUID kbId = parseUuid(kbsId);
+        // Not an id is the model's mistake; an id outside the agent's knowledge bases is refused (ADR 029, 064).
         if (kbId == null || !allowed.contains(kbId)) {
-            return notAvailable(kbsId, allowed);
+            throw new ToolCallFailure(kbId == null ? ToolFailureKind.INVALID_ARGUMENTS : ToolFailureKind.REFUSED,
+                    notAvailable(kbsId, allowed));
         }
         if (query == null || query.isBlank()) {
-            return "The query must not be blank.";
+            throw new ToolCallFailure(ToolFailureKind.INVALID_ARGUMENTS, "The query must not be blank.");
         }
         List<String> contents = ragService.search(kbId, query);
         if (contents.isEmpty()) {

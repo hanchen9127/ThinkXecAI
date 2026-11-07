@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.thinkxecai.agent.GeneratedMessages;
 import com.thinkxecai.exception.ChatSessionGoneException;
 import com.thinkxecai.model.ChatMessageRole;
+import com.thinkxecai.model.ToolFailureKind;
 import com.thinkxecai.model.dto.ChatMessageDTO;
 import com.thinkxecai.model.vo.ChatMessageVO;
 import org.junit.jupiter.api.Test;
@@ -62,11 +63,13 @@ class GeneratedMessageServiceTest extends ServiceTestSupport {
                 new ToolResponseMessage.ToolResponse("a", "getCity", "Sydney"),
                 new ToolResponseMessage.ToolResponse("b", "getDate", "2026-10-19"))).build();
 
-        List<ChatMessageVO> saved = service.save(session, GeneratedMessages.toolResults(results));
+        List<ChatMessageVO> saved = service.save(session,
+                GeneratedMessages.toolResults(results, Arrays.asList(null, ToolFailureKind.TOOL_ERROR)));
 
         assertThat(saved).extracting(ChatMessageVO::getRole).containsOnly(ChatMessageRole.TOOL);
         assertThat(saved).extracting(ChatMessageVO::getContent).containsExactly("Sydney", "2026-10-19");
         assertThat(saved).extracting(vo -> vo.getMetadata().toolResponse().id()).containsExactly("a", "b");
+        assertThat(saved).extracting(vo -> vo.getMetadata().toolResponse().failure()).containsExactly(null, ToolFailureKind.TOOL_ERROR);
         List<String> stored = jdbcTemplate.queryForList(
                 "SELECT content FROM chat_message WHERE session_id = ? ORDER BY created_at", String.class, session);
         assertThat(stored).containsExactly("Sydney", "2026-10-19");

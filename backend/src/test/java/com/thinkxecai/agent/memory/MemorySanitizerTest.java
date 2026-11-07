@@ -36,7 +36,7 @@ class MemorySanitizerTest {
 
     private static ChatMessageDTO result(String callId) {
         return message(ChatMessageRole.TOOL, "result " + callId,
-                new ChatMessageMetadata(null, new ToolResponseMetadata(callId, "tool-" + callId, "result " + callId)));
+                new ChatMessageMetadata(null, new ToolResponseMetadata(callId, "tool-" + callId, "result " + callId, null)));
     }
 
     private static ChatMessageDTO message(ChatMessageRole role, String text, ChatMessageMetadata metadata) {
