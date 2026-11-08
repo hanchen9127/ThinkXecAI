@@ -9,7 +9,8 @@ import { errorMessage } from '../utils/text'
  * Under a list: the Undo bar while a delete waits (V3 K9), rising into place and folding away again
  * after Undo or the wait (ADR 061), and the error when one failed. It sticks to the bottom of the
  * panel that scrolls, so a delete far down a long list still shows its Undo (critique of
- * 2026-11-08), and it takes focus when the delete left focus nowhere.
+ * 2026-11-08), and it takes focus when the delete left focus nowhere. Undo puts focus back on the
+ * row's ⋯, once the row is no longer inert, as the bar folding away would leave it nowhere.
  */
 export default function DeleteFeedback({
   deletes,
@@ -41,7 +42,11 @@ export default function DeleteFeedback({
           <button
             ref={undo}
             type="button"
-            onClick={deletes.undo}
+            onClick={() => {
+              const returnTo = last?.returnTo
+              deletes.undo()
+              setTimeout(() => returnTo?.focus())
+            }}
             className="cursor-pointer font-semibold text-white underline focus-visible:outline-white"
           >
             Undo

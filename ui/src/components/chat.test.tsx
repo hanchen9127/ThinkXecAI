@@ -208,7 +208,11 @@ describe('a new chat', () => {
 
     const box = await screen.findByRole('textbox', { name: 'Message' })
     await userEvent.type(box, 'Hello{Enter}')
-    expect(await screen.findByRole('alert')).toHaveTextContent('Internal server error')
+    // what failed and what to do, not the server's own "Internal server error"
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent("Couldn't send your message.")
+    expect(alert).toHaveTextContent('The server ran into a problem. Try again')
+    expect(alert).not.toHaveTextContent('Internal server error')
     expect(box).toHaveValue('Hello')
 
     fail = false
@@ -361,6 +365,15 @@ describe('a chat', () => {
     await userEvent.click(within(run).getByRole('button', { name: 'Show steps' }))
     const steps = within(run).getByRole('list', { name: 'Agent steps' })
     const [think, execute] = within(steps).getAllByRole('listitem')
+    // the answer is the run's strongest text; the thinking is quieter (critique of 2026-11-08, B)
+    expect(screen.getByText('Clear the old orders.').parentElement).not.toHaveClass('border')
+    expect(
+      within(run).getByText('I can only read the database.').closest('.x-markdown'),
+    ).toHaveClass('border-l-2', 'border-ink', 'text-answer')
+    expect(within(think).getByText('Deleting them.').closest('.x-markdown')).toHaveClass(
+      'text-sm',
+      'text-muted',
+    )
     // a rule doing its job reads as protection, in ink, not as a malfunction in red
     expect(within(execute).getByText('Refused:')).toHaveClass('text-ink')
     expect(within(run).getByText('1 refused')).toHaveClass('text-ink')
@@ -642,6 +655,10 @@ describe('the chat list', () => {
     // the row has gone, so focus goes to Undo, on a bar that stays at the panel's foot
     await waitFor(() => expect(within(list).getByRole('button', { name: 'Undo' })).toHaveFocus())
     expect(within(list).getByRole('status').closest('.sticky')).toHaveClass('bottom-0')
+
+    // Undo brings the row back, and focus with it to its ⋯, as the bar folds away
+    await userEvent.keyboard('{Enter}')
+    await waitFor(() => expect(more).toHaveFocus())
   })
 
   it('puts focus back on the row menu after renaming', async () => {

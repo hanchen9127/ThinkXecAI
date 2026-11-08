@@ -76,7 +76,12 @@ export default function DeleteKnowledgeBaseModal({
         )}
         <p className="m-0 text-muted">This can't be undone.</p>
         {deleteError !== undefined && (
-          <Alert type="error" showIcon title={errorMessage(deleteError)} />
+          <Alert
+            type="error"
+            showIcon
+            title="Couldn't delete the knowledge base."
+            description={errorMessage(deleteError)}
+          />
         )}
       </div>
     </Modal>

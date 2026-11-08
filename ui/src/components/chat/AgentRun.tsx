@@ -123,7 +123,8 @@ export default function AgentRun({
                   {row.kind === 'think' ? (
                     <>
                       <StepLabel kind="Think" number={i + 1} ms={row.ms} />
-                      <Markdown text={row.text} />
+                      {/* Process, not the result: quieter than the answer (critique of 2026-11-08). */}
+                      <Markdown text={row.text} className="text-sm text-muted" />
                     </>
                   ) : (
                     <>
@@ -154,7 +155,12 @@ export default function AgentRun({
             onRetry={answer === lastNotice ? onRetry : undefined}
           />
         ) : (
-          <Markdown key={answer.id} text={answer.content ?? ''} className="max-w-prose text-base" />
+          // The answer is what the run was for: the one text with an ink rule, a step larger (B).
+          <Markdown
+            key={answer.id}
+            text={answer.content ?? ''}
+            className="max-w-prose border-l-2 border-ink pl-3.5 text-answer"
+          />
         ),
       )}
     </article>

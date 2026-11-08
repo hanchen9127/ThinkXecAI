@@ -217,7 +217,7 @@ describe('when the stream ends', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       // Not "still saved": sending fails too while the server is out of reach.
-      /^Live replies stopped\. Can't reach the server\.\s*Try again$/,
+      /^Live replies stopped\. Can't reach the server\. Check that it is running, then try again\.\s*Try again$/,
     )
   })
 
@@ -422,7 +422,10 @@ describe('the working indicator', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: 'Stop' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Chat session not found')
+    // a failed stop says so, not that a message failed to send
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent("Couldn't stop the agent.")
+    expect(alert).toHaveTextContent('It no longer exists; it may have been deleted in another tab.')
     expect(screen.getByRole('button', { name: 'Stop' })).toBeEnabled()
   })
 
@@ -507,7 +510,7 @@ describe('the working indicator', () => {
     renderApp('/chat/s1')
 
     await userEvent.click(await screen.findByRole('button', { name: 'Try again' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('Not saved')
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't send your message.")
 
     await userEvent.click(screen.getByRole('button', { name: 'Try again' }))
     await waitFor(() => expect(sent(api)).toEqual(['user m1', 'user m1']))

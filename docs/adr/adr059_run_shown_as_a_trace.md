@@ -25,6 +25,8 @@ The user's message is a surface-coloured band with a muted mono `>` before it, n
 
 **Amended 2026-11-08 (owner, from the design critique of 2026-11-08).** A refusal is a rule protecting the user, not a malfunction, so it is no longer drawn like one. A `REFUSED` call gets a ring closed by a bar, in ink, on the rail in place of its dot; its "Refused:" is ink, and the folded line's "N refused" is ink after the same ring. Danger red and the `×` stay for the other kinds and for any mix ("N failed"). A shield with "Blocked by a rule" and a grey lock with "Not allowed" were not chosen. Tool calls are named by their label in an outlined token, and an opened call shows the name the model called in mono (ADR 065).
 
+**Amended 2026-11-08 (owner, option B on the canvas, from the critique of 2026-11-08, 27/40).** The answer is the strongest text of an exchange: 17 px (`--text-answer`) with a 2 px ink rule at its left. Think text is muted at 14 px, as process. The user's message keeps its band and `>` but loses its border. Quietening only the question and the thinking (A) and putting the answer above the folded steps (C) were not chosen. X Markdown sets its size and colour from its own variables outside any layer, so `index.css` sets those variables where a text utility is on its root.
+
 ## Trade-offs
 
 - Summaries are derived on the client from stored tool results; a result the summary does not understand shows only the tool name.

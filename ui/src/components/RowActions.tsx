@@ -23,7 +23,8 @@ export default function RowActions({
   /** What else goes with it, shown under "Delete {name}?". */
   deleteDescription: string
   onRename: () => void
-  onDelete: () => void
+  /** Called with ⋯, for focus to return to it if the delete is undone. */
+  onDelete: (returnTo: HTMLElement | null) => void
   focusOnMount?: boolean
 }) {
   const [confirming, setConfirming] = useState(false)
@@ -68,7 +69,7 @@ export default function RowActions({
       onConfirm={() => {
         setConfirming(false)
         ;(document.activeElement as HTMLElement | null)?.blur()
-        onDelete()
+        onDelete(trigger.current)
       }}
       onCancel={keep}
     >

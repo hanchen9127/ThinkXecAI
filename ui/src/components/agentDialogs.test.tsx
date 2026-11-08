@@ -250,9 +250,10 @@ describe('editing an agent', () => {
     await userEvent.type(within(dialog).getByLabelText('Description'), ' More.')
     await userEvent.click(within(dialog).getByRole('button', { name: 'Save changes' }))
 
-    expect(
-      await within(dialog).findByText('allowedTools: not an optional tool: terminate'),
-    ).toBeInTheDocument()
+    // what failed, then the backend's reason, which names the field (a 400)
+    const alert = await within(dialog).findByRole('alert')
+    expect(alert).toHaveTextContent("Couldn't save the agent.")
+    expect(alert).toHaveTextContent('allowedTools: not an optional tool: terminate.')
     expect(screen.getByRole('dialog', { name: 'Edit Store analyst' })).toBeInTheDocument()
   })
 })

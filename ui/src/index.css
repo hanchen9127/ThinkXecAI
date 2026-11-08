@@ -27,6 +27,8 @@
   --radius-ui: 4px;
   --text-icon: 20px;
   --text-label: 11px;
+  /* A run's answer, a step above body text (critique of 2026-11-08, option B). */
+  --text-answer: 17px;
   --container-panel: 300px;
 
   /* Narrow below this (ADR 063): the rail becomes a top bar and a page shows its list or its item.
@@ -171,6 +173,22 @@ body {
   background: var(--color-ground);
   color: var(--color-ink);
   font-family: var(--font-sans);
+}
+
+/* X Markdown sets its size and colour from its own variables on `.x-markdown`, outside any layer, so
+   Tailwind's text utilities on it never applied; with one of them on the root, these set the
+   variables instead (critique of 2026-11-08: the answer larger than the quieter thinking). */
+.x-markdown.text-sm {
+  --font-size: var(--text-sm);
+}
+.x-markdown.text-base {
+  --font-size: var(--text-base);
+}
+.x-markdown.text-answer {
+  --font-size: var(--text-answer);
+}
+.x-markdown.text-muted {
+  --text-color: var(--color-muted);
 }
 
 /* Tables in model and tool text, such as query results: X Markdown's base styles draw no lines and

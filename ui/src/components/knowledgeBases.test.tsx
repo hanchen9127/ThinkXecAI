@@ -465,7 +465,9 @@ describe('renaming a document', () => {
       'x{Enter}',
     )
 
-    expect(await screen.findByText('name: size must be between 0 and 200')).toBeInTheDocument()
+    expect(
+      await screen.findByText("Couldn't rename it. name: size must be between 0 and 200."),
+    ).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Name of opening-hours.md' })).toBeInTheDocument()
   })
 })

@@ -20,7 +20,7 @@ export default function DocumentRow({
   /** Deleted, waiting for Undo: the row folds away (ADR 061). */
   leaving?: boolean
   onRename: (name: string) => Promise<void>
-  onDelete: () => void
+  onDelete: (returnTo: HTMLElement | null) => void
 }) {
   const [editing, setEditing] = useState(false)
   // Back from renaming, focus returns to the row's ⋯, not to nowhere.

@@ -96,7 +96,12 @@ export default function AgentFormModal({
         </nav>
         <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto px-7 py-5">
           {saveError !== undefined && (
-            <Alert type="error" showIcon title={errorMessage(saveError)} />
+            <Alert
+              type="error"
+              showIcon
+              title="Couldn't save the agent."
+              description={errorMessage(saveError)}
+            />
           )}
           {section === 'basics' && <Basics draft={draft} errors={errors} change={change} />}
           {section === 'model' && <ModelSection draft={draft} change={change} />}

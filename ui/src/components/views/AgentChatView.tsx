@@ -126,7 +126,12 @@ function NewChat() {
             <StepsExplained />
           </div>
           {sendError !== undefined && (
-            <Alert type="error" showIcon title={errorMessage(sendError)} />
+            <Alert
+              type="error"
+              showIcon
+              title="Couldn't send your message."
+              description={errorMessage(sendError)}
+            />
           )}
           <Composer
             onSend={send}
@@ -156,7 +161,8 @@ function Chat({ sessionId }: { sessionId: string }) {
   const agents = useAgents()
   const navigate = useNavigate()
   const { messages, loading, error, reload, send, receive } = useChatMessages(sessionId)
-  const [sendError, setSendError] = useState<unknown>()
+  // What failed (sending or stopping) and why, shown above the composer.
+  const [problem, setProblem] = useState<{ title: string; error: unknown }>()
   const history = useMemo(() => groupHistory(messages), [messages])
   const newest = useMemo(() => newestMessage(messages), [messages])
   // The newest message when a stop found no run (a backend restart ended it): nothing will follow.
@@ -213,7 +219,7 @@ function Chat({ sessionId }: { sessionId: string }) {
   const agentName = agent?.name ?? 'Agent'
 
   async function submit(content: string) {
-    setSendError(undefined)
+    setProblem(undefined)
     follow()
     try {
       await send(content)
@@ -223,21 +229,21 @@ function Chat({ sessionId }: { sessionId: string }) {
         chatSessions.reload()
         agents.reload()
       }
-      setSendError(failure)
+      setProblem({ title: "Couldn't send your message.", error: failure })
       throw failure
     }
   }
 
   function stop() {
     setStopping(true)
-    setSendError(undefined)
+    setProblem(undefined)
     stopChatSession(sessionId).then(
       (found) => {
         if (!found) setAbandoned(newest?.id)
       },
       (failure: unknown) => {
         setStopping(false)
-        setSendError(failure)
+        setProblem({ title: "Couldn't stop the agent.", error: failure })
       },
     )
   }
@@ -320,10 +326,11 @@ function Chat({ sessionId }: { sessionId: string }) {
         )}
         {history.map((item, i) =>
           item.kind === 'user' ? (
-            // The user's message as a prompt line on a band, not a bubble (ADR 059).
+            // The user's message as a prompt line on a band, not a bubble (ADR 059); no border, so
+            // the answer, not the question, is the strongest text of an exchange (critique of 2026-11-08).
             <div
               key={item.message.id}
-              className="flex gap-2.5 rounded-ui border border-line bg-surface px-3 py-2.5 not-first:mt-5"
+              className="flex gap-2.5 rounded-ui bg-surface px-3 py-2.5 not-first:mt-5"
             >
               <span aria-hidden="true" className="font-mono text-sm text-muted">
                 &gt;
@@ -355,7 +362,14 @@ function Chat({ sessionId }: { sessionId: string }) {
 
       {/* Stays on screen while the steps above it are read (F3). */}
       <div className={cx(COLUMN, 'sticky bottom-0 z-10 flex flex-col gap-3 bg-ground pt-2 pb-9')}>
-        {sendError !== undefined && <Alert type="error" showIcon title={errorMessage(sendError)} />}
+        {problem !== undefined && (
+          <Alert
+            type="error"
+            showIcon
+            title={problem.title}
+            description={errorMessage(problem.error)}
+          />
+        )}
         {stream.status === 'replaced' ? (
           // Replies would only reach the other tab, so nothing is sent from here (V4 C4 C).
           <div

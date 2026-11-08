@@ -162,7 +162,9 @@ function KnowledgeBasePage({ knowledgeBase }: { knowledgeBase: KnowledgeBase }) 
                   document={document}
                   leaving={deletes.hidden.has(document.id)}
                   onRename={(name) => update(document.id, { name }).then(() => undefined)}
-                  onDelete={() => deletes.confirm({ id: document.id, name: document.name })}
+                  onDelete={(returnTo) =>
+                    deletes.confirm({ id: document.id, name: document.name, returnTo })
+                  }
                 />
               ))}
             </ul>

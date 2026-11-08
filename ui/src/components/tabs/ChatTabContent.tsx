@@ -113,8 +113,8 @@ export default function ChatTabContent() {
               agentName={agentName(session)}
               open={session.id === openId}
               onRename={(title) => update(session.id, { title }).then(() => undefined)}
-              onDelete={() => {
-                deletes.confirm({ id: session.id, name: chatTitle(session) })
+              onDelete={(returnTo) => {
+                deletes.confirm({ id: session.id, name: chatTitle(session), returnTo })
                 if (session.id === openId) navigate('/chat/new')
               }}
             />
@@ -140,7 +140,7 @@ function ChatItem({
   agentName: string
   open: boolean
   onRename: (title: string) => Promise<void>
-  onDelete: () => void
+  onDelete: (returnTo: HTMLElement | null) => void
 }) {
   const [editing, setEditing] = useState(false)
   // Back from renaming, focus returns to the row's ⋯, not to nowhere.

@@ -145,7 +145,7 @@ describe('agent list', () => {
     renderApp('/agent')
 
     expect(await within(agentList()).findByRole('alert')).toHaveTextContent(
-      "Couldn't load agents. Internal server error",
+      "Couldn't load agents. The server ran into a problem. Try again; if it keeps happening, check the server log.",
     )
     fail = false
     await userEvent.click(within(agentList()).getByRole('button', { name: 'Try again' }))
