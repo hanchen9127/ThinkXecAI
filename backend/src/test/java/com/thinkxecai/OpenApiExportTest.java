@@ -103,7 +103,7 @@ class OpenApiExportTest {
         assertThat(names(schema("ApiResponseVoid").get("required"))).containsExactlyInAnyOrder("code", "message", "data");
 
         JsonNode tool = schema("ToolVO");
-        assertThat(names(tool.get("required"))).containsExactlyInAnyOrder("name", "description", "type");
+        assertThat(names(tool.get("required"))).containsExactlyInAnyOrder("name", "callName", "label", "description", "type");
         assertThat(names(tool.at("/properties/type/enum"))).containsExactly("FIXED", "OPTIONAL");
     }
 

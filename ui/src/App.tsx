@@ -8,6 +8,7 @@ import KnowledgeBaseTabContent from './components/tabs/KnowledgeBaseTabContent'
 import AgentsProvider from './contexts/AgentsProvider'
 import ChatSessionsProvider from './contexts/ChatSessionsProvider'
 import KnowledgeBasesProvider from './contexts/KnowledgeBasesProvider'
+import ToolsProvider from './contexts/ToolsProvider'
 import { usePageCount } from './hooks/usePageCount'
 import Content from './layout/Content'
 import { COLUMN } from './layout/column'
@@ -78,11 +79,13 @@ export function AppProviders({ children }: { children: ReactNode }) {
       button={buttonConfig}
       select={{ menuItemSelectedIcon: <CheckOutlined /> }}
     >
-      <KnowledgeBasesProvider>
-        <AgentsProvider>
-          <ChatSessionsProvider>{children}</ChatSessionsProvider>
-        </AgentsProvider>
-      </KnowledgeBasesProvider>
+      <ToolsProvider>
+        <KnowledgeBasesProvider>
+          <AgentsProvider>
+            <ChatSessionsProvider>{children}</ChatSessionsProvider>
+          </AgentsProvider>
+        </KnowledgeBasesProvider>
+      </ToolsProvider>
     </ConfigProvider>
   )
 }

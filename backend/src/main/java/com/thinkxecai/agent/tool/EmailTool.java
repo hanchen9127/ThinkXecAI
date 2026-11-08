@@ -47,6 +47,11 @@ public class EmailTool implements Tool {
     }
 
     @Override
+    public String getLabel() {
+        return "Email";
+    }
+
+    @Override
     public String getDescription() {
         return "Sends a plain-text email through Gmail to an allowed recipient.";
     }

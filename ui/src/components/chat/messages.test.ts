@@ -266,9 +266,12 @@ describe('tool failures (ADR 064)', () => {
       failures.map((failure) => ({ call: call('c', 't'), result: '""', ms: 0, failure }))
 
     expect(failedLabel(calls(null, null))).toBeNull()
-    expect(failedLabel(calls('REFUSED', null))).toBe('1 refused')
-    expect(failedLabel(calls('REFUSED', 'REFUSED'))).toBe('2 refused')
-    expect(failedLabel(calls('REFUSED', 'TOOL_ERROR'))).toBe('2 failed')
-    expect(failedLabel(calls('INVALID_ARGUMENTS'))).toBe('1 failed')
+    expect(failedLabel(calls('REFUSED', null))).toEqual({ text: '1 refused', refused: true })
+    expect(failedLabel(calls('REFUSED', 'REFUSED'))).toEqual({ text: '2 refused', refused: true })
+    expect(failedLabel(calls('REFUSED', 'TOOL_ERROR'))).toEqual({
+      text: '2 failed',
+      refused: false,
+    })
+    expect(failedLabel(calls('INVALID_ARGUMENTS'))).toEqual({ text: '1 failed', refused: false })
   })
 })

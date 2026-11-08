@@ -143,6 +143,8 @@ function ChatItem({
   onDelete: () => void
 }) {
   const [editing, setEditing] = useState(false)
+  // Back from renaming, focus returns to the row's ⋯, not to nowhere.
+  const [renamed, setRenamed] = useState(false)
   const title = chatTitle(session)
 
   return (
@@ -161,7 +163,10 @@ function ChatItem({
           value={session.title ?? ''}
           maxLength={TITLE_LENGTH}
           onSave={onRename}
-          onClose={() => setEditing(false)}
+          onClose={() => {
+            setEditing(false)
+            setRenamed(true)
+          }}
         />
       ) : (
         <div className="flex items-center gap-1.5">
@@ -179,6 +184,7 @@ function ChatItem({
             name={title}
             deleteDescription="Its messages are deleted too."
             onRename={() => setEditing(true)}
+            focusOnMount={renamed}
             onDelete={onDelete}
           />
         </div>

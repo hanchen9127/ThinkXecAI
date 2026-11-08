@@ -23,6 +23,8 @@ export default function DocumentRow({
   onDelete: () => void
 }) {
   const [editing, setEditing] = useState(false)
+  // Back from renaming, focus returns to the row's ⋯, not to nowhere.
+  const [renamed, setRenamed] = useState(false)
 
   return (
     <Expandable
@@ -37,7 +39,10 @@ export default function DocumentRow({
           value={document.name}
           maxLength={LIMITS.name}
           onSave={onRename}
-          onClose={() => setEditing(false)}
+          onClose={() => {
+            setEditing(false)
+            setRenamed(true)
+          }}
         />
       ) : (
         <div className="flex items-center justify-between gap-2">
@@ -51,6 +56,7 @@ export default function DocumentRow({
             name={document.name}
             deleteDescription="Agents stop finding its sections."
             onRename={() => setEditing(true)}
+            focusOnMount={renamed}
             onDelete={onDelete}
           />
         </div>

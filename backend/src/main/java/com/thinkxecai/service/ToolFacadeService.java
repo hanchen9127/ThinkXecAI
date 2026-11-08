@@ -8,12 +8,15 @@ import java.util.List;
 /** The tools agents can use: fixed tools go to every agent, optional ones only where listed in {@code allowedTools}. */
 public interface ToolFacadeService {
 
-    /** Fixed tools first, then optional ones, each group sorted by name. */
+    /**
+     * The tools people are shown, what {@code GET /api/tools} returns: fixed tools first, then optional
+     * ones, each group sorted by name; a tool that only runs the loop ({@code terminate}) is left out.
+     */
     List<ToolVO> listTools();
 
     List<ToolVO> listFixedTools();
 
-    /** The tools an agent can choose from; what {@code GET /api/tools} returns. */
+    /** The tools an agent can choose from for {@code allowedTools}. */
     List<ToolVO> listOptionalTools();
 
     /**

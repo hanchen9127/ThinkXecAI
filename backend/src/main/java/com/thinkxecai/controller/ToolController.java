@@ -17,10 +17,13 @@ public class ToolController {
 
     private final ToolFacadeService toolFacadeService;
 
-    /** Only optional tools: fixed tools are given to every agent, so there is nothing to choose. */
+    /**
+     * Every tool people are shown, fixed and optional, so the UI can name a tool by its label wherever
+     * it appears (ADR 065); the agent form offers only the optional ones.
+     */
     @GetMapping
-    public ApiResponse<List<ToolVO>> listOptionalTools() {
-        return ApiResponse.success(toolFacadeService.listOptionalTools());
+    public ApiResponse<List<ToolVO>> listTools() {
+        return ApiResponse.success(toolFacadeService.listTools());
     }
 
 }

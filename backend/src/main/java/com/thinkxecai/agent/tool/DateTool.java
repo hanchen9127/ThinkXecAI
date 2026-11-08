@@ -27,6 +27,11 @@ public class DateTool implements Tool {
     }
 
     @Override
+    public String getLabel() {
+        return "Date";
+    }
+
+    @Override
     public String getDescription() {
         return "Returns today's date.";
     }

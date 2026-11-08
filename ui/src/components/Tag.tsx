@@ -1,20 +1,32 @@
 import type { ReactNode } from 'react'
+import { cx } from '../utils/cx'
 
 /**
- * A tool or a knowledge base named in a list or a setup, as text after a small mark (ADR 058): a tool
- * name in mono after an Execute-orange square, a knowledge base after a document glyph.
+ * A tool or a knowledge base named in a list or a setup (ADR 058). A tool is an outlined token with
+ * its label (ADR 065): solid when the agent's setup chose it, dashed when every agent has it. A
+ * knowledge base is text after a document glyph.
  */
 export default function Tag({
   kind,
+  always = false,
   children,
 }: {
   kind: 'tool' | 'knowledge'
+  /** A tool every agent has (a fixed tool). */
+  always?: boolean
   children: ReactNode
 }) {
   if (kind === 'tool') {
     return (
-      <span className="inline-flex items-center gap-1.25 font-mono text-xs text-ink">
-        <span aria-hidden="true" className="size-1.5 shrink-0 bg-execute" />
+      <span
+        data-always={always || undefined}
+        className={cx(
+          'inline-flex items-center rounded-xs border px-1.75 text-xs leading-5 whitespace-nowrap',
+          always
+            ? 'border-dashed border-field/70 text-muted'
+            : 'border-field/50 bg-surface text-ink',
+        )}
+      >
         {children}
       </span>
     )

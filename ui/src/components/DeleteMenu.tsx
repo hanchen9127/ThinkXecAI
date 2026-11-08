@@ -12,6 +12,7 @@ export default function DeleteMenu({ onDelete }: { onDelete: () => void }) {
   return (
     <Dropdown
       trigger={['click']}
+      autoFocus
       menu={{ items: [{ key: 'delete', label: 'Delete', danger: true, onClick: then(onDelete) }] }}
     >
       <Button ref={trigger} type="text" aria-label="More actions" icon={<MoreOutlined />} />

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { type ApiCall, deferred, fakeApi } from '../test/fakeApi'
 import { renderApp } from '../test/renderApp'
+import { TOOLS } from '../test/tools'
 
 const agent = (id: string, name: string) => ({
   id,
@@ -335,9 +336,10 @@ describe('a chat', () => {
     expect(within(steps).queryByRole('table')).toBeNull()
   })
 
-  it('marks a failed call with a cross and its kind, and counts it in the folded line', async () => {
+  it('marks a refused call with a calm ring and its kind, and counts it in the folded line', async () => {
     clock = 0
     backend({
+      'GET /tools': () => TOOLS,
       'GET /chat-messages/session/s1': () => [
         msg('user', 'Clear the old orders.'),
         msg('assistant', 'Deleting them.', toolCall('c1', 'databaseQuery', '{"sql":"DELETE"}')),
@@ -359,11 +361,46 @@ describe('a chat', () => {
     await userEvent.click(within(run).getByRole('button', { name: 'Show steps' }))
     const steps = within(run).getByRole('list', { name: 'Agent steps' })
     const [think, execute] = within(steps).getAllByRole('listitem')
-    expect(within(execute).getByText('Refused:')).toHaveClass('text-danger')
-    expect(execute).toHaveTextContent('Refused: Only SELECT statements are allowed.')
-    // a shape, not only a colour: the cross takes the dot's place on the rail
+    // a rule doing its job reads as protection, in ink, not as a malfunction in red
+    expect(within(execute).getByText('Refused:')).toHaveClass('text-ink')
+    expect(within(run).getByText('1 refused')).toHaveClass('text-ink')
+    expect(execute).toHaveTextContent('DatabaseRefused: Only SELECT statements are allowed.')
+    // a shape, not only a colour: the ring takes the dot's place on the rail
+    expect(execute.querySelector('.rail-mark [data-mark="refused"]')).not.toBeNull()
+    expect(execute.querySelector('[data-mark="failed"]')).toBeNull()
+    expect(think.querySelector('.rail-mark [data-mark]')).toBeNull()
+    // the label names the call; the name the model called shows once it is opened
+    await userEvent.click(within(execute).getByRole('button', { name: 'Show Database' }))
+    expect(within(execute).getByText('databaseQuery')).toHaveClass('font-mono')
+  })
+
+  it('marks any other failure with a danger cross and counts it as failed', async () => {
+    clock = 0
+    backend({
+      'GET /chat-messages/session/s1': () => [
+        msg('user', 'Mail the report.'),
+        msg('assistant', 'Sending it.', toolCall('c1', 'sendEmail', '{"to":"a@b.c"}')),
+        msg('tool', null, {
+          toolResponse: {
+            id: 'c1',
+            name: 'sendEmail',
+            responseData: '"Gmail did not accept the message."',
+            failure: 'TOOL_ERROR',
+          },
+        }),
+        msg('assistant', 'The email could not be sent.'),
+      ],
+    })
+    renderApp('/chat/s1')
+
+    const run = await screen.findByRole('article', { name: 'Store analyst' })
+    expect(within(run).getByText('1 failed')).toHaveClass('text-danger')
+    await userEvent.click(within(run).getByRole('button', { name: 'Show steps' }))
+    const execute = within(within(run).getByRole('list', { name: 'Agent steps' })).getAllByRole(
+      'listitem',
+    )[1]
+    expect(within(execute).getByText('Failed:')).toHaveClass('text-danger')
     expect(execute.querySelector('.rail-mark [data-mark="failed"]')).not.toBeNull()
-    expect(think.querySelector('.rail-mark [data-mark="failed"]')).toBeNull()
   })
 
   it.each([
@@ -577,6 +614,50 @@ describe('the chat list', () => {
     await userEvent.click(within(list).getByRole('button', { name: 'Undo' }))
     expect(within(list).getByRole('link', { name: /Out-of-stock products/ })).toBeInTheDocument()
     expect(api.calls.filter((c) => c.method === 'DELETE')).toEqual([])
+  })
+
+  it('keeps focus through a row menu and its question, and the Undo bar in view', async () => {
+    backend()
+    renderApp('/chat')
+    const more = await screen.findByRole('button', { name: 'More actions for Earbud returns' })
+
+    // The menu takes focus when it opens, so the arrow keys move in it.
+    await userEvent.click(more)
+    const menu = await screen.findByRole('menu')
+    await waitFor(() => expect(menu).toContainElement(document.activeElement as HTMLElement))
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Delete' }))
+    const confirmation = await screen.findByRole('tooltip')
+    await waitFor(() =>
+      expect(within(confirmation).getByRole('button', { name: 'Cancel' })).toHaveFocus(),
+    )
+    await userEvent.keyboard('{Escape}')
+    await waitFor(() => expect(more).toHaveFocus())
+
+    await userEvent.click(more)
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }))
+    await userEvent.click(
+      within(await screen.findByRole('tooltip')).getByRole('button', { name: 'Delete' }),
+    )
+    const list = screen.getByRole('region', { name: 'Chats' })
+    // the row has gone, so focus goes to Undo, on a bar that stays at the panel's foot
+    await waitFor(() => expect(within(list).getByRole('button', { name: 'Undo' })).toHaveFocus())
+    expect(within(list).getByRole('status').closest('.sticky')).toHaveClass('bottom-0')
+  })
+
+  it('puts focus back on the row menu after renaming', async () => {
+    backend()
+    renderApp('/chat')
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'More actions for Earbud returns' }),
+    )
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Rename' }))
+    expect(screen.getByRole('textbox', { name: 'Title of Earbud returns' })).toHaveFocus()
+    await userEvent.keyboard('{Escape}')
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'More actions for Earbud returns' })).toHaveFocus(),
+    )
   })
 
   it('sends a waiting delete when the list closes', async () => {

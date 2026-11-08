@@ -25,13 +25,13 @@ export const FAILURE_WORDS: Record<NonNullable<ToolFailure>, string> = {
 
 /**
  * The folded line's count of failed calls: "2 refused" when every failure was a rule declining the
- * call, "2 failed" otherwise; null when none failed.
+ * call, shown calmly as a rule doing its job, "2 failed" otherwise; null when none failed.
  */
-export function failedLabel(calls: ToolCall[]): string | null {
+export function failedLabel(calls: ToolCall[]): { text: string; refused: boolean } | null {
   const failures = calls.flatMap(({ failure }) => (failure ? [failure] : []))
   if (failures.length === 0) return null
   const refused = failures.every((failure) => failure === 'REFUSED')
-  return `${failures.length} ${refused ? 'refused' : 'failed'}`
+  return { text: `${failures.length} ${refused ? 'refused' : 'failed'}`, refused }
 }
 
 /**

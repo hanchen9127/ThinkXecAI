@@ -39,6 +39,11 @@ public class KnowledgeTool implements Tool {
     }
 
     @Override
+    public String getLabel() {
+        return "Knowledge search";
+    }
+
+    @Override
     public String getDescription() {
         return "Searches the agent's knowledge bases for the sections most relevant to a query.";
     }

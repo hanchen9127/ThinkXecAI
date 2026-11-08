@@ -22,6 +22,8 @@ Stone ground `#F3F3F0` with white surfaces, ink `#1F2226`, muted `#5C6066`, line
 
 **Amended 2026-11-06 (owner, from a page walkthrough).** Placeholders use the muted colour (6.3:1 on white; Ant Design's default is 1.8:1). Links and plain buttons share a 2 px ink focus ring. The upload drop zone is a white surface with a visible dashed border, as in the mockup. The agent list puts the model on its own line, with tool and knowledge counts as 24 px targets below it. The delete dialog's underlined field stays.
 
+**Amended 2026-11-08 (owner, from the design critique of 2026-11-08; ADR 065).** A tool is no longer a mono name after an Execute-orange square: it is an outlined token with the tool's label, solid when the agent chose it and dashed when every agent has it. Mono is kept for model ids and for the name a model called, shown inside an opened tool call. Knowledge bases keep their document glyph.
+
 ## Trade-offs
 
 - It is a restyle of the existing Ant Design and Tailwind setup, not a new design system (a mission non-goal).

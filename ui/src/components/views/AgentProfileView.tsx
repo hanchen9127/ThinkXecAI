@@ -10,6 +10,7 @@ import { cx } from '../../utils/cx'
 import { formatApiTimestamp } from '../../utils/time'
 import { errorMessage } from '../../utils/text'
 import DeleteMenu from '../DeleteMenu'
+import { useAgentTools } from '../../hooks/useAgentTools'
 import Tag from '../Tag'
 
 /** `/agent/:agentId`: how one agent is set up, and a way to start chatting with it (V2 A3 B). */
@@ -19,6 +20,7 @@ export default function AgentProfileView() {
   const kbNames = useKnowledgeBaseNames()
   const { openEdit, openDelete, dialogs } = useAgentDialogs()
   const agent = agents.find((a) => a.id === agentId)
+  const tools = useAgentTools(agent?.allowedTools ?? [])
 
   if (!agent) {
     return (
@@ -76,14 +78,7 @@ export default function AgentProfileView() {
             <span className="font-mono text-xs text-muted">{agent.model}</span>
           </Row>
           <Row term="Tools">
-            {agent.allowedTools.map((tool) => (
-              <Tag key={tool} kind="tool">
-                {tool}
-              </Tag>
-            ))}
-            <span className="text-xs text-muted">
-              {agent.allowedTools.length > 0 ? 'plus ' : ''}knowledge search, date, city, weather
-            </span>
+            {tools.count > 0 ? tools.tags : <span className="text-muted">None</span>}
           </Row>
           <Row term="Knowledge bases">
             {agent.allowedKbs.length > 0 ? (

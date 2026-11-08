@@ -251,7 +251,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["listOptionalTools"];
+        get: operations["listTools"];
         put?: never;
         post?: never;
         delete?: never;
@@ -462,7 +462,9 @@ export interface components {
             responseData: string;
         };
         ToolVO: {
+            callName: string;
             description: string;
+            label: string;
             name: string;
             /** @enum {string} */
             type: "FIXED" | "OPTIONAL";
@@ -1050,7 +1052,7 @@ export interface operations {
             };
         };
     };
-    listOptionalTools: {
+    listTools: {
         parameters: {
             query?: never;
             header?: never;

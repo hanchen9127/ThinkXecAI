@@ -30,21 +30,25 @@ class ToolControllerTest {
     private ToolFacadeService service;
 
     @Test
-    void listReturnsTheOptionalToolsOnly() throws Exception {
-        when(service.listOptionalTools()).thenReturn(List.of(
-                new ToolVO("dataBaseTool", "Runs read-only SQL.", ToolType.OPTIONAL)));
+    void listReturnsEveryShownToolWithItsLabelAndCallName() throws Exception {
+        when(service.listTools()).thenReturn(List.of(
+                new ToolVO("dateTool", "getDate", "Date", "Returns today's date.", ToolType.FIXED),
+                new ToolVO("dataBaseTool", "databaseQuery", "Database", "Runs read-only SQL.", ToolType.OPTIONAL)));
 
         mockMvc.perform(get("/api/tools"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.message").value("success"))
-                .andExpect(jsonPath("$.data", hasSize(1)))
-                .andExpect(jsonPath("$.data[0].name").value("dataBaseTool"))
-                .andExpect(jsonPath("$.data[0].description").value("Runs read-only SQL."))
-                .andExpect(jsonPath("$.data[0].type").value("OPTIONAL"))
-                .andExpect(jsonPath("$.data[0].*", hasSize(3)));
+                .andExpect(jsonPath("$.data", hasSize(2)))
+                .andExpect(jsonPath("$.data[0].type").value("FIXED"))
+                .andExpect(jsonPath("$.data[1].name").value("dataBaseTool"))
+                .andExpect(jsonPath("$.data[1].callName").value("databaseQuery"))
+                .andExpect(jsonPath("$.data[1].label").value("Database"))
+                .andExpect(jsonPath("$.data[1].description").value("Runs read-only SQL."))
+                .andExpect(jsonPath("$.data[1].type").value("OPTIONAL"))
+                .andExpect(jsonPath("$.data[1].*", hasSize(5)));
 
-        verify(service).listOptionalTools();
+        verify(service).listTools();
         verifyNoMoreInteractions(service);
     }
 

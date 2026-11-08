@@ -19,6 +19,17 @@ public class TerminateTool implements Tool {
     }
 
     @Override
+    public String getLabel() {
+        return "Finish";
+    }
+
+    /** It ends the loop rather than giving the agent an ability, so people are not shown it. */
+    @Override
+    public boolean isShown() {
+        return false;
+    }
+
+    @Override
     public String getDescription() {
         return "Ends the agent loop when the task is complete.";
     }

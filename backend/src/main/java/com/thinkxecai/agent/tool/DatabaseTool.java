@@ -86,6 +86,11 @@ public class DatabaseTool implements Tool {
     }
 
     @Override
+    public String getLabel() {
+        return "Database";
+    }
+
+    @Override
     public String getDescription() {
         return "Runs read-only SQL queries against the PostgreSQL database, including the sample e-commerce tables.";
     }

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { fakeApi } from '../test/fakeApi'
 import { renderApp } from '../test/renderApp'
+import { TOOLS } from '../test/tools'
 
 const storeAnalyst = {
   id: 'a1',
@@ -32,6 +33,7 @@ function backend(agents: object[] = [storeAnalyst, tripPlanner]) {
     'GET /agents': agents,
     'GET /knowledge-bases': [{ id: 'k1', name: 'Store policies' }],
     'GET /chat-sessions': [],
+    'GET /tools': TOOLS,
   })
 }
 
@@ -49,20 +51,22 @@ describe('agent list', () => {
       'href',
       '/agent/a1',
     )
-    expect(within(list).getByRole('button', { name: '2 tools' })).toHaveAttribute(
+    // the two it chose and the four every agent has, as the profile lists them (ADR 065)
+    expect(within(list).getByRole('button', { name: '6 tools' })).toHaveAttribute(
       'aria-expanded',
       'false',
     )
     expect(within(list).getByRole('button', { name: '1 knowledge base' })).toBeInTheDocument()
-    expect(within(list).getByRole('button', { name: '2 tools' })).toHaveClass('h-6')
-    expect(within(list).getByText('no tools')).not.toHaveAttribute('aria-expanded')
-    expect(within(list).queryByRole('button', { name: 'no tools' })).toBeNull()
+    expect(within(list).getByRole('button', { name: '6 tools' })).toHaveClass('h-6')
+    expect(within(list).getByRole('button', { name: '4 tools' })).toBeInTheDocument()
+    expect(within(list).getByText('no knowledge bases')).not.toHaveAttribute('aria-expanded')
+    expect(within(list).queryByRole('button', { name: 'no knowledge bases' })).toBeNull()
   })
 
   it('opens a count into names and folds it again', async () => {
     backend()
     renderApp('/agent')
-    const tools = await within(agentList()).findByRole('button', { name: '2 tools' })
+    const tools = await within(agentList()).findByRole('button', { name: '6 tools' })
 
     await userEvent.click(tools)
 
@@ -72,7 +76,7 @@ describe('agent list', () => {
       within(names)
         .getAllByRole('listitem')
         .map((li) => li.textContent),
-    ).toEqual(['dataBaseTool', 'emailTool'])
+    ).toEqual(['Database', 'Email', 'Knowledge search', 'Sample city', 'Date', 'Sample weather'])
 
     await userEvent.click(tools)
 
@@ -174,9 +178,14 @@ describe('agent profile', () => {
     const setup = screen.getByRole('region', { name: 'Setup' })
     const row = (term: string) => within(setup).getByText(term).nextElementSibling
     expect(row('Model')).toHaveTextContent('deepseek-chat')
+    // chosen tools first, then every agent's, all by label (ADR 065)
     expect(row('Tools')).toHaveTextContent(
-      'dataBaseToolemailToolplus knowledge search, date, city, weather',
+      'DatabaseEmailKnowledge searchSample cityDateSample weather',
     )
+    expect(within(row('Tools') as HTMLElement).getByText('Database')).not.toHaveAttribute(
+      'data-always',
+    )
+    expect(within(row('Tools') as HTMLElement).getByText('Date')).toHaveAttribute('data-always')
     expect(row('Knowledge bases')).toHaveTextContent('Store policies')
     expect(row('Remembered messages')).toHaveTextContent('The last 10')
     expect(row('Temperature, top P')).toHaveTextContent('0.7, 1.00saved, not yet used at run time')
@@ -194,7 +203,7 @@ describe('agent profile', () => {
     expect(within(setup).getByText('Knowledge bases').nextElementSibling).toHaveTextContent('None')
     expect(within(setup).getByText('Instructions').nextElementSibling).toHaveTextContent('None')
     expect(within(setup).getByText('Tools').nextElementSibling).toHaveTextContent(
-      /^knowledge search, date, city, weather$/,
+      /^Knowledge searchSample cityDateSample weather$/,
     )
   })
 

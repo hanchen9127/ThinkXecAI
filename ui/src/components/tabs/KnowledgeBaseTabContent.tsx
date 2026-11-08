@@ -101,6 +101,7 @@ function KnowledgeBaseItem({
         </Link>
         <Dropdown
           trigger={['click']}
+          autoFocus
           menu={{
             items: [
               { key: 'edit', label: 'Edit', onClick: focusMenuThen(onEdit) },
