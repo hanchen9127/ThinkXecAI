@@ -78,7 +78,24 @@ export default function AgentProfileView() {
             <span className="font-mono text-xs text-muted">{agent.model}</span>
           </Row>
           <Row term="Tools">
-            {tools.count > 0 ? tools.tags : <span className="text-muted">None</span>}
+            {tools.error !== undefined ? (
+              <span role="alert" className="flex flex-wrap gap-x-2 text-muted">
+                Couldn't load the tools. {errorMessage(tools.error)}
+                <button
+                  type="button"
+                  onClick={tools.reload}
+                  className="cursor-pointer text-ink underline"
+                >
+                  Try again
+                </button>
+              </span>
+            ) : !tools.known ? (
+              <span className="text-muted">Loading tools…</span>
+            ) : tools.count > 0 ? (
+              tools.tags
+            ) : (
+              <span className="text-muted">None</span>
+            )}
           </Row>
           <Row term="Knowledge bases">
             {agent.allowedKbs.length > 0 ? (

@@ -117,13 +117,16 @@ function AgentItem({
       </div>
       <p className="m-0 font-mono text-xs text-muted">{agent.model}</p>
       <p className="m-0 flex flex-wrap gap-x-3 text-xs text-muted">
-        <CountToggle
-          count={tools.count}
-          one="tool"
-          many="tools"
-          expanded={shown === 'tools'}
-          onToggle={() => toggle('tools')}
-        />
+        {/* Until the tool list is known a count would leave out the tools every agent has. */}
+        {tools.known && (
+          <CountToggle
+            count={tools.count}
+            one="tool"
+            many="tools"
+            expanded={shown === 'tools'}
+            onToggle={() => toggle('tools')}
+          />
+        )}
         <CountToggle
           count={agent.allowedKbs.length}
           one="knowledge base"
@@ -132,7 +135,9 @@ function AgentItem({
           onToggle={() => toggle('knowledge')}
         />
       </p>
-      {shown === 'tools' && <TagRow tags={tools.tags} label={`Tools of ${agent.name}`} />}
+      {shown === 'tools' && tools.known && (
+        <TagRow tags={tools.tags} label={`Tools of ${agent.name}`} />
+      )}
       {shown === 'knowledge' && (
         <TagRow
           tags={kbNames(agent.allowedKbs).map((name, i) => (

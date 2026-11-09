@@ -25,7 +25,7 @@ A send failure showed one of these alone in a red Alert, without saying what had
 The owner chose the frontend mapping and to keep the Alert.
 
 **One function, `errorMessage`, says why a request failed and what to do next, by status:**
-- **No answer from the server:** "Can't reach the server. Check that it is running, then try again."
+- **No answer from the server, or a 502 or 504:** "Can't reach the server. Check that it is running, then try again." A proxy in front of the server (the Docker setup, ADR 062) answers 502 or 504 when the server is down (amended 2026-11-09).
 - **404:** "It no longer exists; it may have been deleted in another tab."
 - **503:** the backend's own message, already written for people (ADR 057).
 - **Any other 5xx:** "The server ran into a problem. Try again; if it keeps happening, check the server log."

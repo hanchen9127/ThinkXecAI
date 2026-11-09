@@ -1,7 +1,7 @@
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
-import { fakeApi } from '../test/fakeApi'
+import { deferred, fakeApi } from '../test/fakeApi'
 import { renderApp } from '../test/renderApp'
 import { TOOLS } from '../test/tools'
 
@@ -28,12 +28,12 @@ const tripPlanner = {
   systemPrompt: null,
 }
 
-function backend(agents: object[] = [storeAnalyst, tripPlanner]) {
+function backend(agents: object[] = [storeAnalyst, tripPlanner], tools: unknown = TOOLS) {
   return fakeApi({
     'GET /agents': agents,
     'GET /knowledge-bases': [{ id: 'k1', name: 'Store policies' }],
     'GET /chat-sessions': [],
-    'GET /tools': TOOLS,
+    'GET /tools': tools as object,
   })
 }
 
@@ -205,6 +205,38 @@ describe('agent profile', () => {
     expect(within(setup).getByText('Tools').nextElementSibling).toHaveTextContent(
       /^Knowledge searchSample cityDateSample weather$/,
     )
+  })
+
+  it('says the tools are loading, not that there are none, and counts none in the list', async () => {
+    const tools = deferred<unknown>()
+    backend(undefined, () => tools.promise)
+    renderApp('/agent/a2')
+
+    const setup = await screen.findByRole('region', { name: 'Setup' })
+    expect(within(setup).getByText('Tools').nextElementSibling).toHaveTextContent('Loading tools…')
+    // A count now would leave out the tools every agent has.
+    expect(within(agentList()).queryByRole('button', { name: /tools?$/ })).toBeNull()
+
+    tools.resolve(TOOLS)
+    expect(await within(agentList()).findAllByRole('button', { name: /tools$/ })).toHaveLength(2)
+  })
+
+  it('says the tools failed to load and loads them again on request', async () => {
+    let fail = true
+    backend(undefined, () => {
+      if (fail) throw { code: 500, message: 'Internal server error' }
+      return TOOLS
+    })
+    renderApp('/agent/a2')
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent("Couldn't load the tools.")
+    expect(within(agentList()).queryByRole('button', { name: /tools?$/ })).toBeNull()
+
+    fail = false
+    await userEvent.click(within(alert).getByRole('button', { name: 'Try again' }))
+    const setup = screen.getByRole('region', { name: 'Setup' })
+    expect(await within(setup).findByText('Knowledge search')).toBeInTheDocument()
   })
 
   it('starts a chat with this agent chosen', async () => {

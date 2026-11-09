@@ -18,6 +18,6 @@ export function useTools() {
 }
 
 /** A tool's label (ADR 065); its code name while the tools are loading, failed, or it is not listed. */
-export function toolLabel(tools: ToolVO[], name: string) {
+function toolLabel(tools: ToolVO[], name: string) {
   return tools.find((tool) => tool.name === name || tool.callName === name)?.label ?? name
 }

@@ -28,6 +28,14 @@ describe('errorMessage', () => {
     )
   })
 
+  it("reads a proxy's 502 or 504 as a server that can't be reached", () => {
+    for (const code of [502, 504]) {
+      expect(errorMessage(new ApiError(code, 'Bad Gateway'))).toBe(
+        "Can't reach the server. Check that it is running, then try again.",
+      )
+    }
+  })
+
   it("keeps a service's own message and replaces any other server error", () => {
     expect(errorMessage(new ApiError(503, 'A service did not answer in time.'))).toBe(
       'A service did not answer in time.',

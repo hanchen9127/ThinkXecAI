@@ -18,7 +18,10 @@ import AgentRun, { StepsExplained } from '../chat/AgentRun'
 import Composer from '../chat/Composer'
 import { chatTitle, groupHistory, retryQuestion, titleFrom } from '../chat/messages'
 
-/** `/`, `/chat`, and `/chat/new` (a new chat, `?agent=<id>` chooses its agent), and `/chat/:chatSessionId`. */
+/**
+ * A new chat at `/`, `/chat/new`, and on a wide screen `/chat` (on a narrow one `/chat` is the list,
+ * ADR 063); `?agent=<id>` chooses its agent. An existing chat at `/chat/:chatSessionId`.
+ */
 export default function AgentChatView() {
   const { chatSessionId } = useParams()
   if (!chatSessionId) return <NewChat />

@@ -60,6 +60,8 @@ public class DatabaseTool implements Tool {
     private static final String QUERY_CANCELED = "57014";
     /** SQLSTATE class 42: syntax error or access rule violation, such as an unknown column. */
     private static final String MALFORMED_SQL_CLASS = "42";
+    /** SQLSTATE class 22: a data exception in the query's own values, such as a bad literal or a division by zero. */
+    private static final String DATA_EXCEPTION_CLASS = "22";
     /** A write in the read-only transaction, or a privilege the database user lacks: the rules holding. */
     private static final Set<String> REFUSED_STATES = Set.of("25006", "42501");
 
@@ -153,22 +155,24 @@ public class DatabaseTool implements Tool {
         }
     }
 
-    /** Statements as the driver will split and send this text on this connection; 0 when it cannot be parsed. */
-    private static int statementCount(String sql, Connection connection) {
-        try {
-            boolean standardConformingStrings = connection.unwrap(BaseConnection.class).getStandardConformingStrings();
-            List<NativeQuery> queries = Parser.parseJdbcSql(sql, standardConformingStrings, false, true, false, false);
-            return queries.size();
-        } catch (SQLException e) {
-            return 0;
-        }
+    /**
+     * Statements as the driver will split and send this text on this connection. The driver's parser does not
+     * reject unclosed quotes or comments (it counts them as one statement for the database to reject); if it
+     * or the connection does throw, the error goes through {@link #failure} like any other, rather than
+     * being taken for extra statements.
+     */
+    static int statementCount(String sql, Connection connection) throws SQLException {
+        boolean standardConformingStrings = connection.unwrap(BaseConnection.class).getStandardConformingStrings();
+        List<NativeQuery> queries = Parser.parseJdbcSql(sql, standardConformingStrings, false, true, false, false);
+        return queries.size();
     }
 
     /**
      * The database's own message tells the model what to fix; no stack trace or Java class names. SQLSTATE
-     * class 42 (syntax error or access rule violation, such as an unknown column) is the model's SQL being
-     * wrong, except a missing privilege; that and a write in the read-only transaction are the rules refusing;
-     * anything else is the database failing (ADR 064).
+     * class 42 (syntax error or access rule violation, such as an unknown column) and class 22 (a data
+     * exception, such as {@code 'abc'::int} or a division by zero) are the model's SQL being wrong, except a
+     * missing privilege; that and a write in the read-only transaction are the rules refusing; anything else
+     * is the database failing (ADR 064).
      */
     private static ToolCallFailure failure(SQLException e) {
         if (QUERY_CANCELED.equals(e.getSQLState())) {
@@ -177,7 +181,8 @@ public class DatabaseTool implements Tool {
         }
         String state = e.getSQLState() == null ? "" : e.getSQLState();
         ToolFailureKind kind = REFUSED_STATES.contains(state) ? ToolFailureKind.REFUSED
-                : state.startsWith(MALFORMED_SQL_CLASS) ? ToolFailureKind.INVALID_ARGUMENTS
+                : state.startsWith(MALFORMED_SQL_CLASS) || state.startsWith(DATA_EXCEPTION_CLASS)
+                        ? ToolFailureKind.INVALID_ARGUMENTS
                 : ToolFailureKind.TOOL_ERROR;
         return new ToolCallFailure(kind, "Query failed: " + e.getMessage());
     }

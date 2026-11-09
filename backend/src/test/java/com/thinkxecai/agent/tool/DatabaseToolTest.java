@@ -15,10 +15,16 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.time.Duration;
 import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * The read-only guarantee comes from the database, so it is tested against the real one (ISSUE-005,
@@ -234,6 +240,29 @@ class DatabaseToolTest extends MapperTestSupport {
 
         assertThat(answer).startsWith("INVALID_ARGUMENTS: Query failed: ERROR: relation \"no_such_table\" does not exist");
         assertThat(answer).doesNotContain("Exception", "java.", "at org.");
+    }
+
+    /** A data exception comes from the model's own values, like a syntax error does (ADR 064). */
+    @ParameterizedTest
+    @ValueSource(strings = {"SELECT 1/0", "SELECT 'abc'::int"})
+    void dataExceptionsAreTheModelsArguments(String sql) {
+        assertThat(query(sql)).startsWith("INVALID_ARGUMENTS: Query failed: ERROR:");
+    }
+
+    /** The driver counts an unclosed quote or comment as one statement; the database rejects it as malformed. */
+    @ParameterizedTest
+    @ValueSource(strings = {"SELECT 'abc", "SELECT 1 /* open"})
+    void unclosedQuotesAndCommentsReachTheDatabaseAsOneStatement(String sql) {
+        assertThat(query(sql)).startsWith("INVALID_ARGUMENTS: Query failed: ERROR:");
+    }
+
+    /** A parse or connection error is reported as one, not taken for extra statements. */
+    @Test
+    void aStatementCountThatCannotBeMadeThrowsInsteadOfCountingNone() throws Exception {
+        Connection connection = mock(Connection.class);
+        when(connection.unwrap(any())).thenThrow(new SQLException("not a PostgreSQL connection"));
+
+        assertThatThrownBy(() -> DatabaseTool.statementCount("SELECT 1", connection)).isInstanceOf(SQLException.class);
     }
 
     /** Each call has a connection of its own, so nothing a query does to its session outlives the call. */

@@ -341,10 +341,11 @@ describe('the working indicator', () => {
     expect(stop).toBeEnabled()
     const send = screen.getByRole('button', { name: 'Send' })
     expect(send).toBeDisabled()
+    // Stop sits left of Send, so it comes first.
+    expect(stop.compareDocumentPosition(send) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     // A correction typed during a run can still stop it, or be queued with Send (ADR 060).
     await userEvent.type(screen.getByRole('textbox', { name: 'Message' }), 'And the price?')
-    expect(stop).toBeEnabled()
-    expect(stop).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Stop' })).toBeEnabled()
     expect(send).toBeEnabled()
   })
 

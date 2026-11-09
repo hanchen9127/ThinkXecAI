@@ -138,14 +138,12 @@
   }
 }
 
-/* Send turns into Stop (ADR 061): the icon's shape changes from a triangle to a square; both use
-   four points so the clip path can ease between them. */
+/* The Send triangle and the Stop square (ADR 060): drawn shapes in the button's text colour. */
 .shape-icon {
   width: 9px;
   height: 9px;
   background: currentColor;
-  clip-path: polygon(0 0, 100% 50%, 100% 50%, 0 100%);
-  transition: clip-path var(--default-transition-duration) var(--default-transition-timing-function);
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
 }
 
 .shape-icon[data-shape='square'] {

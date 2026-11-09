@@ -35,8 +35,12 @@ export default function Content({
       return true
     }
     if (focusHeading()) return
+    // A heading that arrives later (the page was loading) takes focus only if the user has not moved
+    // it since the page changed; focus that fell to the page counts as not moved.
+    const before = document.activeElement
     const observer = new MutationObserver(() => {
-      if (focusHeading()) observer.disconnect()
+      const moved = document.activeElement !== before && document.activeElement !== document.body
+      if (moved || focusHeading()) observer.disconnect()
     })
     observer.observe(area, { childList: true, subtree: true })
     const giveUp = setTimeout(() => observer.disconnect(), 5000)

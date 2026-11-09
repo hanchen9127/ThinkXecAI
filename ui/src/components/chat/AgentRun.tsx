@@ -294,9 +294,8 @@ function Cross({ className }: { className?: string }) {
 
 /**
  * A rail row: the dot (a ring for a refused tool call, a cross for any other failure), the line down
- * to the next row, and the row's
- * content. A `fresh` row arrived while the run was watched and fades in; `grows` marks the line
- * under it, drawn when the next row arrives (index.css).
+ * to the next row, and the row's content. A `fresh` row arrived while the run was watched and fades
+ * in; `grows` marks the line under it, drawn when the next row arrives (index.css).
  */
 function RailItem({
   dot,
@@ -401,9 +400,9 @@ function Elapsed({ since }: { since: string }) {
 
 /**
  * A tool call: the tool's label, a one-line summary of its result, and Show, which opens the name the
- * model called, the arguments, and the result in place (ADR 065). A
- * call without a result in a run that is no longer working never ran (a stop between Think and
- * Execute, ADR 060): "Not run", not "No result yet" (Phase 14 check).
+ * model called, the arguments, and the result in place (ADR 065). A call without a result in a run
+ * that is no longer working never ran (a stop between Think and Execute, ADR 060): "Not run", not "No
+ * result yet" (Phase 14 check).
  */
 function Call({ toolCall, label, ended }: { toolCall: ToolCall; label: string; ended: boolean }) {
   const [open, setOpen] = useState(false)
