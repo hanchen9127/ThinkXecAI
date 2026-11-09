@@ -25,6 +25,8 @@ In the UI, while a run works and the composer is empty, Send becomes Stop; typin
 
 The stop endpoint now answers `data` `true` when the session had a run to stop and `false` when not, in place of `null`. The UI infers that a run is working from the last message, so after a backend restart Stop got a 200, no notice ever came, and the button stayed on Stopping… for up to 7 minutes. On `false` the working state ends at once. The answer is a plain boolean because `ApiResponse` has no per-endpoint wrappers. Reopening such a chat within those 7 minutes still shows it working, until Stop is used.
 
+**Amended 2026-11-09 (owner, design critique 29/40).** Stop no longer takes Send's place. While a run works, an outlined ink Stop sits left of Send and stays while the user types; Send is disabled only by an empty box and still queues a message. The one button that turned into Send as soon as the user typed hid Stop from the person most likely to want it, someone typing a correction (canvas Redesign 9, option A; Stop on the working row and a Stop link while typing were not chosen). "Stopping…" is the same button marked `aria-disabled` rather than disabled, because Chrome drops the focus of a button that becomes disabled; a second click sends nothing. If Stop held focus when the run ends, focus moves to the message box.
+
 ## Trade-offs
 
 - Stop can take as long as the step in progress (a model call can take minutes, ADR 039).

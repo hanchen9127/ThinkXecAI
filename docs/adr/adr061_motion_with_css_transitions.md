@@ -18,6 +18,8 @@ CSS transitions only, no new dependency. Every transition runs 150 ms with `cubi
 
 **Amended 2026-11-06 (owner, M7, on the canvas).** Moving to another page was the one action with no feedback. The content now fades in while rising 8 px, for a section in the rail and an item in a list; the list panel does not move. A fade alone, and fading the list as well, were not chosen. Still CSS only: the content is mounted anew for each page, so `@starting-style` gives its first frame. There is no exit motion, because the old page is gone by then. The first page does not move, and a new chat becoming its session is not a page change.
 
+**Amended 2026-11-09.** Send no longer turns into Stop (ADR 060 amended): Stop is its own button with a square, and only its label cross-fades from Stop to Stopping…, which dims it.
+
 ## Trade-offs
 
 - An element that leaves (a deleted row) has to stay mounted until its transition ends, which takes a little code a library would hide.

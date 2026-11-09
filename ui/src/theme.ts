@@ -73,13 +73,19 @@ export const theme: ThemeConfig = {
   },
 }
 
-/** "Stopping…" stays the ink button, not Ant Design's grey disabled one; the Composer dims it. */
-export const stoppingTheme: ThemeConfig = {
+/**
+ * Stop beside Send (ADR 060): outlined in ink, which a default button is not (its border is the light
+ * line). Hover and press keep it ink; "Stopping…" is the same button, dimmed by the Composer.
+ */
+export const stopTheme: ThemeConfig = {
   components: {
     Button: {
-      colorBgContainerDisabled: palette.ink,
-      colorTextDisabled: palette.surface,
-      borderColorDisabled: palette.ink,
+      defaultBorderColor: palette.ink,
+      defaultColor: palette.ink,
+      defaultHoverBorderColor: palette.ink,
+      defaultHoverColor: palette.ink,
+      defaultActiveBorderColor: palette.ink,
+      defaultActiveColor: palette.ink,
     },
   },
 }

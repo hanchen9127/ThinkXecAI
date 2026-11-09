@@ -333,19 +333,32 @@ describe('the working indicator', () => {
     expect(within(steps).getByText('dateTool').closest('li')).toHaveAttribute('data-grows')
   })
 
-  it('turns Send into Stop while it works, and back into Send for a message to queue', async () => {
+  it('shows Stop beside Send while it works, and keeps it while the user types', async () => {
     backend({ 'GET /chat-messages/session/s1': () => [recent('m1', 'user', 1_000)] })
     renderApp('/chat/s1')
 
     const stop = await screen.findByRole('button', { name: 'Stop' })
     expect(stop).toBeEnabled()
-    // One button: its icon changes shape and its labels cross-fade (ADR 061).
-    expect(stop.querySelector('.shape-icon')).toHaveAttribute('data-shape', 'square')
+    const send = screen.getByRole('button', { name: 'Send' })
+    expect(send).toBeDisabled()
+    // A correction typed during a run can still stop it, or be queued with Send (ADR 060).
     await userEvent.type(screen.getByRole('textbox', { name: 'Message' }), 'And the price?')
-    expect(screen.queryByRole('button', { name: 'Stop' })).toBeNull()
-    expect(stop).toHaveAccessibleName('Send')
     expect(stop).toBeEnabled()
-    expect(stop.querySelector('.shape-icon')).toHaveAttribute('data-shape', 'triangle')
+    expect(stop).toBeInTheDocument()
+    expect(send).toBeEnabled()
+  })
+
+  it('puts focus back in the message box when the Stop it was on goes', async () => {
+    backend({
+      'GET /chat-messages/session/s1': () => [recent('m1', 'user', 1_000)],
+      'POST /chat-sessions/s1/stop': () => false,
+    })
+    renderApp('/chat/s1')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Stop' }))
+
+    await waitFor(() => expect(screen.queryByRole('button', { name: /^Stop/ })).toBeNull())
+    expect(screen.getByRole('textbox', { name: 'Message' })).toHaveFocus()
   })
 
   it('stops the session, says Stopping… until the notice, then offers Try again', async () => {
@@ -359,18 +372,18 @@ describe('the working indicator', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Stop' }))
     expect(api.calls.filter((c) => c.path === '/chat-sessions/s1/stop')).toHaveLength(1)
     const stopping = screen.getByRole('button', { name: 'Stopping…' })
-    expect(stopping).toBeDisabled()
+    expect(stopping).toHaveAttribute('aria-disabled', 'true')
     expect(stopping).toHaveClass('opacity-60')
+    // It keeps focus, but a second click sends no second stop.
+    await userEvent.click(stopping)
+    expect(api.calls.filter((c) => c.path === '/chat-sessions/s1/stop')).toHaveLength(1)
 
-    // Typing while it stops gives a plain Send, to queue a message.
-    const box = screen.getByRole('textbox', { name: 'Message' })
-    await userEvent.type(box, 'And the price?')
-    expect(stopping).toHaveAccessibleName('Send')
-    expect(stopping).toBeEnabled()
-    expect(stopping).not.toHaveClass('opacity-60')
-    expect(stopping.querySelector('.shape-icon')).toHaveAttribute('data-shape', 'triangle')
-    await userEvent.clear(box)
+    // Typing while it stops leaves Stopping… in place and gives a Send, to queue a message.
+    await userEvent.type(screen.getByRole('textbox', { name: 'Message' }), 'And the price?')
     expect(stopping).toHaveAccessibleName('Stopping…')
+    expect(stopping).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled()
+    await userEvent.clear(screen.getByRole('textbox', { name: 'Message' }))
 
     const stopped = { ...recent('m2', 'assistant', 0), content: 'Stopped.' }
     FakeEventSource.latest().emit('message', generated(stopped))
