@@ -8,7 +8,6 @@ import { useAgents } from '../../hooks/useAgents'
 import { useChatSessions } from '../../hooks/useChatSessions'
 import { useUndoableDelete } from '../../hooks/useUndoableDelete'
 import { cx } from '../../utils/cx'
-import { errorMessage } from '../../utils/text'
 import { formatListTime } from '../../utils/time'
 import DeleteFeedback from '../DeleteFeedback'
 import Expandable from '../Expandable'
@@ -16,6 +15,7 @@ import RenameField from '../RenameField'
 import RowActions from '../RowActions'
 import { TITLE_LENGTH, chatTitle } from '../chat/messages'
 import TabHeading from './TabHeading'
+import LoadError from '../LoadError'
 
 /**
  * The chats, most recently active first (ADR 018): title, agent, and time (V1 element 5 A). A
@@ -91,14 +91,7 @@ export default function ChatTabContent() {
           )}
         </div>
       )}
-      {error !== undefined && (
-        <div role="alert" className="flex flex-col items-start gap-2 text-muted">
-          <p className="m-0">Couldn't load chats. {errorMessage(error)}</p>
-          <button type="button" onClick={reload} className="cursor-pointer text-ink underline">
-            Try again
-          </button>
-        </div>
-      )}
+      {error !== undefined && <LoadError what="chats" error={error} onRetry={reload} />}
       {loading && chatSessions.length === 0 && <p className="m-0 text-muted">Loading chats…</p>}
       {!loading && error === undefined && visible.length === 0 && (
         <p className="m-0 text-muted">No chats yet.</p>

@@ -159,7 +159,8 @@ public class DatabaseTool implements Tool {
      * Statements as the driver will split and send this text on this connection. The driver's parser does not
      * reject unclosed quotes or comments (it counts them as one statement for the database to reject); if it
      * or the connection does throw, the error goes through {@link #failure} like any other, rather than
-     * being taken for extra statements.
+     * being taken for extra statements. Package-private only so a test can give it a connection that
+     * throws; nothing else should call it.
      */
     static int statementCount(String sql, Connection connection) throws SQLException {
         boolean standardConformingStrings = connection.unwrap(BaseConnection.class).getStandardConformingStrings();

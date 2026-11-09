@@ -1,7 +1,7 @@
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
-import { deferred, fakeApi } from '../test/fakeApi'
+import { type Route, deferred, fakeApi } from '../test/fakeApi'
 import { renderApp } from '../test/renderApp'
 import { TOOLS } from '../test/tools'
 
@@ -28,12 +28,12 @@ const tripPlanner = {
   systemPrompt: null,
 }
 
-function backend(agents: object[] = [storeAnalyst, tripPlanner], tools: unknown = TOOLS) {
+function backend(agents: object[] = [storeAnalyst, tripPlanner], tools: Route = TOOLS) {
   return fakeApi({
     'GET /agents': agents,
     'GET /knowledge-bases': [{ id: 'k1', name: 'Store policies' }],
     'GET /chat-sessions': [],
-    'GET /tools': tools as object,
+    'GET /tools': tools,
   })
 }
 

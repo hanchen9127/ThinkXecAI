@@ -17,6 +17,7 @@ import { errorMessage } from '../../utils/text'
 import AgentRun, { StepsExplained } from '../chat/AgentRun'
 import Composer from '../chat/Composer'
 import { chatTitle, groupHistory, retryQuestion, titleFrom } from '../chat/messages'
+import LoadError from '../LoadError'
 
 /**
  * A new chat at `/`, `/chat/new`, and on a wide screen `/chat` (on a narrow one `/chat` is the list,
@@ -61,16 +62,7 @@ function NewChat() {
           // An outage is not "none yet": say so, and let the user try again (Phase 14, D5).
           <>
             <h1 className="m-0 text-xl font-semibold">New chat</h1>
-            <div role="alert" className="flex flex-col items-start gap-2 text-muted">
-              <p className="m-0">Couldn't load agents. {errorMessage(agentsError)}</p>
-              <button
-                type="button"
-                onClick={reloadAgents}
-                className="cursor-pointer text-ink underline"
-              >
-                Try again
-              </button>
-            </div>
+            <LoadError what="agents" error={agentsError} onRetry={reloadAgents} />
           </>
         ) : (
           <>
@@ -199,9 +191,7 @@ function Chat({ sessionId }: { sessionId: string }) {
         {chatSessions.loading ? (
           <p className="m-0 text-muted">Loading the chat…</p>
         ) : chatSessions.error !== undefined ? (
-          <p role="alert" className="m-0 text-muted">
-            Couldn't load chats. {errorMessage(chatSessions.error)}
-          </p>
+          <LoadError what="chats" error={chatSessions.error} />
         ) : (
           <>
             <h1 className="m-0 text-xl font-semibold">Chat not found</h1>
@@ -315,14 +305,7 @@ function Chat({ sessionId }: { sessionId: string }) {
       )}
 
       <section aria-label="Messages" className={cx(COLUMN, 'flex flex-1 flex-col gap-3 py-9')}>
-        {error !== undefined && (
-          <div role="alert" className="flex flex-col items-start gap-2 text-muted">
-            <p className="m-0">Couldn't load the messages. {errorMessage(error)}</p>
-            <button type="button" onClick={reload} className="cursor-pointer text-ink underline">
-              Try again
-            </button>
-          </div>
-        )}
+        {error !== undefined && <LoadError what="the messages" error={error} onRetry={reload} />}
         {loading && messages.length === 0 && <p className="m-0 text-muted">Loading messages…</p>}
         {!loading && error === undefined && messages.length === 0 && (
           <p className="m-0 text-muted">No messages yet.</p>

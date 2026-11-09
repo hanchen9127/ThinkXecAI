@@ -17,6 +17,19 @@ describe('useMenuTrigger', () => {
     expect(action).toHaveBeenCalledOnce()
   })
 
+  it('runs only the last action chosen within one tick', () => {
+    const first = vi.fn()
+    const second = vi.fn()
+    const { result } = renderHook(() => useMenuTrigger())
+
+    result.current.then(first)()
+    result.current.then(second)()
+    vi.runAllTimers()
+
+    expect(first).not.toHaveBeenCalled()
+    expect(second).toHaveBeenCalledOnce()
+  })
+
   it('drops the action when the row unmounts within that tick', () => {
     const action = vi.fn()
     const { result, unmount } = renderHook(() => useMenuTrigger())

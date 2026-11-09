@@ -9,10 +9,11 @@ import { useMenuTrigger } from '../../hooks/useMenuTrigger'
 import { useAgents } from '../../hooks/useAgents'
 import { useKnowledgeBaseNames } from '../../hooks/useKnowledgeBaseNames'
 import { cx } from '../../utils/cx'
-import { countLabel, errorMessage } from '../../utils/text'
+import { countLabel } from '../../utils/text'
 import { useAgentTools } from '../../hooks/useAgentTools'
 import Tag from '../Tag'
 import TabHeading from './TabHeading'
+import LoadError from '../LoadError'
 
 /** The agent list (V2 A1 D): a short summary per agent whose counts open into names. */
 export default function AgentTabContent() {
@@ -30,14 +31,7 @@ export default function AgentTabContent() {
           </Button>
         }
       />
-      {error !== undefined && (
-        <div role="alert" className="flex flex-col items-start gap-2 text-muted">
-          <p className="m-0">Couldn't load agents. {errorMessage(error)}</p>
-          <button type="button" onClick={reload} className="cursor-pointer text-ink underline">
-            Try again
-          </button>
-        </div>
-      )}
+      {error !== undefined && <LoadError what="agents" error={error} onRetry={reload} />}
       {loading && agents.length === 0 && <p className="m-0 text-muted">Loading agents…</p>}
       {!loading && error === undefined && agents.length === 0 && (
         <p className="m-0 text-muted">No agents yet.</p>

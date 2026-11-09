@@ -8,10 +8,10 @@ import { COLUMN, ITEM_HEADER } from '../../layout/column'
 import BackToList from '../BackToList'
 import { cx } from '../../utils/cx'
 import { formatApiTimestamp } from '../../utils/time'
-import { errorMessage } from '../../utils/text'
 import DeleteMenu from '../DeleteMenu'
 import { useAgentTools } from '../../hooks/useAgentTools'
 import Tag from '../Tag'
+import LoadError from '../LoadError'
 
 /** `/agent/:agentId`: how one agent is set up, and a way to start chatting with it (V2 A3 B). */
 export default function AgentProfileView() {
@@ -28,9 +28,7 @@ export default function AgentProfileView() {
         {loading ? (
           <p className="m-0 text-muted">Loading the agent…</p>
         ) : error !== undefined ? (
-          <p role="alert" className="m-0 text-muted">
-            Couldn't load agents. {errorMessage(error)}
-          </p>
+          <LoadError what="agents" error={error} />
         ) : (
           <>
             <h1 className="m-0 text-xl font-semibold">Agent not found</h1>
@@ -79,16 +77,7 @@ export default function AgentProfileView() {
           </Row>
           <Row term="Tools">
             {tools.error !== undefined ? (
-              <span role="alert" className="flex flex-wrap gap-x-2 text-muted">
-                Couldn't load the tools. {errorMessage(tools.error)}
-                <button
-                  type="button"
-                  onClick={tools.reload}
-                  className="cursor-pointer text-ink underline"
-                >
-                  Try again
-                </button>
-              </span>
+              <LoadError what="the tools" error={tools.error} onRetry={tools.reload} />
             ) : !tools.known ? (
               <span className="text-muted">Loading tools…</span>
             ) : tools.count > 0 ? (
