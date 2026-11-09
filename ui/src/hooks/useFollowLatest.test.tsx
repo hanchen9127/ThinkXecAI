@@ -1,93 +1,132 @@
 import { act, renderHook } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { ReactNode } from 'react'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { ScrollAreaContext } from '../layout/scrollArea'
 import { useFollowLatest } from './useFollowLatest'
 
-const scrollTo = vi.fn()
+/** A 2,000 px page in a 500 px scroll area, `main` (ADR 063); its end is at 1,500. */
+let area: HTMLElement
+let top: number
+/** Every position the hook moved the page to. */
+let moves: number[]
+
+function fakeArea() {
+  const element = document.createElement('main')
+  Object.defineProperty(element, 'scrollHeight', { get: () => 2000 })
+  Object.defineProperty(element, 'clientHeight', { get: () => 500 })
+  Object.defineProperty(element, 'scrollTop', { get: () => top })
+  element.scrollTo = ((options: ScrollToOptions) => {
+    moves.push(options.top ?? 0)
+  }) as typeof element.scrollTo
+  return element
+}
+
+function wrapper({ children }: { children: ReactNode }) {
+  return <ScrollAreaContext value={area}>{children}</ScrollAreaContext>
+}
 
 function start() {
-  const view = renderHook(({ latest }) => useFollowLatest(latest), { initialProps: { latest: 0 } })
-  scrollTo.mockClear()
+  const view = renderHook(({ latest }) => useFollowLatest(latest), {
+    initialProps: { latest: 0 },
+    wrapper,
+  })
+  moves = []
   return view
 }
 
-/** Scrolls a 2,000 px page in a 500 px window to `y`; its end is at 1,500. */
-function scrollPage(y: number) {
-  window.scrollY = y
+/** The reader scrolls the area to `y`. */
+function scrollArea(y: number) {
+  top = y
   act(() => {
-    window.dispatchEvent(new Event('scroll'))
+    area.dispatchEvent(new Event('scroll'))
   })
 }
 
 beforeEach(() => {
-  vi.stubGlobal('scrollTo', scrollTo)
-  vi.spyOn(document.documentElement, 'scrollHeight', 'get').mockReturnValue(2000)
-  vi.spyOn(document.documentElement, 'clientHeight', 'get').mockReturnValue(500)
-  window.scrollY = 0
+  top = 0
+  moves = []
+  area = fakeArea()
 })
 
 afterEach(() => {
-  vi.restoreAllMocks()
-  vi.unstubAllGlobals()
-  window.scrollY = 0
-  scrollTo.mockClear()
+  top = 0
 })
 
 describe('useFollowLatest', () => {
   it('opens at the end', () => {
-    renderHook(() => useFollowLatest(0))
-    expect(scrollTo).toHaveBeenCalledWith(0, 2000)
+    renderHook(() => useFollowLatest(0), { wrapper })
+    expect(moves).toEqual([2000])
   })
 
   it('goes to the end when something new arrives', () => {
     const { rerender } = start()
     rerender({ latest: 1 })
-    expect(scrollTo).toHaveBeenCalledWith(0, 2000)
+    expect(moves).toEqual([2000])
   })
 
   it('does not move the page when nothing new arrived', () => {
     const { rerender } = start()
     rerender({ latest: 0 })
-    expect(scrollTo).not.toHaveBeenCalled()
+    expect(moves).toEqual([])
   })
 
   it('leaves a reader who scrolled up where they are', () => {
     const { rerender } = start()
-    scrollPage(1500)
-    scrollPage(900)
+    scrollArea(1500)
+    scrollArea(900)
     rerender({ latest: 1 })
-    expect(scrollTo).not.toHaveBeenCalled()
+    expect(moves).toEqual([])
   })
 
   it('keeps following when the page grew under a scroll event that is not upwards', () => {
     const { rerender } = start()
-    scrollPage(30)
+    scrollArea(30)
     rerender({ latest: 1 })
-    expect(scrollTo).toHaveBeenCalledTimes(1)
+    expect(moves).toEqual([2000])
   })
 
   it('counts a reader just short of the end as being there', () => {
     const { rerender } = start()
-    scrollPage(1500)
-    scrollPage(900)
-    scrollPage(1453)
+    scrollArea(1500)
+    scrollArea(900)
+    scrollArea(1453)
     rerender({ latest: 1 })
-    expect(scrollTo).toHaveBeenCalledTimes(1)
+    expect(moves).toEqual([2000])
   })
 
   it('does not count a reader further up as being there', () => {
     const { rerender } = start()
-    scrollPage(1500)
-    scrollPage(1452)
+    scrollArea(1500)
+    scrollArea(1452)
     rerender({ latest: 1 })
-    expect(scrollTo).not.toHaveBeenCalled()
+    expect(moves).toEqual([])
   })
 
   it('follows again after `follow`', () => {
     const { result, rerender } = start()
-    scrollPage(1500)
-    scrollPage(900)
+    scrollArea(1500)
+    scrollArea(900)
     result.current()
     rerender({ latest: 1 })
-    expect(scrollTo).toHaveBeenCalledTimes(1)
+    expect(moves).toEqual([2000])
+  })
+
+  it('ignores the window: only the area it scrolls in counts', () => {
+    const { rerender } = start()
+    scrollArea(1500)
+    scrollArea(900)
+    act(() => {
+      window.dispatchEvent(new Event('scroll'))
+    })
+    rerender({ latest: 1 })
+    expect(moves).toEqual([])
+  })
+
+  it('does nothing without a scroll area', () => {
+    const { rerender } = renderHook(({ latest }) => useFollowLatest(latest), {
+      initialProps: { latest: 0 },
+    })
+    rerender({ latest: 1 })
+    expect(moves).toEqual([])
   })
 })

@@ -6,7 +6,24 @@ export function countLabel(count: number, one: string, many: string): string {
   return count === 1 ? `1 ${one}` : `${count} ${many}`
 }
 
-/** What to show for a failed request: the backend's own message, or that it could not be reached. */
+const UNREACHABLE = "Can't reach the server. Check that it is running, then try again."
+
+/**
+ * Why a request failed and what to do next, in words a person can act on (critique of 2026-11-08);
+ * the caller says what failed ("Couldn't send your message."). Mapped once, by status: a 400 or 409
+ * keeps the backend's message, which names the field or the conflict, and a 503 keeps its own,
+ * written for people (ADR 057); the rest are replaced, as they name code, not a next step. A 502 or 504
+ * comes from a proxy in front of the server (the Docker setup, ADR 062) when the server is down, so it
+ * reads like no answer at all.
+ */
 export function errorMessage(error: unknown): string {
-  return error instanceof ApiError ? error.message : "Can't reach the server."
+  if (!(error instanceof ApiError) || error.code === 502 || error.code === 504) {
+    return UNREACHABLE
+  }
+  if (error.code === 404) return 'It no longer exists; it may have been deleted in another tab.'
+  if (error.code === 503) return error.message
+  if (error.code >= 500) {
+    return 'The server ran into a problem. Try again; if it keeps happening, check the server log.'
+  }
+  return /[.!?]$/.test(error.message) ? error.message : `${error.message}.`
 }

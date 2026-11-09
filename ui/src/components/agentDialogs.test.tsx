@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { type ApiCall, fakeApi } from '../test/fakeApi'
 import { renderApp } from '../test/renderApp'
+import { TOOLS } from '../test/tools'
 
 const storeAnalyst = {
   id: 'a1',
@@ -23,10 +24,7 @@ function backend(extra: Record<string, (call: ApiCall) => unknown> = {}) {
     'GET /agents': () => agents,
     'GET /knowledge-bases': [{ id: 'k1', name: 'Store policies' }],
     'GET /chat-sessions': [],
-    'GET /tools': [
-      { name: 'dataBaseTool', description: 'Runs read-only SQL queries.', type: 'OPTIONAL' },
-      { name: 'emailTool', description: 'Sends a plain-text email.', type: 'OPTIONAL' },
-    ],
+    'GET /tools': TOOLS,
     'GET /chat-sessions/agent/a1': [{ id: 's1' }, { id: 's2' }],
     'POST /agents': ({ body }) => {
       const created = { ...storeAnalyst, ...(body as object), id: 'a2' }
@@ -63,6 +61,59 @@ async function openMenuItem(agentName: string, item: string) {
   )
   await userEvent.click(await screen.findByRole('menuitem', { name: item }))
 }
+
+describe('focus around the dialogs (Phase 14, D6)', () => {
+  it('goes back to New agent when its dialog closes with Esc', async () => {
+    backend()
+    renderApp('/agent')
+
+    const opener = await screen.findByRole('button', { name: 'New agent' })
+    await userEvent.click(opener)
+    await screen.findByRole('dialog', { name: 'New agent' })
+    await userEvent.keyboard('{Escape}')
+
+    await waitFor(() => expect(opener).toHaveFocus())
+  })
+
+  it('goes back to the menu button after a dialog opened from its menu closes', async () => {
+    backend()
+    renderApp('/agent/a1')
+
+    const opener = await screen.findByRole('button', { name: 'More actions' })
+    await userEvent.click(opener)
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }))
+    const dialog = await screen.findByRole('dialog', { name: /Delete/ })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+
+    await waitFor(() => expect(opener).toHaveFocus())
+  })
+
+  it("goes back to a list row's menu button after its Edit dialog closes", async () => {
+    backend()
+    renderApp('/agent')
+
+    await openMenuItem('Store analyst', 'Edit')
+    const dialog = await screen.findByRole('dialog', { name: 'Edit Store analyst' })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'More actions for Store analyst' })).toHaveFocus(),
+    )
+  })
+
+  it('leaves focus to the new page when saving opened one', async () => {
+    backend()
+    renderApp('/agent')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'New agent' }))
+    const dialog = await screen.findByRole('dialog', { name: 'New agent' })
+    await userEvent.type(within(dialog).getByLabelText('Name'), 'Trip planner')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Create agent' }))
+
+    const heading = await screen.findByRole('heading', { level: 1, name: 'Trip planner' })
+    await waitFor(() => expect(heading).toHaveFocus())
+  })
+})
 
 describe('creating an agent', () => {
   it('sends the whole form and opens the new agent', async () => {
@@ -117,7 +168,7 @@ describe('creating an agent', () => {
     expect(within(dialog).getByLabelText('Name')).toHaveValue('Trip planner')
   })
 
-  it('adds a chosen tool, shown with its description', async () => {
+  it('offers the optional tools by label, with their descriptions, and names the rest', async () => {
     const api = backend()
     renderApp('/agent')
 
@@ -125,8 +176,17 @@ describe('creating an agent', () => {
     const dialog = await screen.findByRole('dialog', { name: 'New agent' })
     await userEvent.type(within(dialog).getByLabelText('Name'), 'Mailer')
     await userEvent.click(within(dialog).getByRole('button', { name: 'Tools' }))
+    expect(
+      within(dialog).getByText(
+        'Every agent also has: Knowledge search, Sample city, Date, Sample weather.',
+      ),
+    ).toBeInTheDocument()
     await userEvent.click(within(dialog).getByRole('combobox'))
-    await userEvent.click(await screen.findByText('Sends a plain-text email.'))
+    // only what can be chosen: a tool every agent has is not an option
+    expect(await screen.findByText('Email.')).toBeInTheDocument()
+    expect(screen.queryByText('Date.')).toBeNull()
+    await userEvent.click(screen.getByText('Email.'))
+    expect(within(dialog).getByRole('button', { name: 'Remove Email' })).toBeInTheDocument()
     await userEvent.click(within(dialog).getByRole('button', { name: 'Create agent' }))
 
     await waitFor(() => expect(sent(api, 'POST')).toHaveLength(1))
@@ -190,9 +250,10 @@ describe('editing an agent', () => {
     await userEvent.type(within(dialog).getByLabelText('Description'), ' More.')
     await userEvent.click(within(dialog).getByRole('button', { name: 'Save changes' }))
 
-    expect(
-      await within(dialog).findByText('allowedTools: not an optional tool: terminate'),
-    ).toBeInTheDocument()
+    // what failed, then the backend's reason, which names the field (a 400)
+    const alert = await within(dialog).findByRole('alert')
+    expect(alert).toHaveTextContent("Couldn't save the agent.")
+    expect(alert).toHaveTextContent('allowedTools: not an optional tool: terminate.')
     expect(screen.getByRole('dialog', { name: 'Edit Store analyst' })).toBeInTheDocument()
   })
 })

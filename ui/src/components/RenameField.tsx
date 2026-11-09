@@ -40,7 +40,7 @@ export default function RenameField({
       await onSave(trimmed)
       onClose()
     } catch (error) {
-      setProblem(errorMessage(error))
+      setProblem(`Couldn't rename it. ${errorMessage(error)}`)
       setSaving(false)
     }
   }

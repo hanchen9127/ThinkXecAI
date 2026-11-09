@@ -1,6 +1,7 @@
 package com.thinkxecai.agent;
 
 import com.thinkxecai.agent.tool.TerminateTool;
+import com.thinkxecai.model.ToolFailureKind;
 import com.thinkxecai.model.dto.ChatMessageDTO;
 import com.thinkxecai.model.vo.ChatMessageVO;
 import com.thinkxecai.service.GeneratedMessageService;
@@ -16,6 +17,7 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.model.tool.ToolCallingChatOptions;
 import org.springframework.ai.model.tool.ToolCallingManager;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.BooleanSupplier;
@@ -47,6 +49,7 @@ public class AgentRuntime {
     private final ChatMemory memory;
     private final ToolCallingChatOptions options;
     private final ToolCallingManager toolCallingManager;
+    private final ToolOutcomes outcomes;
     private final GeneratedMessageService generatedMessageService;
     private final GeneratedMessagePublisher publisher;
     private AgentState state = AgentState.IDLE;
@@ -54,7 +57,7 @@ public class AgentRuntime {
     private boolean answerOnly;
 
     AgentRuntime(UUID agentId, UUID sessionId, ChatClient chatClient, ChatMemory memory,
-                 ToolCallingChatOptions options, ToolCallingManager toolCallingManager,
+                 ToolCallingChatOptions options, ToolCallingManager toolCallingManager, ToolOutcomes outcomes,
                  GeneratedMessageService generatedMessageService, GeneratedMessagePublisher publisher) {
         this.agentId = agentId;
         this.sessionId = sessionId;
@@ -62,6 +65,7 @@ public class AgentRuntime {
         this.memory = memory;
         this.options = options;
         this.toolCallingManager = toolCallingManager;
+        this.outcomes = outcomes;
         this.generatedMessageService = generatedMessageService;
         this.publisher = publisher;
     }
@@ -147,10 +151,12 @@ public class AgentRuntime {
         // The prompt carries the tool callbacks and the tool context (the agent's knowledge bases).
         Prompt prompt = new Prompt(conversation(), options);
         ChatResponse calls = new ChatResponse(List.of(new Generation(reply)));
+        outcomes.start();
         List<Message> history = toolCallingManager.executeToolCalls(prompt, calls).conversationHistory();
         boolean answered = reply.getText() != null && !reply.getText().isBlank();
-        ToolResponseMessage results = asJson((ToolResponseMessage) history.get(history.size() - 1), answered);
-        save(GeneratedMessages.toolResults(results));
+        ToolResponseMessage executed = (ToolResponseMessage) history.get(history.size() - 1);
+        ToolResponseMessage results = asJson(executed, answered);
+        save(GeneratedMessages.toolResults(results, kinds(executed, answered)));
         memory.add(conversationId(), results);
         boolean terminate = results.getResponses().stream().anyMatch(response -> TerminateTool.NAME.equals(response.name()));
         answerOnly = terminate && !answered;
@@ -171,6 +177,25 @@ public class AgentRuntime {
                         .toList())
                 .metadata(results.getMetadata())
                 .build();
+    }
+
+    /**
+     * Why each call failed, if it did (ADR 064); {@code terminate} in a reply without text was declined by
+     * the runtime's rule (ADR 045), so it is {@link ToolFailureKind#REFUSED}.
+     */
+    private List<ToolFailureKind> kinds(ToolResponseMessage executed, boolean answered) {
+        List<ToolResponseMessage.ToolResponse> responses = executed.getResponses();
+        List<ToolFailureKind> kinds = outcomes.kinds(responses);
+        if (answered) {
+            return kinds;
+        }
+        List<ToolFailureKind> adjusted = new ArrayList<>(kinds);
+        for (int i = 0; i < responses.size(); i++) {
+            if (TerminateTool.NAME.equals(responses.get(i).name())) {
+                adjusted.set(i, ToolFailureKind.REFUSED);
+            }
+        }
+        return adjusted;
     }
 
     private List<Message> conversation() {

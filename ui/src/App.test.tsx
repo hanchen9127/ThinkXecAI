@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeApi } from './test/fakeApi'
@@ -24,7 +24,7 @@ function currentSection() {
 }
 
 describe('moving between pages', () => {
-  const entering = () => document.querySelector('main > [data-entering]')
+  const entering = () => document.querySelector('main [data-entering]')
 
   it('moves nothing on the first page, then fades in each page the user opens', async () => {
     renderAt('/agent')
@@ -66,13 +66,83 @@ describe('routes', () => {
       await screen.findByRole('heading', { level: 1, name: 'Page not found' }),
     ).toBeInTheDocument()
     expect(currentSection()).toEqual([])
-    expect(screen.getByRole('link', { name: 'Go to chats' })).toHaveAttribute('href', '/chat')
+    expect(screen.getByRole('link', { name: 'Start a chat' })).toHaveAttribute('href', '/chat/new')
   })
 
-  it('always shows the full product name', () => {
+  it('always shows the full product name: in the list panel, and in the top bar of a narrow screen', () => {
     renderAt('/')
 
-    expect(screen.getByText('ThinkXecAI')).toBeInTheDocument()
+    expect(screen.getAllByText('ThinkXecAI')).toHaveLength(2)
+  })
+})
+
+describe('focus (Phase 14, D6)', () => {
+  it('starts the tab order with a link that skips to the page', async () => {
+    renderAt('/agent')
+    await screen.findByRole('heading', { level: 1, name: 'Agents' })
+
+    await userEvent.tab()
+    const skip = screen.getByRole('link', { name: 'Skip to content' })
+    expect(skip).toHaveFocus()
+    await userEvent.click(skip)
+    expect(screen.getByRole('main')).toHaveFocus()
+  })
+
+  it('moves focus to the heading of a page the user opens, not on the first page', async () => {
+    renderAt('/agent')
+    const first = await screen.findByRole('heading', { level: 1, name: 'Agents' })
+    expect(first).not.toHaveFocus()
+
+    await userEvent.click(screen.getByRole('link', { name: 'Knowledge bases' }))
+    const heading = await screen.findByRole('heading', { level: 1, name: 'Knowledge bases' })
+    await waitFor(() => expect(heading).toHaveFocus())
+  })
+})
+
+describe('the shell (ADR 063)', () => {
+  const panel = () => document.querySelector('aside')!
+
+  it('is as tall as the window and lets the list and the page scroll on their own', () => {
+    const { container } = renderAt('/chat')
+
+    expect(container.firstElementChild).toHaveClass('h-dvh', 'overflow-hidden')
+    expect(panel()).toHaveClass('overflow-y-auto')
+    expect(screen.getByRole('main')).toHaveClass('overflow-y-auto')
+  })
+
+  it.each(['/agent', '/chat', '/knowledge-base'])(
+    'shows the list alone at %s on a narrow screen, and both on a wide one',
+    (path) => {
+      renderAt(path)
+
+      expect(panel()).toHaveClass('flex', 'wide:flex')
+      expect(screen.getByRole('main')).toHaveClass('hidden', 'wide:flex')
+    },
+  )
+
+  it.each(['/', '/chat/new', '/chat/s1', '/agent/a1', '/knowledge-base/k1', '/settings'])(
+    'shows the page alone at %s on a narrow screen, and both on a wide one',
+    (path) => {
+      renderAt(path)
+
+      expect(panel()).toHaveClass('hidden', 'wide:flex')
+      expect(screen.getByRole('main')).toHaveClass('flex', 'wide:flex')
+    },
+  )
+
+  it('opens a new chat at /chat/new', async () => {
+    renderAt('/chat/new')
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'New chat' })).toBeInTheDocument()
+  })
+
+  it('leads a new chat back to the list of chats', async () => {
+    renderAt('/chat/new')
+
+    expect(await screen.findByRole('link', { name: 'Back to chats' })).toHaveAttribute(
+      'href',
+      '/chat',
+    )
   })
 })
 

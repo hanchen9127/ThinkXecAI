@@ -22,6 +22,7 @@ import java.util.stream.Collectors;
 public class ToolFacadeServiceImpl implements ToolFacadeService {
 
     private final List<Tool> tools;
+    private final Map<String, String> callNames;
 
     /** All {@link Tool} beans. Names are what agents store, so two tools with one name stop startup. */
     public ToolFacadeServiceImpl(List<Tool> tools) {
@@ -38,11 +39,12 @@ public class ToolFacadeServiceImpl implements ToolFacadeService {
         this.tools = tools.stream()
                 .sorted(Comparator.comparing(Tool::getType).thenComparing(Tool::getName))
                 .toList();
+        this.callNames = this.tools.stream().collect(Collectors.toMap(Tool::getName, ToolFacadeServiceImpl::callName));
     }
 
     @Override
     public List<ToolVO> listTools() {
-        return tools.stream().map(ToolFacadeServiceImpl::toVO).toList();
+        return tools.stream().filter(Tool::isShown).map(this::toVO).toList();
     }
 
     @Override
@@ -84,12 +86,22 @@ public class ToolFacadeServiceImpl implements ToolFacadeService {
     private List<ToolVO> ofType(ToolType type) {
         return tools.stream()
                 .filter(tool -> tool.getType() == type)
-                .map(ToolFacadeServiceImpl::toVO)
+                .map(this::toVO)
                 .toList();
     }
 
-    private static ToolVO toVO(Tool tool) {
-        return new ToolVO(tool.getName(), tool.getDescription(), tool.getType());
+    private ToolVO toVO(Tool tool) {
+        return new ToolVO(tool.getName(), callNames.get(tool.getName()), tool.getLabel(), tool.getDescription(),
+                tool.getType());
+    }
+
+    /** The name the model calls, read the way the run reads it: from the tool's own Spring AI callback. */
+    private static String callName(Tool tool) {
+        ToolCallback[] callbacks = MethodToolCallbackProvider.builder().toolObjects(tool).build().getToolCallbacks();
+        if (callbacks.length != 1) {
+            throw new IllegalStateException(tool.getName() + " must have exactly one @Tool method, has " + callbacks.length);
+        }
+        return callbacks[0].getToolDefinition().name();
     }
 
 }

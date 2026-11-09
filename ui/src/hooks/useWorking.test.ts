@@ -16,7 +16,9 @@ function message(
   return { id, sessionId: 's1', role, content: 'x', metadata, createdAt: at, updatedAt: at }
 }
 const withTools = { toolCalls: [{ id: 'c1', type: 'function', name: 'dateTool', arguments: '{}' }] }
-const result = { toolResponse: { id: 'c1', name: 'dateTool', responseData: '"2026-11-02"' } }
+const result = {
+  toolResponse: { id: 'c1', name: 'dateTool', responseData: '"2026-11-02"', failure: null },
+}
 
 beforeEach(() => {
   vi.useFakeTimers()
@@ -33,7 +35,9 @@ function track(initial: ChatMessage[]) {
 const terminate = {
   toolCalls: [{ id: 't1', type: 'function', name: 'terminate', arguments: '{}' }],
 }
-const terminated = { toolResponse: { id: 't1', name: 'terminate', responseData: '"Done"' } }
+const terminated = {
+  toolResponse: { id: 't1', name: 'terminate', responseData: '"Done"', failure: null },
+}
 
 /** `awaitsAgent` on a chat whose newest message is the last one given. */
 function awaits(...messages: ChatMessage[]) {

@@ -8,7 +8,6 @@ import { useAgents } from '../../hooks/useAgents'
 import { useChatSessions } from '../../hooks/useChatSessions'
 import { useUndoableDelete } from '../../hooks/useUndoableDelete'
 import { cx } from '../../utils/cx'
-import { errorMessage } from '../../utils/text'
 import { formatListTime } from '../../utils/time'
 import DeleteFeedback from '../DeleteFeedback'
 import Expandable from '../Expandable'
@@ -16,6 +15,7 @@ import RenameField from '../RenameField'
 import RowActions from '../RowActions'
 import { TITLE_LENGTH, chatTitle } from '../chat/messages'
 import TabHeading from './TabHeading'
+import LoadError from '../LoadError'
 
 /**
  * The chats, most recently active first (ADR 018): title, agent, and time (V1 element 5 A). A
@@ -43,6 +43,10 @@ export default function ChatTabContent() {
   // A deleted chat stays in the list while its row folds away (ADR 061).
   const listed = chatSessions.filter(matches)
 
+  // A new chat from an open one keeps its agent: the first agent could be one with other tools.
+  const openAgentId = chatSessions.find((session) => session.id === openId)?.agentId
+  const newChat = openAgentId ? path`/chat/new?agent=${openAgentId}` : '/chat/new'
+
   function closeSearch() {
     setSearching(false)
     setQuery('')
@@ -60,7 +64,7 @@ export default function ChatTabContent() {
               icon={<SearchOutlined />}
               onClick={() => (searching ? closeSearch() : setSearching(true))}
             />
-            <Button type="primary" onClick={() => navigate('/chat')}>
+            <Button type="primary" onClick={() => navigate(newChat)}>
               New chat
             </Button>
           </div>
@@ -87,14 +91,7 @@ export default function ChatTabContent() {
           )}
         </div>
       )}
-      {error !== undefined && (
-        <div role="alert" className="flex flex-col items-start gap-2 text-muted">
-          <p className="m-0">Couldn't load chats. {errorMessage(error)}</p>
-          <button type="button" onClick={reload} className="cursor-pointer text-ink underline">
-            Try again
-          </button>
-        </div>
-      )}
+      {error !== undefined && <LoadError what="chats" error={error} onRetry={reload} />}
       {loading && chatSessions.length === 0 && <p className="m-0 text-muted">Loading chats…</p>}
       {!loading && error === undefined && visible.length === 0 && (
         <p className="m-0 text-muted">No chats yet.</p>
@@ -109,9 +106,9 @@ export default function ChatTabContent() {
               agentName={agentName(session)}
               open={session.id === openId}
               onRename={(title) => update(session.id, { title }).then(() => undefined)}
-              onDelete={() => {
-                deletes.confirm({ id: session.id, name: chatTitle(session) })
-                if (session.id === openId) navigate('/chat')
+              onDelete={(returnTo) => {
+                deletes.confirm({ id: session.id, name: chatTitle(session), returnTo })
+                if (session.id === openId) navigate('/chat/new')
               }}
             />
           ))}
@@ -136,9 +133,11 @@ function ChatItem({
   agentName: string
   open: boolean
   onRename: (title: string) => Promise<void>
-  onDelete: () => void
+  onDelete: (returnTo: HTMLElement | null) => void
 }) {
   const [editing, setEditing] = useState(false)
+  // Back from renaming, focus returns to the row's ⋯, not to nowhere.
+  const [renamed, setRenamed] = useState(false)
   const title = chatTitle(session)
 
   return (
@@ -157,7 +156,10 @@ function ChatItem({
           value={session.title ?? ''}
           maxLength={TITLE_LENGTH}
           onSave={onRename}
-          onClose={() => setEditing(false)}
+          onClose={() => {
+            setEditing(false)
+            setRenamed(true)
+          }}
         />
       ) : (
         <div className="flex items-center gap-1.5">
@@ -175,6 +177,7 @@ function ChatItem({
             name={title}
             deleteDescription="Its messages are deleted too."
             onRename={() => setEditing(true)}
+            focusOnMount={renamed}
             onDelete={onDelete}
           />
         </div>

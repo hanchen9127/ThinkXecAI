@@ -1,10 +1,69 @@
-import type { ReactNode } from 'react'
+import { type ReactNode, useEffect, useState } from 'react'
+import { cx } from '../utils/cx'
+import { ScrollAreaContext } from './scrollArea'
 
-// grow-999 leaves the sidebar at its basis and gives the content every spare pixel; below
-// panel + content width the row wraps and the content takes the full width. A page rising into
-// place (ADR 061) is clipped here, so it never adds a scroll bar for a moment.
-export default function Content({ children }: { children: ReactNode }) {
+/** The id the skip link moves focus to. */
+export const MAIN_ID = 'main'
+
+/**
+ * The page's own scroll area (ADR 063): the only part of the shell that scrolls for a page, so a long
+ * list beside it never sets its height. The wrapper inside clips the page rising into place
+ * (ADR 061), so that never adds to the scroll height. On a narrow screen a list route hides it.
+ *
+ * `page` counts the pages the user moved to (`usePageCount`): from the second one on, focus moves to
+ * the new page's heading, so a keyboard or screen-reader user starts there and not on the link they
+ * left (Phase 14, D6). Pages load lazily, so the heading may arrive a moment later.
+ */
+export default function Content({
+  page,
+  hiddenWhenNarrow,
+  children,
+}: {
+  page: number
+  hiddenWhenNarrow: boolean
+  children: ReactNode
+}) {
+  const [area, setArea] = useState<HTMLElement | null>(null)
+
+  useEffect(() => {
+    if (page === 0 || !area) return
+    const focusHeading = () => {
+      const heading = area.querySelector('h1')
+      if (!heading) return false
+      if (!heading.hasAttribute('tabindex')) heading.setAttribute('tabindex', '-1')
+      heading.focus({ preventScroll: true })
+      return true
+    }
+    if (focusHeading()) return
+    // A heading that arrives later (the page was loading) takes focus only if the user has not moved
+    // it since the page changed; focus that fell to the page counts as not moved.
+    const before = document.activeElement
+    const observer = new MutationObserver(() => {
+      const moved = document.activeElement !== before && document.activeElement !== document.body
+      if (moved || focusHeading()) observer.disconnect()
+    })
+    observer.observe(area, { childList: true, subtree: true })
+    const giveUp = setTimeout(() => observer.disconnect(), 5000)
+    return () => {
+      observer.disconnect()
+      clearTimeout(giveUp)
+    }
+  }, [page, area])
+
   return (
-    <main className="flex min-w-0 grow-999 basis-content flex-col overflow-y-clip">{children}</main>
+    <main
+      ref={setArea}
+      id={MAIN_ID}
+      // Focusable from the skip link only; it is not a stop in the tab order.
+      tabIndex={-1}
+      className={cx(
+        'min-h-0 min-w-0 flex-1 flex-col overflow-y-auto outline-none wide:flex',
+        hiddenWhenNarrow ? 'hidden' : 'flex',
+      )}
+    >
+      <div className="flex flex-1 flex-col overflow-y-clip">
+        <ScrollAreaContext value={area}>{children}</ScrollAreaContext>
+      </div>
+    </main>
   )
 }

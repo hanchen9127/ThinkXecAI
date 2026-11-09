@@ -1,5 +1,7 @@
 package com.thinkxecai.agent;
 
+import com.thinkxecai.agent.tool.ToolCallFailure;
+import com.thinkxecai.model.ToolFailureKind;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.tool.definition.ToolDefinition;
 import org.springframework.ai.tool.execution.ToolExecutionException;
@@ -19,6 +21,14 @@ class ToolFailureTest {
                 new ToolExecutionException(TOOL, new IllegalStateException("Ollama at 127.0.0.1:11434 refused")));
 
         assertThat(text).isEqualTo("Tool KnowledgeTool failed: IllegalStateException.");
+    }
+
+    @Test
+    void aToolsOwnFailureReachesTheModelAsTheToolWroteIt() {
+        String text = AgentRuntimeFactory.toolFailed(new ToolExecutionException(TOOL,
+                new ToolCallFailure(ToolFailureKind.REFUSED, "Knowledge base x is not available to this agent.")));
+
+        assertThat(text).isEqualTo("Knowledge base x is not available to this agent.");
     }
 
     @Test

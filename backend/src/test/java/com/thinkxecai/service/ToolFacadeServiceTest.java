@@ -16,6 +16,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 class ToolFacadeServiceTest extends ServiceTestSupport {
 
@@ -32,7 +33,51 @@ class ToolFacadeServiceTest extends ServiceTestSupport {
         assertThat(service.listOptionalTools()).extracting(ToolVO::getName)
                 .containsExactly("dataBaseTool", "emailTool");
         assertThat(service.listTools()).extracting(ToolVO::getName)
-                .containsExactly("KnowledgeTool", "cityTool", "dateTool", "terminate", "weatherTool", "dataBaseTool", "emailTool");
+                .containsExactly("KnowledgeTool", "cityTool", "dateTool", "weatherTool", "dataBaseTool", "emailTool");
+    }
+
+    /** The trace names a call by what the model called, the lists by the stored name; both map to one label. */
+    @Test
+    void eachShownToolCarriesTheNameTheModelCallsAndALabel() {
+        assertThat(service.listTools())
+                .extracting(ToolVO::getName, ToolVO::getCallName, ToolVO::getLabel)
+                .containsExactly(
+                        tuple("KnowledgeTool", "KnowledgeTool", "Knowledge search"),
+                        tuple("cityTool", "getCity", "Sample city"),
+                        tuple("dateTool", "getDate", "Date"),
+                        tuple("weatherTool", "weather", "Sample weather"),
+                        tuple("dataBaseTool", "databaseQuery", "Database"),
+                        tuple("emailTool", "sendEmail", "Email"));
+        List<String> runNames = modelFacingNames(service.toolCallbacksFor(List.of("emailTool", "dataBaseTool")));
+        assertThat(service.listTools()).extracting(ToolVO::getCallName).isSubsetOf(runNames);
+    }
+
+    @Test
+    void aToolWithoutExactlyOneToolMethodStopsStartup() {
+        Tool bare = new Tool() {
+            @Override
+            public String getName() {
+                return "bare";
+            }
+
+            @Override
+            public String getLabel() {
+                return "Bare";
+            }
+
+            @Override
+            public String getDescription() {
+                return "No @Tool method.";
+            }
+
+            @Override
+            public ToolType getType() {
+                return ToolType.FIXED;
+            }
+        };
+
+        assertThatThrownBy(() -> new ToolFacadeServiceImpl(List.of(bare)))
+                .isInstanceOf(IllegalStateException.class);
     }
 
     @Test
@@ -96,22 +141,37 @@ class ToolFacadeServiceTest extends ServiceTestSupport {
     }
 
     private static Tool tool(String name, ToolType type) {
-        return new Tool() {
-            @Override
-            public String getName() {
-                return name;
-            }
+        return new StubTool(name, type);
+    }
 
-            @Override
-            public String getDescription() {
-                return name + " description";
-            }
+    /** A tool with one {@code @Tool} method, as every real tool has. */
+    public record StubTool(String name, ToolType type) implements Tool {
 
-            @Override
-            public ToolType getType() {
-                return type;
-            }
-        };
+        @Override
+        public String getName() {
+            return name;
+        }
+
+        @Override
+        public String getLabel() {
+            return name + " label";
+        }
+
+        @Override
+        public String getDescription() {
+            return name + " description";
+        }
+
+        @Override
+        public ToolType getType() {
+            return type;
+        }
+
+        @org.springframework.ai.tool.annotation.Tool(description = "Does nothing.")
+        public String run() {
+            return "";
+        }
+
     }
 
     private static List<String> modelFacingNames(List<ToolCallback> callbacks) {

@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { ChatMessage } from '../../api/api'
 import {
+  type ToolCall,
+  type ToolFailure,
   chatTitle,
   decodeToolResult,
+  failedLabel,
   formatArguments,
   formatDuration,
   groupHistory,
@@ -28,7 +31,7 @@ const call = (id: string, name: string, args = '{}') => ({
   arguments: args,
 })
 const result = (id: string, name: string, data: string) =>
-  message('tool', null, { toolResponse: { id, name, responseData: data } })
+  message('tool', null, { toolResponse: { id, name, responseData: data, failure: null } })
 
 describe('groupHistory with terminate', () => {
   const ask = () => message('user', 'Count the products.')
@@ -97,15 +100,15 @@ describe('groupHistory', () => {
         id: step1.id,
         think: 'I will look it up.',
         thinkMs: 1000,
-        calls: [{ call: call('c1', 'dataBaseTool'), result: '"| sku |"', ms: 1000 }],
+        calls: [{ call: call('c1', 'dataBaseTool'), result: '"| sku |"', ms: 1000, failure: null }],
       },
       {
         id: step2.id,
         think: null,
         thinkMs: 1000,
         calls: [
-          { call: call('c2', 'knowledgeSearch'), result: undefined, ms: undefined },
-          { call: call('c3', 'dateTool'), result: '"2026-11-02"', ms: 1000 },
+          { call: call('c2', 'knowledgeSearch'), result: undefined, ms: undefined, failure: null },
+          { call: call('c3', 'dateTool'), result: '"2026-11-02"', ms: 1000, failure: null },
         ],
       },
     ])
@@ -234,5 +237,41 @@ describe('chatTitle', () => {
     expect(chatTitle({ title: null })).toBe('Untitled chat')
     expect(chatTitle({ title: ' ' })).toBe('Untitled chat')
     expect(chatTitle({ title: 'Stock' })).toBe('Stock')
+  })
+})
+
+describe('tool failures (ADR 064)', () => {
+  const failedResult = (id: string, name: string, data: string, failure: ToolFailure) =>
+    message('tool', null, { toolResponse: { id, name, responseData: data, failure } })
+  // As the backend sends a tool message saved before ADR 064: the field is absent.
+  const oldResult = (id: string, name: string, data: string) =>
+    message('tool', null, {
+      toolResponse: { id, name, responseData: data },
+    } as unknown as ChatMessage['metadata'])
+
+  it('gives each call the failure its result recorded, and none to a result saved before it', () => {
+    const steps = groupHistory([
+      message('user', 'Look it up.'),
+      message('assistant', null, { toolCalls: [call('a', 'databaseQuery'), call('b', 'getDate')] }),
+      failedResult('a', 'databaseQuery', '"Only SELECT statements are allowed."', 'REFUSED'),
+      // saved before ADR 064: no failure at all
+      oldResult('b', 'getDate', '"x"'),
+    ]).flatMap((item) => (item.kind === 'agent' ? item.steps : []))
+
+    expect(steps[0].calls.map((c) => c.failure)).toEqual(['REFUSED', null])
+  })
+
+  it('counts refusals as refused, and any other mix as failed', () => {
+    const calls = (...failures: ToolFailure[]): ToolCall[] =>
+      failures.map((failure) => ({ call: call('c', 't'), result: '""', ms: 0, failure }))
+
+    expect(failedLabel(calls(null, null))).toBeNull()
+    expect(failedLabel(calls('REFUSED', null))).toEqual({ text: '1 refused', refused: true })
+    expect(failedLabel(calls('REFUSED', 'REFUSED'))).toEqual({ text: '2 refused', refused: true })
+    expect(failedLabel(calls('REFUSED', 'TOOL_ERROR'))).toEqual({
+      text: '2 failed',
+      refused: false,
+    })
+    expect(failedLabel(calls('INVALID_ARGUMENTS'))).toEqual({ text: '1 failed', refused: false })
   })
 })

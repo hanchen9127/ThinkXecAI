@@ -3,20 +3,26 @@ import { useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
 import { type ChatSession, createChatMessage, stopChatSession } from '../../api/api'
 import { ApiError, path } from '../../api/http'
+import { useAgentDialogs } from '../../hooks/useAgentDialogs'
 import { useAgents } from '../../hooks/useAgents'
 import { useChatMessages } from '../../hooks/useChatMessages'
 import { useChatSessions } from '../../hooks/useChatSessions'
 import { useChatStream } from '../../hooks/useChatStream'
 import { useFollowLatest } from '../../hooks/useFollowLatest'
 import { newestMessage, useWorking } from '../../hooks/useWorking'
-import { COLUMN } from '../../layout/column'
+import { COLUMN, ITEM_HEADER } from '../../layout/column'
+import BackToList from '../BackToList'
 import { cx } from '../../utils/cx'
 import { errorMessage } from '../../utils/text'
-import AgentRun from '../chat/AgentRun'
+import AgentRun, { StepsExplained } from '../chat/AgentRun'
 import Composer from '../chat/Composer'
 import { chatTitle, groupHistory, retryQuestion, titleFrom } from '../chat/messages'
+import LoadError from '../LoadError'
 
-/** `/`, `/chat` (a new chat, `?agent=<id>` chooses its agent), and `/chat/:chatSessionId`. */
+/**
+ * A new chat at `/`, `/chat/new`, and on a wide screen `/chat` (on a narrow one `/chat` is the list,
+ * ADR 063); `?agent=<id>` chooses its agent. An existing chat at `/chat/:chatSessionId`.
+ */
 export default function AgentChatView() {
   const { chatSessionId } = useParams()
   if (!chatSessionId) return <NewChat />
@@ -29,7 +35,9 @@ export default function AgentChatView() {
  * opens the chat; the starting design navigated first and lost the message.
  */
 function NewChat() {
-  const { agents, loading } = useAgents()
+  const { agents, loading, error: agentsError, reload: reloadAgents } = useAgents()
+  // Without an agent, "Create an agent" opens the form here: a first run needs no detour (Phase 14).
+  const { openCreate, dialogs } = useAgentDialogs()
   const chatSessions = useChatSessions()
   const navigate = useNavigate()
   const [params] = useSearchParams()
@@ -47,19 +55,29 @@ function NewChat() {
   if (!agent) {
     return (
       <div className={cx(COLUMN, 'flex flex-col gap-2 py-9')}>
+        <BackToList className="-mt-5 -ml-3" />
         {loading ? (
           <p className="m-0 text-muted">Loading agents…</p>
+        ) : agentsError !== undefined ? (
+          // An outage is not "none yet": say so, and let the user try again (Phase 14, D5).
+          <>
+            <h1 className="m-0 text-xl font-semibold">New chat</h1>
+            <LoadError what="agents" error={agentsError} onRetry={reloadAgents} />
+          </>
         ) : (
           <>
             <h1 className="m-0 text-xl font-semibold">New chat</h1>
             <p className="m-0 text-muted">
               A chat needs an agent to answer, and there is none yet.
             </p>
-            <Link to="/agent" className="text-ink underline">
-              Create an agent
-            </Link>
+            <div>
+              <Button type="primary" onClick={openCreate}>
+                Create an agent
+              </Button>
+            </div>
           </>
         )}
+        {dialogs}
       </div>
     )
   }
@@ -91,13 +109,24 @@ function NewChat() {
           <div className={cx(COLUMN, 'py-2.5')}>The chat you had open was deleted.</div>
         </div>
       )}
-      <div className="box-border flex flex-1 flex-col justify-center px-12 py-12">
+      <div className={cx(COLUMN, 'pt-2 wide:hidden')}>
+        <BackToList className="-ml-3" />
+      </div>
+      <div className="box-border flex flex-1 flex-col justify-center px-4 py-12 wide:px-12">
         <div className="mx-auto flex w-full max-w-180 flex-col gap-4">
-          <h1 className="m-0 text-3xl font-semibold tracking-tight">
-            What should {agent.name} look into?
-          </h1>
+          <div className="flex flex-col gap-2">
+            <h1 className="m-0 text-3xl font-semibold tracking-tight">
+              What should {agent.name} look into?
+            </h1>
+            <StepsExplained />
+          </div>
           {sendError !== undefined && (
-            <Alert type="error" showIcon title={errorMessage(sendError)} />
+            <Alert
+              type="error"
+              showIcon
+              title="Couldn't send your message."
+              description={errorMessage(sendError)}
+            />
           )}
           <Composer
             onSend={send}
@@ -127,7 +156,8 @@ function Chat({ sessionId }: { sessionId: string }) {
   const agents = useAgents()
   const navigate = useNavigate()
   const { messages, loading, error, reload, send, receive } = useChatMessages(sessionId)
-  const [sendError, setSendError] = useState<unknown>()
+  // What failed (sending or stopping) and why, shown above the composer.
+  const [problem, setProblem] = useState<{ title: string; error: unknown }>()
   const history = useMemo(() => groupHistory(messages), [messages])
   const newest = useMemo(() => newestMessage(messages), [messages])
   // The newest message when a stop found no run (a backend restart ended it): nothing will follow.
@@ -149,7 +179,7 @@ function Chat({ sessionId }: { sessionId: string }) {
       onMessage: receive,
       onGone: () => {
         chatSessions.reload()
-        navigate('/chat', { replace: true, state: { deleted: true } })
+        navigate('/chat/new', { replace: true, state: { deleted: true } })
       },
     },
     session !== undefined,
@@ -157,17 +187,16 @@ function Chat({ sessionId }: { sessionId: string }) {
   if (!session) {
     return (
       <div className={cx(COLUMN, 'flex flex-col gap-3 py-9')}>
+        <BackToList className="-mt-5 -ml-3" />
         {chatSessions.loading ? (
           <p className="m-0 text-muted">Loading the chat…</p>
         ) : chatSessions.error !== undefined ? (
-          <p role="alert" className="m-0 text-muted">
-            Couldn't load chats. {errorMessage(chatSessions.error)}
-          </p>
+          <LoadError what="chats" error={chatSessions.error} />
         ) : (
           <>
             <h1 className="m-0 text-xl font-semibold">Chat not found</h1>
             <p className="m-0 text-muted">It may have been deleted.</p>
-            <Link to="/chat" className="text-ink underline">
+            <Link to="/chat/new" className="text-ink underline">
               Start a new chat
             </Link>
           </>
@@ -183,7 +212,7 @@ function Chat({ sessionId }: { sessionId: string }) {
   const agentName = agent?.name ?? 'Agent'
 
   async function submit(content: string) {
-    setSendError(undefined)
+    setProblem(undefined)
     follow()
     try {
       await send(content)
@@ -193,21 +222,21 @@ function Chat({ sessionId }: { sessionId: string }) {
         chatSessions.reload()
         agents.reload()
       }
-      setSendError(failure)
+      setProblem({ title: "Couldn't send your message.", error: failure })
       throw failure
     }
   }
 
   function stop() {
     setStopping(true)
-    setSendError(undefined)
+    setProblem(undefined)
     stopChatSession(sessionId).then(
       (found) => {
         if (!found) setAbandoned(newest?.id)
       },
       (failure: unknown) => {
         setStopping(false)
-        setSendError(failure)
+        setProblem({ title: "Couldn't stop the agent.", error: failure })
       },
     )
   }
@@ -225,20 +254,23 @@ function Chat({ sessionId }: { sessionId: string }) {
 
   return (
     <>
-      <header className="border-b border-line bg-surface">
-        <div className={cx(COLUMN, 'pt-6 pb-5')}>
-          <h1 className="m-0 text-xl font-semibold break-words">{chatTitle(session)}</h1>
-          <p className="m-0 mt-0.5 text-sm text-muted">
-            {agent ? (
-              <>
-                {agent.name} on <span className="font-mono text-xs">{agent.model}</span>
-              </>
-            ) : agentGone ? (
-              'No agent'
-            ) : (
-              '…'
-            )}
-          </p>
+      <header className={ITEM_HEADER}>
+        <div className={cx(COLUMN, 'flex items-start gap-1 pt-6 pb-5')}>
+          <BackToList className="-mt-2 -ml-3" />
+          <div className="min-w-0 flex-1">
+            <h1 className="m-0 text-xl font-semibold break-words">{chatTitle(session)}</h1>
+            <p className="m-0 mt-0.5 text-sm text-muted">
+              {agent ? (
+                <>
+                  {agent.name} on <span className="font-mono text-xs">{agent.model}</span>
+                </>
+              ) : agentGone ? (
+                'No agent'
+              ) : (
+                '…'
+              )}
+            </p>
+          </div>
         </div>
       </header>
       {stream.status === 'stopped' && (
@@ -265,7 +297,7 @@ function Chat({ sessionId }: { sessionId: string }) {
         <div role="status" className="border-b border-line bg-surface text-sm text-ink">
           <div className={cx(COLUMN, 'flex flex-wrap items-center justify-between gap-3 py-2.5')}>
             <span>Its agent was deleted. You can read this chat but not continue it.</span>
-            <Link to="/chat" className="font-semibold text-ink underline">
+            <Link to="/chat/new" className="font-semibold text-ink underline">
               New chat
             </Link>
           </div>
@@ -273,24 +305,18 @@ function Chat({ sessionId }: { sessionId: string }) {
       )}
 
       <section aria-label="Messages" className={cx(COLUMN, 'flex flex-1 flex-col gap-3 py-9')}>
-        {error !== undefined && (
-          <div role="alert" className="flex flex-col items-start gap-2 text-muted">
-            <p className="m-0">Couldn't load the messages. {errorMessage(error)}</p>
-            <button type="button" onClick={reload} className="cursor-pointer text-ink underline">
-              Try again
-            </button>
-          </div>
-        )}
+        {error !== undefined && <LoadError what="the messages" error={error} onRetry={reload} />}
         {loading && messages.length === 0 && <p className="m-0 text-muted">Loading messages…</p>}
         {!loading && error === undefined && messages.length === 0 && (
           <p className="m-0 text-muted">No messages yet.</p>
         )}
         {history.map((item, i) =>
           item.kind === 'user' ? (
-            // The user's message as a prompt line on a band, not a bubble (ADR 059).
+            // The user's message as a prompt line on a band, not a bubble (ADR 059); no border, so
+            // the answer, not the question, is the strongest text of an exchange (critique of 2026-11-08).
             <div
               key={item.message.id}
-              className="flex gap-2.5 rounded-ui border border-line bg-surface px-3 py-2.5 not-first:mt-5"
+              className="flex gap-2.5 rounded-ui bg-surface px-3 py-2.5 not-first:mt-5"
             >
               <span aria-hidden="true" className="font-mono text-sm text-muted">
                 &gt;
@@ -322,7 +348,14 @@ function Chat({ sessionId }: { sessionId: string }) {
 
       {/* Stays on screen while the steps above it are read (F3). */}
       <div className={cx(COLUMN, 'sticky bottom-0 z-10 flex flex-col gap-3 bg-ground pt-2 pb-9')}>
-        {sendError !== undefined && <Alert type="error" showIcon title={errorMessage(sendError)} />}
+        {problem !== undefined && (
+          <Alert
+            type="error"
+            showIcon
+            title={problem.title}
+            description={errorMessage(problem.error)}
+          />
+        )}
         {stream.status === 'replaced' ? (
           // Replies would only reach the other tab, so nothing is sent from here (V4 C4 C).
           <div

@@ -160,6 +160,16 @@ describe('the knowledge-base list', () => {
     expect(sent(api, 'POST')[0].body).toEqual({ name: 'Onboarding' })
   })
 
+  it('leads back to the list of knowledge bases', async () => {
+    backend()
+    renderApp('/knowledge-base/k1')
+
+    expect(await screen.findByRole('link', { name: 'Back to knowledge bases' })).toHaveAttribute(
+      'href',
+      '/knowledge-base',
+    )
+  })
+
   it('edits only what changed', async () => {
     const api = backend()
     renderApp('/knowledge-base/k1')
@@ -455,7 +465,9 @@ describe('renaming a document', () => {
       'x{Enter}',
     )
 
-    expect(await screen.findByText('name: size must be between 0 and 200')).toBeInTheDocument()
+    expect(
+      await screen.findByText("Couldn't rename it. name: size must be between 0 and 200."),
+    ).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Name of opening-hours.md' })).toBeInTheDocument()
   })
 })

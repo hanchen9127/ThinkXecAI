@@ -217,7 +217,7 @@ describe('when the stream ends', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       // Not "still saved": sending fails too while the server is out of reach.
-      /^Live replies stopped\. Can't reach the server\.\s*Try again$/,
+      /^Live replies stopped\. Can't reach the server\. Check that it is running, then try again\.\s*Try again$/,
     )
   })
 
@@ -333,19 +333,33 @@ describe('the working indicator', () => {
     expect(within(steps).getByText('dateTool').closest('li')).toHaveAttribute('data-grows')
   })
 
-  it('turns Send into Stop while it works, and back into Send for a message to queue', async () => {
+  it('shows Stop beside Send while it works, and keeps it while the user types', async () => {
     backend({ 'GET /chat-messages/session/s1': () => [recent('m1', 'user', 1_000)] })
     renderApp('/chat/s1')
 
     const stop = await screen.findByRole('button', { name: 'Stop' })
     expect(stop).toBeEnabled()
-    // One button: its icon changes shape and its labels cross-fade (ADR 061).
-    expect(stop.querySelector('.shape-icon')).toHaveAttribute('data-shape', 'square')
+    const send = screen.getByRole('button', { name: 'Send' })
+    expect(send).toBeDisabled()
+    // Stop sits left of Send, so it comes first.
+    expect(stop.compareDocumentPosition(send) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    // A correction typed during a run can still stop it, or be queued with Send (ADR 060).
     await userEvent.type(screen.getByRole('textbox', { name: 'Message' }), 'And the price?')
-    expect(screen.queryByRole('button', { name: 'Stop' })).toBeNull()
-    expect(stop).toHaveAccessibleName('Send')
-    expect(stop).toBeEnabled()
-    expect(stop.querySelector('.shape-icon')).toHaveAttribute('data-shape', 'triangle')
+    expect(screen.getByRole('button', { name: 'Stop' })).toBeEnabled()
+    expect(send).toBeEnabled()
+  })
+
+  it('puts focus back in the message box when the Stop it was on goes', async () => {
+    backend({
+      'GET /chat-messages/session/s1': () => [recent('m1', 'user', 1_000)],
+      'POST /chat-sessions/s1/stop': () => false,
+    })
+    renderApp('/chat/s1')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Stop' }))
+
+    await waitFor(() => expect(screen.queryByRole('button', { name: /^Stop/ })).toBeNull())
+    expect(screen.getByRole('textbox', { name: 'Message' })).toHaveFocus()
   })
 
   it('stops the session, says Stopping… until the notice, then offers Try again', async () => {
@@ -359,18 +373,18 @@ describe('the working indicator', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Stop' }))
     expect(api.calls.filter((c) => c.path === '/chat-sessions/s1/stop')).toHaveLength(1)
     const stopping = screen.getByRole('button', { name: 'Stopping…' })
-    expect(stopping).toBeDisabled()
+    expect(stopping).toHaveAttribute('aria-disabled', 'true')
     expect(stopping).toHaveClass('opacity-60')
+    // It keeps focus, but a second click sends no second stop.
+    await userEvent.click(stopping)
+    expect(api.calls.filter((c) => c.path === '/chat-sessions/s1/stop')).toHaveLength(1)
 
-    // Typing while it stops gives a plain Send, to queue a message.
-    const box = screen.getByRole('textbox', { name: 'Message' })
-    await userEvent.type(box, 'And the price?')
-    expect(stopping).toHaveAccessibleName('Send')
-    expect(stopping).toBeEnabled()
-    expect(stopping).not.toHaveClass('opacity-60')
-    expect(stopping.querySelector('.shape-icon')).toHaveAttribute('data-shape', 'triangle')
-    await userEvent.clear(box)
+    // Typing while it stops leaves Stopping… in place and gives a Send, to queue a message.
+    await userEvent.type(screen.getByRole('textbox', { name: 'Message' }), 'And the price?')
     expect(stopping).toHaveAccessibleName('Stopping…')
+    expect(stopping).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled()
+    await userEvent.clear(screen.getByRole('textbox', { name: 'Message' }))
 
     const stopped = { ...recent('m2', 'assistant', 0), content: 'Stopped.' }
     FakeEventSource.latest().emit('message', generated(stopped))
@@ -422,7 +436,10 @@ describe('the working indicator', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: 'Stop' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Chat session not found')
+    // a failed stop says so, not that a message failed to send
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent("Couldn't stop the agent.")
+    expect(alert).toHaveTextContent('It no longer exists; it may have been deleted in another tab.')
     expect(screen.getByRole('button', { name: 'Stop' })).toBeEnabled()
   })
 
@@ -507,7 +524,7 @@ describe('the working indicator', () => {
     renderApp('/chat/s1')
 
     await userEvent.click(await screen.findByRole('button', { name: 'Try again' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('Not saved')
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't send your message.")
 
     await userEvent.click(screen.getByRole('button', { name: 'Try again' }))
     await waitFor(() => expect(sent(api)).toEqual(['user m1', 'user m1']))
@@ -541,6 +558,33 @@ describe('the working indicator', () => {
 
     expect(await screen.findByText('Stopped.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull()
+  })
+
+  it('says a call stopped before it ran was not run, and one still running has no result yet', async () => {
+    // The stop came between Think and Execute: the call is stored, its result never is (ADR 060).
+    backend({
+      'GET /chat-messages/session/s1': () => [
+        recent('m1', 'user', 20_000),
+        recent('m2', 'assistant', 15_000, calls),
+        notice('m3', 10_000),
+      ],
+    })
+    const { unmount } = renderApp('/chat/s1')
+    expect(await screen.findByText('Stopped.')).toBeInTheDocument()
+    expect(screen.getByText('Not run')).toBeInTheDocument()
+    expect(screen.queryByText('No result yet')).toBeNull()
+    unmount()
+
+    // Still working on that call: its result is on its way.
+    backend({
+      'GET /chat-messages/session/s1': () => [
+        recent('m1', 'user', 20_000),
+        recent('m2', 'assistant', 15_000, calls),
+      ],
+    })
+    renderApp('/chat/s1')
+    expect(await screen.findByText('No result yet')).toBeInTheDocument()
+    expect(screen.queryByText('Not run')).toBeNull()
   })
 
   it('offers no Try again once the agent is gone', async () => {

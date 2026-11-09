@@ -15,6 +15,11 @@ public class CityTool implements Tool {
     }
 
     @Override
+    public String getLabel() {
+        return "Sample city";
+    }
+
+    @Override
     public String getDescription() {
         return "Returns a fixed sample city (test tool, always Sydney; no real location lookup).";
     }

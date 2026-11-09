@@ -9,7 +9,7 @@ export interface ApiCall {
 
 type Handler = (call: ApiCall) => unknown
 /** A fixed `data` value, or a handler computing it (`unknown | Handler` would lose the handler's types). */
-type Route = Handler | object | string | number | boolean | null
+export type Route = Handler | object | string | number | boolean | null
 
 /**
  * Replaces `fetch` with a fake backend: `routes` maps `'GET /agents'` to the `data` of a success

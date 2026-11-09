@@ -8,7 +8,8 @@ import { useAgents, useAgentsState } from './useAgents'
 import { useChatSessions } from './useChatSessions'
 import { useDocuments } from './useDocuments'
 import { useKnowledgeBases, useKnowledgeBasesState } from './useKnowledgeBases'
-import { useOptionalTools } from './useOptionalTools'
+import ToolsProvider from '../contexts/ToolsProvider'
+import { useTools } from './useTools'
 
 function count(calls: { method: string; path: string }[], method: string, path: string) {
   return calls.filter((c) => c.method === method && c.path === path).length
@@ -150,12 +151,33 @@ describe('shared lists', () => {
   })
 })
 
-describe('useOptionalTools', () => {
-  it('loads the optional tools', async () => {
-    fakeApi({ 'GET /tools': [{ name: 'emailTool', description: 'Sends', type: 'OPTIONAL' }] })
-    const { result } = renderHook(() => useOptionalTools())
+describe('useTools', () => {
+  const database = {
+    name: 'dataBaseTool',
+    callName: 'databaseQuery',
+    label: 'Database',
+    description: 'Runs read-only SQL.',
+    type: 'OPTIONAL',
+  }
+
+  it('names a tool by its label, from its stored name or the name a call used', async () => {
+    fakeApi({ 'GET /tools': [database] })
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <ToolsProvider>{children}</ToolsProvider>
+    )
+    const { result } = renderHook(() => useTools(), { wrapper })
 
     await waitFor(() => expect(result.current.tools).toHaveLength(1))
+    expect(result.current.labelOf('dataBaseTool')).toBe('Database')
+    expect(result.current.labelOf('databaseQuery')).toBe('Database')
+    expect(result.current.labelOf('someOldTool')).toBe('someOldTool')
+  })
+
+  it('falls back to the code name outside the provider', () => {
+    const { result } = renderHook(() => useTools())
+
+    expect(result.current.tools).toEqual([])
+    expect(result.current.labelOf('databaseQuery')).toBe('databaseQuery')
   })
 })
 

@@ -1,16 +1,19 @@
 import { MoreOutlined } from '@ant-design/icons'
 import { Button, Dropdown } from 'antd'
-import { useState } from 'react'
+import { type ReactElement, useState } from 'react'
 import { Link, matchPath, useLocation } from 'react-router'
 import type { Agent } from '../../api/api'
 import { path } from '../../api/http'
 import { useAgentDialogs } from '../../hooks/useAgentDialogs'
+import { useMenuTrigger } from '../../hooks/useMenuTrigger'
 import { useAgents } from '../../hooks/useAgents'
 import { useKnowledgeBaseNames } from '../../hooks/useKnowledgeBaseNames'
 import { cx } from '../../utils/cx'
-import { countLabel, errorMessage } from '../../utils/text'
+import { countLabel } from '../../utils/text'
+import { useAgentTools } from '../../hooks/useAgentTools'
 import Tag from '../Tag'
 import TabHeading from './TabHeading'
+import LoadError from '../LoadError'
 
 /** The agent list (V2 A1 D): a short summary per agent whose counts open into names. */
 export default function AgentTabContent() {
@@ -28,14 +31,7 @@ export default function AgentTabContent() {
           </Button>
         }
       />
-      {error !== undefined && (
-        <div role="alert" className="flex flex-col items-start gap-2 text-muted">
-          <p className="m-0">Couldn't load agents. {errorMessage(error)}</p>
-          <button type="button" onClick={reload} className="cursor-pointer text-ink underline">
-            Try again
-          </button>
-        </div>
-      )}
+      {error !== undefined && <LoadError what="agents" error={error} onRetry={reload} />}
       {loading && agents.length === 0 && <p className="m-0 text-muted">Loading agents…</p>}
       {!loading && error === undefined && agents.length === 0 && (
         <p className="m-0 text-muted">No agents yet.</p>
@@ -70,7 +66,10 @@ function AgentItem({
   onDelete: () => void
 }) {
   const kbNames = useKnowledgeBaseNames()
+  const tools = useAgentTools(agent.allowedTools)
   const [shown, setShown] = useState<'tools' | 'knowledge' | null>(null)
+  // Focus goes back to ⋯ when the dialog an item opens is closed (Phase 14, D6).
+  const { trigger: menuButton, then: focusMenuThen } = useMenuTrigger()
   const toggle = (part: 'tools' | 'knowledge') => setShown(shown === part ? null : part)
 
   return (
@@ -93,14 +92,16 @@ function AgentItem({
         </Link>
         <Dropdown
           trigger={['click']}
+          autoFocus
           menu={{
             items: [
-              { key: 'edit', label: 'Edit', onClick: onEdit },
-              { key: 'delete', label: 'Delete', danger: true, onClick: onDelete },
+              { key: 'edit', label: 'Edit', onClick: focusMenuThen(onEdit) },
+              { key: 'delete', label: 'Delete', danger: true, onClick: focusMenuThen(onDelete) },
             ],
           }}
         >
           <Button
+            ref={menuButton}
             type="text"
             size="small"
             aria-label={`More actions for ${agent.name}`}
@@ -110,13 +111,16 @@ function AgentItem({
       </div>
       <p className="m-0 font-mono text-xs text-muted">{agent.model}</p>
       <p className="m-0 flex flex-wrap gap-x-3 text-xs text-muted">
-        <CountToggle
-          count={agent.allowedTools.length}
-          one="tool"
-          many="tools"
-          expanded={shown === 'tools'}
-          onToggle={() => toggle('tools')}
-        />
+        {/* Until the tool list is known a count would leave out the tools every agent has. */}
+        {tools.known && (
+          <CountToggle
+            count={tools.count}
+            one="tool"
+            many="tools"
+            expanded={shown === 'tools'}
+            onToggle={() => toggle('tools')}
+          />
+        )}
         <CountToggle
           count={agent.allowedKbs.length}
           one="knowledge base"
@@ -125,13 +129,16 @@ function AgentItem({
           onToggle={() => toggle('knowledge')}
         />
       </p>
-      {shown === 'tools' && (
-        <TagRow kind="tool" names={agent.allowedTools} label={`Tools of ${agent.name}`} />
+      {shown === 'tools' && tools.known && (
+        <TagRow tags={tools.tags} label={`Tools of ${agent.name}`} />
       )}
       {shown === 'knowledge' && (
         <TagRow
-          kind="knowledge"
-          names={kbNames(agent.allowedKbs)}
+          tags={kbNames(agent.allowedKbs).map((name, i) => (
+            <Tag key={`${name}-${i}`} kind="knowledge">
+              {name}
+            </Tag>
+          ))}
           label={`Knowledge bases of ${agent.name}`}
         />
       )}
@@ -161,21 +168,11 @@ function CountToggle(props: {
   )
 }
 
-function TagRow({
-  kind,
-  names,
-  label,
-}: {
-  kind: 'tool' | 'knowledge'
-  names: string[]
-  label: string
-}) {
+function TagRow({ tags, label }: { tags: ReactElement[]; label: string }) {
   return (
     <ul aria-label={label} className="m-0 mt-2 flex list-none flex-wrap gap-1.5 p-0">
-      {names.map((name, i) => (
-        <li key={`${name}-${i}`}>
-          <Tag kind={kind}>{name}</Tag>
-        </li>
+      {tags.map((tag) => (
+        <li key={tag.key}>{tag}</li>
       ))}
     </ul>
   )

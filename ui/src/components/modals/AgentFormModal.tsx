@@ -2,7 +2,7 @@ import { Alert, Input, Modal, Select, Slider } from 'antd'
 import { type ReactNode, useState } from 'react'
 import { AGENT_MODELS, type Agent } from '../../api/api'
 import { useKnowledgeBases } from '../../hooks/useKnowledgeBases'
-import { useOptionalTools } from '../../hooks/useOptionalTools'
+import { useTools } from '../../hooks/useTools'
 import { cx } from '../../utils/cx'
 import { errorMessage } from '../../utils/text'
 import Tag from '../Tag'
@@ -96,7 +96,12 @@ export default function AgentFormModal({
         </nav>
         <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto px-7 py-5">
           {saveError !== undefined && (
-            <Alert type="error" showIcon title={errorMessage(saveError)} />
+            <Alert
+              type="error"
+              showIcon
+              title="Couldn't save the agent."
+              description={errorMessage(saveError)}
+            />
           )}
           {section === 'basics' && <Basics draft={draft} errors={errors} change={change} />}
           {section === 'model' && <ModelSection draft={draft} change={change} />}
@@ -205,7 +210,8 @@ function ModelSection({ draft, change }: SectionProps) {
 }
 
 function ToolsSection({ draft, change }: SectionProps) {
-  const { tools, error } = useOptionalTools()
+  const { tools, error } = useTools()
+  const fixed = tools.filter((tool) => tool.type === 'FIXED').map((tool) => tool.label)
   return (
     <Field
       id="agent-tools"
@@ -213,7 +219,9 @@ function ToolsSection({ draft, change }: SectionProps) {
       hint={
         error !== undefined
           ? `Couldn't load the tools. ${errorMessage(error)}`
-          : 'Always available: knowledge search, date, city, weather.'
+          : fixed.length > 0
+            ? `Every agent also has: ${fixed.join(', ')}.`
+            : undefined
       }
     >
       <Select
@@ -224,11 +232,9 @@ function ToolsSection({ draft, change }: SectionProps) {
         value={draft.allowedTools}
         placeholder="No optional tools"
         onChange={(allowedTools) => change({ allowedTools })}
-        options={tools.map((tool) => ({
-          value: tool.name,
-          label: tool.name,
-          description: tool.description,
-        }))}
+        options={tools
+          .filter((tool) => tool.type === 'OPTIONAL')
+          .map((tool) => ({ value: tool.name, label: tool.label, description: tool.description }))}
         optionRender={(option) => (
           <span>
             <span className="block">{option.data.label}</span>

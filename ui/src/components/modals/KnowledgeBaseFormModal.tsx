@@ -57,7 +57,14 @@ export default function KnowledgeBaseFormModal({
       destroyOnHidden
     >
       <div className="flex flex-col gap-4 py-2">
-        {saveError !== undefined && <Alert type="error" showIcon title={errorMessage(saveError)} />}
+        {saveError !== undefined && (
+          <Alert
+            type="error"
+            showIcon
+            title="Couldn't save the knowledge base."
+            description={errorMessage(saveError)}
+          />
+        )}
         <div className="flex flex-col gap-1">
           <label htmlFor="kb-name" className="text-xs font-semibold text-muted">
             Name

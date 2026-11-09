@@ -25,10 +25,15 @@ import static org.mockito.Mockito.when;
 class EmailToolTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final String NOT_ONE_ADDRESS = "Not sent: \"to\" must be exactly one email address.";
+    private static final String NOT_ONE_ADDRESS = "INVALID_ARGUMENTS: Not sent: \"to\" must be exactly one email address.";
 
     private final GmailSender gmailSender = mock(GmailSender.class);
     private final EmailTool tool = new EmailTool(gmailSender, " Alice@Example.com , , bob@example.com ");
+
+    /** The tool's answer, or its failure kind and text (ADR 064). */
+    private static String send(EmailTool tool, String to, String subject, String content) {
+        return ToolOutcome.of(() -> tool.sendEmail(to, subject, content));
+    }
 
     @BeforeEach
     void configured() {
@@ -38,19 +43,19 @@ class EmailToolTest {
 
     @Test
     void anAllowedRecipientGetsTheEmailAndTheModelGetsGmailsId() {
-        assertThat(tool.sendEmail("alice@example.com", " Report ", "Body"))
+        assertThat(send(tool, "alice@example.com", " Report ", "Body"))
                 .isEqualTo("Sent to alice@example.com (Gmail message id msg-1).");
         verify(gmailSender).send(address("alice@example.com"), "Report", "Body");
     }
 
     @Test
     void theAllowlistIgnoresCase() {
-        assertThat(tool.sendEmail("BOB@EXAMPLE.COM", "S", "B")).startsWith("Sent to BOB@EXAMPLE.COM");
+        assertThat(send(tool, "BOB@EXAMPLE.COM", "S", "B")).startsWith("Sent to BOB@EXAMPLE.COM");
     }
 
     @Test
     void aDisplayNameIsDroppedAndOnlyTheAddressIsUsed() {
-        assertThat(tool.sendEmail("Alice Smith <alice@example.com>", "S", "B")).startsWith("Sent to alice@example.com");
+        assertThat(send(tool, "Alice Smith <alice@example.com>", "S", "B")).startsWith("Sent to alice@example.com");
 
         ArgumentCaptor<InternetAddress> recipient = ArgumentCaptor.forClass(InternetAddress.class);
         verify(gmailSender).send(recipient.capture(), anyString(), anyString());
@@ -59,9 +64,9 @@ class EmailToolTest {
 
     @Test
     void anotherAddressIsRefusedWithoutRevealingTheAllowlist() {
-        String answer = tool.sendEmail("mallory@evil.example", "S", "B");
+        String answer = send(tool, "mallory@evil.example", "S", "B");
 
-        assertThat(answer).isEqualTo("Not sent: mallory@evil.example is not an allowed recipient.");
+        assertThat(answer).isEqualTo("REFUSED: Not sent: mallory@evil.example is not an allowed recipient.");
         assertThat(answer).doesNotContainIgnoringCase("alice").doesNotContainIgnoringCase("bob");
         verify(gmailSender, never()).send(any(), anyString(), anyString());
     }
@@ -75,7 +80,7 @@ class EmailToolTest {
             "not an address",
             "alice@"})
     void anythingButExactlyOneValidAddressIsRefused(String to) {
-        assertThat(tool.sendEmail(to, "S", "B")).isEqualTo(NOT_ONE_ADDRESS);
+        assertThat(send(tool, to, "S", "B")).isEqualTo(NOT_ONE_ADDRESS);
         verify(gmailSender, never()).send(any(), anyString(), anyString());
     }
 
@@ -83,8 +88,8 @@ class EmailToolTest {
     void anEmptyAllowlistRefusesEverySend() {
         EmailTool closed = new EmailTool(gmailSender, "");
 
-        assertThat(closed.sendEmail("alice@example.com", "S", "B"))
-                .isEqualTo("Not sent: alice@example.com is not an allowed recipient.");
+        assertThat(send(closed, "alice@example.com", "S", "B"))
+                .isEqualTo("REFUSED: Not sent: alice@example.com is not an allowed recipient.");
         verify(gmailSender, never()).send(any(), anyString(), anyString());
     }
 
@@ -92,19 +97,19 @@ class EmailToolTest {
     void missingGmailSettingsAreNamedBeforeTheAllowlistIsChecked() {
         when(gmailSender.missingSettings()).thenReturn(List.of("THINKXECAI_GMAIL_CLIENT_SECRET", "THINKXECAI_GMAIL_REFRESH_TOKEN"));
 
-        assertThat(tool.sendEmail("mallory@evil.example", "S", "B")).isEqualTo(
-                "Not sent: email is not configured on this server. Missing environment variables: "
+        assertThat(send(tool, "mallory@evil.example", "S", "B")).isEqualTo(
+                "TOOL_ERROR: Not sent: email is not configured on this server. Missing environment variables: "
                         + "THINKXECAI_GMAIL_CLIENT_SECRET, THINKXECAI_GMAIL_REFRESH_TOKEN.");
         verify(gmailSender, never()).send(any(), anyString(), anyString());
     }
 
     @Test
     void blankArgumentsAndMultiLineSubjectsAreRefused() {
-        assertThat(tool.sendEmail(" ", "S", "B")).isEqualTo("Not sent: to, subject, and content must all be given.");
-        assertThat(tool.sendEmail("alice@example.com", null, "B")).isEqualTo("Not sent: to, subject, and content must all be given.");
-        assertThat(tool.sendEmail("alice@example.com", "S", "")).isEqualTo("Not sent: to, subject, and content must all be given.");
-        assertThat(tool.sendEmail("alice@example.com", "Hi\r\nBcc: mallory@evil.example", "B"))
-                .isEqualTo("Not sent: the subject must be a single line.");
+        assertThat(send(tool, " ", "S", "B")).isEqualTo("INVALID_ARGUMENTS: Not sent: to, subject, and content must all be given.");
+        assertThat(send(tool, "alice@example.com", null, "B")).isEqualTo("INVALID_ARGUMENTS: Not sent: to, subject, and content must all be given.");
+        assertThat(send(tool, "alice@example.com", "S", "")).isEqualTo("INVALID_ARGUMENTS: Not sent: to, subject, and content must all be given.");
+        assertThat(send(tool, "alice@example.com", "Hi\r\nBcc: mallory@evil.example", "B"))
+                .isEqualTo("INVALID_ARGUMENTS: Not sent: the subject must be a single line.");
         verify(gmailSender, never()).send(any(), anyString(), anyString());
     }
 
@@ -113,14 +118,14 @@ class EmailToolTest {
         when(gmailSender.send(any(), anyString(), anyString()))
                 .thenThrow(new GmailSender.SendFailure("Not sent: Gmail rejected the message (HTTP 400)."));
 
-        assertThat(tool.sendEmail("alice@example.com", "S", "B")).isEqualTo("Not sent: Gmail rejected the message (HTTP 400).");
+        assertThat(send(tool, "alice@example.com", "S", "B")).isEqualTo("TOOL_ERROR: Not sent: Gmail rejected the message (HTTP 400).");
     }
 
     @Test
-    void anUnexpectedErrorIsNotThrownIntoTheAgentLoop() {
+    void anUnexpectedErrorIsAToolErrorWithoutDetails() {
         when(gmailSender.send(any(), anyString(), anyString())).thenThrow(new IllegalStateException("boom"));
 
-        assertThat(tool.sendEmail("alice@example.com", "S", "B")).isEqualTo("Not sent: an internal error occurred.");
+        assertThat(send(tool, "alice@example.com", "S", "B")).isEqualTo("TOOL_ERROR: Not sent: an internal error occurred.");
     }
 
     @Test

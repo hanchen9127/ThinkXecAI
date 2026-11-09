@@ -39,3 +39,9 @@ if (!window.matchMedia) {
       dispatchEvent: () => false,
     }) as MediaQueryList
 }
+
+// jsdom has no Element.scrollTo; the page scrolls in `main` (ADR 063). Tests that follow the page
+// replace it on that element.
+if (!Element.prototype.scrollTo) {
+  Element.prototype.scrollTo = () => {}
+}

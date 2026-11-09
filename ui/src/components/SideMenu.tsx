@@ -22,34 +22,38 @@ const ITEMS: { section: Section; label: string; short: string; to: string; icon:
   },
 ]
 
-/** The rail: one labelled link per section, the open one marked; a white focus ring (ADR 058). */
+/**
+ * The rail: one link per section, the open one marked, with a white focus ring (ADR 058). On a wide
+ * screen a column of labelled icons; on a narrow one a bar on top with the product name and the
+ * icons alone, each still named for screen readers (ADR 063).
+ */
 export default function SideMenu({ active }: { active: Section | null }) {
   return (
-    <nav
-      aria-label="Main"
-      className="flex shrink-0 basis-19 flex-col items-center gap-2 bg-rail py-4"
-    >
-      {ITEMS.map((item) => {
-        const current = item.section === active
-        return (
-          <Link
-            key={item.section}
-            to={item.to}
-            aria-label={item.label}
-            aria-current={current ? 'page' : undefined}
-            className={cx(
-              'flex h-12.5 w-15 flex-col items-center justify-center gap-0.75 rounded-ui no-underline',
-              'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white',
-              current ? 'bg-rail-active text-white' : 'text-rail-icon hover:text-white',
-            )}
-          >
-            <span className="text-icon leading-none">{item.icon}</span>
-            <span aria-hidden="true" className="text-label">
-              {item.short}
-            </span>
-          </Link>
-        )
-      })}
-    </nav>
+    <div className="flex h-13 shrink-0 items-center justify-between bg-rail pr-2 pl-4 wide:h-auto wide:basis-19 wide:flex-col wide:justify-start wide:px-0 wide:py-4">
+      <p className="m-0 text-sm font-semibold text-white wide:hidden">ThinkXecAI</p>
+      <nav aria-label="Main" className="flex gap-0.5 wide:flex-col wide:items-center wide:gap-2">
+        {ITEMS.map((item) => {
+          const current = item.section === active
+          return (
+            <Link
+              key={item.section}
+              to={item.to}
+              aria-label={item.label}
+              aria-current={current ? 'page' : undefined}
+              className={cx(
+                'flex size-11 flex-col items-center justify-center gap-0.75 rounded-ui no-underline wide:h-12.5 wide:w-15',
+                'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white',
+                current ? 'bg-rail-active text-white' : 'text-rail-icon hover:text-white',
+              )}
+            >
+              <span className="text-icon leading-none">{item.icon}</span>
+              <span aria-hidden="true" className="hidden text-label wide:inline">
+                {item.short}
+              </span>
+            </Link>
+          )
+        })}
+      </nav>
+    </div>
   )
 }

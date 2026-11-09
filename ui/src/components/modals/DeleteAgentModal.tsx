@@ -53,7 +53,12 @@ export default function DeleteAgentModal({
       <div className="flex flex-col gap-4">
         <p className="m-0">{effect(chats?.length)} This can't be undone.</p>
         {deleteError !== undefined && (
-          <Alert type="error" showIcon title={errorMessage(deleteError)} />
+          <Alert
+            type="error"
+            showIcon
+            title="Couldn't delete the agent."
+            description={errorMessage(deleteError)}
+          />
         )}
         <div className="flex flex-col gap-1">
           <label htmlFor="delete-agent-name" className="text-xs font-semibold text-muted">

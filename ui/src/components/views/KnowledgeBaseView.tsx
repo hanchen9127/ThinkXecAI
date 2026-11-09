@@ -10,14 +10,16 @@ import { useDocuments } from '../../hooks/useDocuments'
 import { useKnowledgeBaseDialogs } from '../../hooks/useKnowledgeBaseDialogs'
 import { useKnowledgeBases } from '../../hooks/useKnowledgeBases'
 import { useUndoableDelete } from '../../hooks/useUndoableDelete'
-import { COLUMN } from '../../layout/column'
+import { COLUMN, ITEM_HEADER } from '../../layout/column'
+import BackToList from '../BackToList'
 import { cx } from '../../utils/cx'
 import { parseApiTimestamp } from '../../utils/time'
-import { countLabel, errorMessage } from '../../utils/text'
+import { countLabel } from '../../utils/text'
 import DeleteFeedback from '../DeleteFeedback'
 import DeleteMenu from '../DeleteMenu'
 import DocumentRow from '../knowledgeBases/DocumentRow'
 import { agentsUsing } from '../knowledgeBases/knowledgeBases'
+import LoadError from '../LoadError'
 
 /** `/knowledge-base` and `/knowledge-base/:knowledgeBaseId`. */
 export default function KnowledgeBaseView() {
@@ -42,9 +44,7 @@ export default function KnowledgeBaseView() {
         {loading ? (
           <p className="m-0 text-muted">Loading the knowledge base…</p>
         ) : error !== undefined ? (
-          <p role="alert" className="m-0 text-muted">
-            Couldn't load knowledge bases. {errorMessage(error)}
-          </p>
+          <LoadError what="knowledge bases" error={error} />
         ) : (
           <>
             <h1 className="m-0 text-xl font-semibold">Knowledge base not found</h1>
@@ -97,14 +97,17 @@ function KnowledgeBasePage({ knowledgeBase }: { knowledgeBase: KnowledgeBase }) 
 
   return (
     <>
-      <header className="border-b border-line bg-surface">
+      <header className={ITEM_HEADER}>
         <div className={cx(COLUMN, 'flex flex-wrap items-start justify-between gap-4 pt-6 pb-5')}>
-          <div className="min-w-0">
-            <h1 className="m-0 text-xl font-semibold">{knowledgeBase.name}</h1>
-            {knowledgeBase.description && (
-              <p className="m-0 mt-0.5 text-sm text-muted">{knowledgeBase.description}</p>
-            )}
-            <UsedBy agents={users} />
+          <div className="flex min-w-0 items-start gap-1">
+            <BackToList className="-mt-2 -ml-3" />
+            <div className="min-w-0">
+              <h1 className="m-0 text-xl font-semibold">{knowledgeBase.name}</h1>
+              {knowledgeBase.description && (
+                <p className="m-0 mt-0.5 text-sm text-muted">{knowledgeBase.description}</p>
+              )}
+              <UsedBy agents={users} />
+            </div>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button onClick={() => openEdit(knowledgeBase)}>Edit</Button>
@@ -133,14 +136,7 @@ function KnowledgeBasePage({ knowledgeBase }: { knowledgeBase: KnowledgeBase }) 
           <h2 className="m-0 text-base font-semibold">
             {shown.length === 0 ? 'Documents' : countLabel(shown.length, 'document', 'documents')}
           </h2>
-          {error !== undefined && (
-            <div role="alert" className="flex flex-col items-start gap-2 text-muted">
-              <p className="m-0">Couldn't load the documents. {errorMessage(error)}</p>
-              <button type="button" onClick={reload} className="cursor-pointer text-ink underline">
-                Try again
-              </button>
-            </div>
-          )}
+          {error !== undefined && <LoadError what="the documents" error={error} onRetry={reload} />}
           {loading && documents.length === 0 && (
             <p className="m-0 text-muted">Loading documents…</p>
           )}
@@ -158,7 +154,9 @@ function KnowledgeBasePage({ knowledgeBase }: { knowledgeBase: KnowledgeBase }) 
                   document={document}
                   leaving={deletes.hidden.has(document.id)}
                   onRename={(name) => update(document.id, { name }).then(() => undefined)}
-                  onDelete={() => deletes.confirm({ id: document.id, name: document.name })}
+                  onDelete={(returnTo) =>
+                    deletes.confirm({ id: document.id, name: document.name, returnTo })
+                  }
                 />
               ))}
             </ul>

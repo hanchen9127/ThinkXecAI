@@ -5,12 +5,13 @@ import { Link, matchPath, useLocation } from 'react-router'
 import type { Agent, KnowledgeBase } from '../../api/api'
 import { path } from '../../api/http'
 import { useAgents } from '../../hooks/useAgents'
+import { useMenuTrigger } from '../../hooks/useMenuTrigger'
 import { useKnowledgeBaseDialogs } from '../../hooks/useKnowledgeBaseDialogs'
 import { useKnowledgeBases } from '../../hooks/useKnowledgeBases'
 import { cx } from '../../utils/cx'
-import { errorMessage } from '../../utils/text'
 import { agentsUsing } from '../knowledgeBases/knowledgeBases'
 import TabHeading from './TabHeading'
+import LoadError from '../LoadError'
 
 /** The knowledge-base list (V3 K1 C): each name, and the agents that search it on demand. */
 export default function KnowledgeBaseTabContent() {
@@ -30,14 +31,7 @@ export default function KnowledgeBaseTabContent() {
           </Button>
         }
       />
-      {error !== undefined && (
-        <div role="alert" className="flex flex-col items-start gap-2 text-muted">
-          <p className="m-0">Couldn't load knowledge bases. {errorMessage(error)}</p>
-          <button type="button" onClick={reload} className="cursor-pointer text-ink underline">
-            Try again
-          </button>
-        </div>
-      )}
+      {error !== undefined && <LoadError what="knowledge bases" error={error} onRetry={reload} />}
       {loading && knowledgeBases.length === 0 && (
         <p className="m-0 text-muted">Loading knowledge bases…</p>
       )}
@@ -77,6 +71,8 @@ function KnowledgeBaseItem({
   onDelete: () => void
 }) {
   const [shown, setShown] = useState(false)
+  // Focus goes back to ⋯ when the dialog an item opens is closed (Phase 14, D6).
+  const { trigger: menuButton, then: focusMenuThen } = useMenuTrigger()
 
   return (
     <li
@@ -98,14 +94,16 @@ function KnowledgeBaseItem({
         </Link>
         <Dropdown
           trigger={['click']}
+          autoFocus
           menu={{
             items: [
-              { key: 'edit', label: 'Edit', onClick: onEdit },
-              { key: 'delete', label: 'Delete', danger: true, onClick: onDelete },
+              { key: 'edit', label: 'Edit', onClick: focusMenuThen(onEdit) },
+              { key: 'delete', label: 'Delete', danger: true, onClick: focusMenuThen(onDelete) },
             ],
           }}
         >
           <Button
+            ref={menuButton}
             type="text"
             size="small"
             aria-label={`More actions for ${knowledgeBase.name}`}

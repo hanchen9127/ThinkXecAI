@@ -27,8 +27,13 @@
   --radius-ui: 4px;
   --text-icon: 20px;
   --text-label: 11px;
+  /* A run's answer, a step above body text (critique of 2026-11-08, option B). */
+  --text-answer: 17px;
   --container-panel: 300px;
-  --container-content: 560px;
+
+  /* Narrow below this (ADR 063): the rail becomes a top bar and a page shows its list or its item.
+     The rail, the panel, and a 560px page fit from here on. */
+  --breakpoint-wide: 58.5rem;
 
   /* Motion (ADR 061): every transition; theme.ts holds the same as `motion`. */
   --default-transition-duration: 150ms;
@@ -133,14 +138,12 @@
   }
 }
 
-/* Send turns into Stop (ADR 061): the icon's shape changes from a triangle to a square; both use
-   four points so the clip path can ease between them. */
+/* The Send triangle and the Stop square (ADR 060): drawn shapes in the button's text colour. */
 .shape-icon {
   width: 9px;
   height: 9px;
   background: currentColor;
-  clip-path: polygon(0 0, 100% 50%, 100% 50%, 0 100%);
-  transition: clip-path var(--default-transition-duration) var(--default-transition-timing-function);
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
 }
 
 .shape-icon[data-shape='square'] {
@@ -155,6 +158,12 @@
     outline: 2px solid var(--color-ink);
     outline-offset: 2px;
   }
+
+  /* A page's heading takes focus after a page change (Phase 14, D6) so reading starts there; it is
+     not a control, so it draws no ring. */
+  h1[tabindex='-1']:focus {
+    outline: none;
+  }
 }
 
 body {
@@ -162,6 +171,22 @@ body {
   background: var(--color-ground);
   color: var(--color-ink);
   font-family: var(--font-sans);
+}
+
+/* X Markdown sets its size and colour from its own variables on `.x-markdown`, outside any layer, so
+   Tailwind's text utilities on it never applied; with one of them on the root, these set the
+   variables instead (critique of 2026-11-08: the answer larger than the quieter thinking). */
+.x-markdown.text-sm {
+  --font-size: var(--text-sm);
+}
+.x-markdown.text-base {
+  --font-size: var(--text-base);
+}
+.x-markdown.text-answer {
+  --font-size: var(--text-answer);
+}
+.x-markdown.text-muted {
+  --text-color: var(--color-muted);
 }
 
 /* Tables in model and tool text, such as query results: X Markdown's base styles draw no lines and

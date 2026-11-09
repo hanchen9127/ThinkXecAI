@@ -7,6 +7,7 @@ import DeleteKnowledgeBaseModal from '../components/modals/DeleteKnowledgeBaseMo
 import KnowledgeBaseFormModal from '../components/modals/KnowledgeBaseFormModal'
 import { useAgents } from './useAgents'
 import { useKnowledgeBases } from './useKnowledgeBases'
+import { useReturnFocus } from './useReturnFocus'
 
 type Open =
   | { kind: 'create' }
@@ -24,6 +25,11 @@ export function useKnowledgeBaseDialogs(): {
   dialogs: ReactNode
 } {
   const [open, setOpen] = useState<Open | null>(null)
+  const focus = useReturnFocus(open !== null)
+  const show = (next: Open) => {
+    focus.remember()
+    setOpen(next)
+  }
   const { create, update, remove } = useKnowledgeBases()
   const agents = useAgents()
   const navigate = useNavigate()
@@ -77,9 +83,9 @@ export function useKnowledgeBaseDialogs(): {
   }
 
   return {
-    openCreate: () => setOpen({ kind: 'create' }),
-    openEdit: (knowledgeBase) => setOpen({ kind: 'edit', knowledgeBase }),
-    openDelete: (knowledgeBase) => setOpen({ kind: 'delete', knowledgeBase }),
+    openCreate: () => show({ kind: 'create' }),
+    openEdit: (knowledgeBase) => show({ kind: 'edit', knowledgeBase }),
+    openDelete: (knowledgeBase) => show({ kind: 'delete', knowledgeBase }),
     dialogs,
   }
 }

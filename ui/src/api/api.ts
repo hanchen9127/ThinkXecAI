@@ -230,8 +230,8 @@ export function deleteDocument(documentId: string, options?: { keepalive?: boole
 // Tools
 // ---------------------------------------------------------------------------
 
-/** The tools an agent can choose for `allowedTools`; fixed tools are always given and not listed. */
-export function listOptionalTools() {
+/** Every tool people are shown, fixed and optional, with its label (ADR 065). */
+export function listTools() {
   return http.get<ResponseData<'/api/tools', 'get'>>('/tools')
 }
 

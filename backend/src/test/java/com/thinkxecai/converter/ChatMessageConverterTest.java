@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.thinkxecai.model.ChatMessageMetadata;
 import com.thinkxecai.model.ChatMessageRole;
 import com.thinkxecai.model.ToolCallMetadata;
+import com.thinkxecai.model.ToolFailureKind;
 import com.thinkxecai.model.ToolResponseMetadata;
 import com.thinkxecai.model.dto.ChatMessageDTO;
 import com.thinkxecai.model.entity.ChatMessageEntity;
@@ -39,9 +40,9 @@ class ChatMessageConverterTest {
     }
 
     @Test
-    void toolResponseRoundTripsBetweenDtoAndEntity() {
+    void toolResponseRoundTripsBetweenDtoAndEntityWithItsFailure() {
         ChatMessageMetadata metadata = new ChatMessageMetadata(null,
-                new ToolResponseMetadata("call-1", "getDate", "2026-10-03"));
+                new ToolResponseMetadata("call-1", "getDate", "2026-10-03", ToolFailureKind.REFUSED));
         ChatMessageDTO dto = message(ChatMessageRole.TOOL, "2026-10-03", metadata);
 
         ChatMessageEntity entity = converter.toEntity(dto);
@@ -57,7 +58,7 @@ class ChatMessageConverterTest {
         ChatMessageDTO assistant = message(ChatMessageRole.ASSISTANT, "", new ChatMessageMetadata(
                 List.of(new ToolCallMetadata("call-1", "function", "getDate", "{}")), null));
         ChatMessageDTO tool = message(ChatMessageRole.TOOL, "2026-10-03", new ChatMessageMetadata(
-                null, new ToolResponseMetadata("call-1", "getDate", "2026-10-03")));
+                null, new ToolResponseMetadata("call-1", "getDate", "2026-10-03", null)));
 
         JsonNode assistantJson = objectMapper.readTree(converter.toEntity(assistant).getMetadata());
         assertThat(fieldNames(assistantJson)).containsExactly("toolCalls");
@@ -67,17 +68,18 @@ class ChatMessageConverterTest {
         JsonNode toolJson = objectMapper.readTree(converter.toEntity(tool).getMetadata());
         assertThat(fieldNames(toolJson)).containsExactly("toolResponse");
         assertThat(fieldNames(toolJson.get("toolResponse")))
-                .containsExactlyInAnyOrder("id", "name", "responseData");
+                .containsExactlyInAnyOrder("id", "name", "responseData", "failure");
+        assertThat(toolJson.get("toolResponse").get("failure").isNull()).isTrue();
     }
 
     @Test
-    void unknownJsonKeysAreIgnored() {
+    void unknownJsonKeysAreIgnoredAndAMissingFailureIsNone() {
         ChatMessageEntity entity = entity("tool",
                 "{\"toolResponse\":{\"id\":\"call-1\",\"name\":\"getDate\",\"responseData\":\"x\",\"extra\":1},\"legacy\":true}");
 
         ChatMessageDTO dto = converter.toDTO(entity);
 
-        assertThat(dto.getMetadata().toolResponse()).isEqualTo(new ToolResponseMetadata("call-1", "getDate", "x"));
+        assertThat(dto.getMetadata().toolResponse()).isEqualTo(new ToolResponseMetadata("call-1", "getDate", "x", null));
         assertThat(dto.getMetadata().toolCalls()).isNull();
     }
 

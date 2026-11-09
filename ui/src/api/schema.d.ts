@@ -251,7 +251,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["listOptionalTools"];
+        get: operations["listTools"];
         put?: never;
         post?: never;
         delete?: never;
@@ -455,12 +455,16 @@ export interface components {
             type: string;
         };
         ToolResponseMetadata: {
+            /** @enum {string|null} */
+            failure: "UNKNOWN_TOOL" | "INVALID_ARGUMENTS" | "REFUSED" | "TOOL_ERROR" | null;
             id: string;
             name: string;
             responseData: string;
         };
         ToolVO: {
+            callName: string;
             description: string;
+            label: string;
             name: string;
             /** @enum {string} */
             type: "FIXED" | "OPTIONAL";
@@ -1048,7 +1052,7 @@ export interface operations {
             };
         };
     };
-    listOptionalTools: {
+    listTools: {
         parameters: {
             query?: never;
             header?: never;

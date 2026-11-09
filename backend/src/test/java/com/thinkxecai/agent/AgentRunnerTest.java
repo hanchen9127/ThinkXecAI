@@ -100,6 +100,12 @@ class AgentRunnerTest extends ServiceTestSupport {
         return (String) rows.get(rows.size() - 1).get("content");
     }
 
+    /** Why each stored tool result failed, in order; null for a success (ADR 064). */
+    private List<String> failures() {
+        return jdbcTemplate.queryForList("SELECT metadata->'toolResponse'->>'failure' FROM chat_message "
+                + "WHERE session_id = ? AND role = 'tool' ORDER BY created_at", String.class, session);
+    }
+
     private Prompt prompt(int index) {
         return model.prompts.get(index);
     }
@@ -129,6 +135,7 @@ class AgentRunnerTest extends ServiceTestSupport {
         String resultId = jdbcTemplate.queryForObject("SELECT metadata->'toolResponse'->>'id' FROM chat_message "
                 + "WHERE session_id = ? AND role = 'tool'", String.class, session);
         assertThat(callId).startsWith("call_").isEqualTo(resultId);
+        assertThat(failures()).containsExactly((String) null);
         // The second model call sees the call and its result.
         List<Message> second = prompt(1).getInstructions();
         assertThat(second.get(second.size() - 2)).isInstanceOfSatisfying(AssistantMessage.class, assistant ->
@@ -176,6 +183,8 @@ class AgentRunnerTest extends ServiceTestSupport {
         String result = jdbcTemplate.queryForObject("SELECT content FROM chat_message WHERE session_id = ? "
                 + "AND metadata->'toolResponse'->>'name' = 'terminate'", String.class, session);
         assertThat(result).isEqualTo(ToolJson.result(TerminateTool.NOT_ENDED));
+        // the runtime's rule declined it (ADR 045, 064); the date before it succeeded
+        assertThat(failures()).containsExactly(null, "REFUSED");
         assertThat(lastContent()).isEqualTo("Today is 2026-10-20.");
         assertThat(model.prompts).hasSize(3);
         // Gemini called terminate without text again after that result: the next call offers no tools
@@ -509,6 +518,7 @@ class AgentRunnerTest extends ServiceTestSupport {
         // Spring AI serializes a tool's String result as JSON; that is what the model saw and what is stored.
         assertThat(results.get(0)).isEqualTo("\"Install with npm.\"");
         assertThat(results.get(1)).contains("is not available");
+        assertThat(failures()).containsExactly(null, "REFUSED");
         verify(ragService).search(allowed, "setup");
         verify(ragService, never()).search(eq(other), anyString());
     }
@@ -525,6 +535,7 @@ class AgentRunnerTest extends ServiceTestSupport {
                 "SELECT content FROM chat_message WHERE session_id = ? AND role = 'tool'", String.class, session);
         // as JSON, like every tool result: Spring AI's Gemini model parses them (ToolJson)
         assertThat(result).isEqualTo("\"Unknown tool: databaseQuery. Use only the tools you were given.\"");
+        assertThat(failures()).containsExactly("UNKNOWN_TOOL");
     }
 
     @Test
@@ -538,10 +549,27 @@ class AgentRunnerTest extends ServiceTestSupport {
         String result = jdbcTemplate.queryForObject(
                 "SELECT content FROM chat_message WHERE session_id = ? AND role = 'tool'", String.class, session);
         assertThat(result).isEqualTo("\"Tool weather failed: the arguments are not valid JSON for this tool.\"");
+        assertThat(failures()).containsExactly("INVALID_ARGUMENTS");
         assertThat(prompt(1).getInstructions().get(prompt(1).getInstructions().size() - 1))
                 .isInstanceOfSatisfying(ToolResponseMessage.class, results ->
                         assertThat(results.getResponses()).extracting(ToolResponseMessage.ToolResponse::responseData)
                                 .containsExactly(result));
+    }
+
+    @Test
+    void parallelCallsEachKeepTheirOwnFailure() {
+        userSays("Look it all up.");
+        model.thenCall("", call("a", "databaseQuery", "{\"sql\":\"SELECT 1\"}"), call("b", "getDate", "{}"),
+                        call("c", "weather", "{\"city\": Sydney"),
+                        call("d", "KnowledgeTool", "{\"kbsId\":\"not-an-id\",\"query\":\"x\"}"))
+                .thenReply("Done.");
+
+        runner.run(agent, session, lastQuestion, NOT_STOPPED);
+
+        assertThat(failures()).containsExactly("UNKNOWN_TOOL", null, "INVALID_ARGUMENTS", "INVALID_ARGUMENTS");
+        List<String> ids = jdbcTemplate.queryForList("SELECT metadata->'toolResponse'->>'id' FROM chat_message "
+                + "WHERE session_id = ? AND role = 'tool' ORDER BY created_at", String.class, session);
+        assertThat(ids).containsExactly("a", "b", "c", "d");
     }
 
     @Test

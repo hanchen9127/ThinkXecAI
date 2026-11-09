@@ -6,6 +6,8 @@ export const UNDO_MS = 5000
 interface Item {
   id: string
   name: string
+  /** Where focus goes if the delete is undone: the row's ⋯, which comes back with the row. */
+  returnTo?: HTMLElement | null
 }
 
 /**

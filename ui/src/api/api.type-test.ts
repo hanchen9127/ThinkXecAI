@@ -17,7 +17,7 @@ import type {
   deleteAgent,
   listAgents,
   listChatMessagesBySession,
-  listOptionalTools,
+  listTools,
   uploadDocument,
 } from './api'
 
@@ -32,9 +32,9 @@ export type ApiTypeChecks = [
   Expect<Equal<Data<typeof deleteAgent>, null>>,
   Expect<Equal<Data<typeof listChatMessagesBySession>, ChatMessage[]>>,
   Expect<Equal<Data<typeof uploadDocument>, Document>>,
-  Expect<Equal<Data<typeof listOptionalTools>, ToolVO[]>>,
+  Expect<Equal<Data<typeof listTools>, ToolVO[]>>,
   Expect<Equal<ToolType, 'FIXED' | 'OPTIONAL'>>,
-  Expect<Equal<keyof ToolVO, 'name' | 'description' | 'type'>>,
+  Expect<Equal<keyof ToolVO, 'name' | 'callName' | 'label' | 'description' | 'type'>>,
   Expect<Equal<AgentModel, 'deepseek-chat' | 'gemini-3.8-flash' | 'qwen3.8-flash'>>,
   // A model added to the backend fails here until the picker lists it.
   Expect<Equal<(typeof AGENT_MODELS)[number], AgentModel>>,

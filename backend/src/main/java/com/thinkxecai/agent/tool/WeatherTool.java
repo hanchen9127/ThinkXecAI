@@ -16,6 +16,11 @@ public class WeatherTool implements Tool {
     }
 
     @Override
+    public String getLabel() {
+        return "Sample weather";
+    }
+
+    @Override
     public String getDescription() {
         return "Returns sample weather for a city and date (test tool, no real forecast).";
     }

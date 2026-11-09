@@ -8,12 +8,14 @@ import KnowledgeBaseTabContent from './components/tabs/KnowledgeBaseTabContent'
 import AgentsProvider from './contexts/AgentsProvider'
 import ChatSessionsProvider from './contexts/ChatSessionsProvider'
 import KnowledgeBasesProvider from './contexts/KnowledgeBasesProvider'
+import ToolsProvider from './contexts/ToolsProvider'
 import { usePageCount } from './hooks/usePageCount'
 import Content from './layout/Content'
 import { COLUMN } from './layout/column'
 import Layout from './layout/Layout'
 import Sidebar from './layout/Sidebar'
-import { sectionOf } from './layout/sections'
+import SkipLink from './layout/SkipLink'
+import { isListRoute, sectionOf } from './layout/sections'
 import { buttonConfig, theme } from './theme'
 import { cx } from './utils/cx'
 
@@ -33,12 +35,18 @@ const TABS = {
 
 /** The layout and the routes from tech-stack.md → Frontend Architecture; rendered inside a router. */
 export function AppRoutes() {
-  const section = sectionOf(useLocation().pathname)
+  const { pathname } = useLocation()
+  const section = sectionOf(pathname)
+  // A narrow screen shows the list on a section's own route and the page everywhere else (ADR 063).
+  const listScreen = section !== null && isListRoute(pathname)
   const page = usePageCount()
   return (
     <Layout>
-      <Sidebar active={section}>{section && TABS[section]}</Sidebar>
-      <Content>
+      <SkipLink />
+      <Sidebar active={section} hiddenWhenNarrow={!listScreen}>
+        {section && TABS[section]}
+      </Sidebar>
+      <Content page={page} hiddenWhenNarrow={listScreen}>
         <Suspense fallback={<p className={cx(COLUMN, 'm-0 py-9 text-muted')}>Loading…</p>}>
           <div
             key={page}
@@ -50,6 +58,7 @@ export function AppRoutes() {
               <Route path="/agent" element={<AgentHomeView />} />
               <Route path="/agent/:agentId" element={<AgentProfileView />} />
               <Route path="/chat" element={<AgentChatView />} />
+              <Route path="/chat/new" element={<AgentChatView />} />
               <Route path="/chat/:chatSessionId" element={<AgentChatView />} />
               <Route path="/knowledge-base" element={<KnowledgeBaseView />} />
               <Route path="/knowledge-base/:knowledgeBaseId" element={<KnowledgeBaseView />} />
@@ -70,11 +79,13 @@ export function AppProviders({ children }: { children: ReactNode }) {
       button={buttonConfig}
       select={{ menuItemSelectedIcon: <CheckOutlined /> }}
     >
-      <KnowledgeBasesProvider>
-        <AgentsProvider>
-          <ChatSessionsProvider>{children}</ChatSessionsProvider>
-        </AgentsProvider>
-      </KnowledgeBasesProvider>
+      <ToolsProvider>
+        <KnowledgeBasesProvider>
+          <AgentsProvider>
+            <ChatSessionsProvider>{children}</ChatSessionsProvider>
+          </AgentsProvider>
+        </KnowledgeBasesProvider>
+      </ToolsProvider>
     </ConfigProvider>
   )
 }
