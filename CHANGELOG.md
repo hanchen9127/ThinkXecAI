@@ -2,7 +2,7 @@
 
 ## 1.0.0 — 2026-11-09
 
-The first release: every phase of the plan is done, and the whole system was verified end to end
+The first release: every phase listed in the README is done, and the whole system was verified end to end
 against a real model (DeepSeek) with local `bge-m3` embeddings. The decisions behind it are in
 [docs/adr/](docs/adr/README.md) (ADR 001–067).
 
@@ -50,7 +50,7 @@ against a real model (DeepSeek) with local `bge-m3` embeddings. The decisions be
 
 - 609 backend tests against a real PostgreSQL and 366 frontend tests, run by CI on every pull
   request, with a check that the frontend's API types match the backend's OpenAPI description.
-- From the tool system on (PR #13), every pull request was reviewed by two reviewers (correctness and
+- From PR #13 (the tool system) on, every pull request was reviewed by two reviewers (correctness and
   security; specs, tests, and maintainability) before merging; the twelve earlier ones were reviewed
   the same way afterwards and their findings fixed together (PR #14). The UI went through five design
   reviews.
