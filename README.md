@@ -74,7 +74,7 @@ keeps the data. A plain `docker compose up` starts only PostgreSQL.
 
 ## Project Status
 
-Version 1.0.0: every phase of the plan is done, and the whole system was verified end to end against
+Version 1.0.0: every phase below is done, and the whole system was verified end to end against
 a real model. See [CHANGELOG.md](CHANGELOG.md) for what the release contains and
 [docs/adr/](docs/adr/README.md) for the decisions behind it.
 
