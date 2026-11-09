@@ -17,15 +17,15 @@ README for running the whole system and for what each screen does.
 
 ## Layout of `src/`
 
-| Folder                                                      | What is in it                                                                                                           |
-| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `api/`                                                      | The typed API client (below)                                                                                            |
-| `layout/`                                                   | The icon rail, list panel, and content area; which section a path belongs to                                            |
-| `components/tabs/`                                          | The list panel of each section: agents, chats, knowledge bases                                                          |
-| `components/views/`                                         | One page per route, each loaded when first opened                                                                       |
-| `components/chat/`, `agents/`, `knowledgeBases/`, `modals/` | Their parts; the pure rules (grouping messages, forms, file checks) sit in `.ts` files with their own tests             |
-| `contexts/`, `hooks/`                                       | The shared agent, knowledge-base, and chat lists; loading data; the SSE stream; delete with Undo; the working indicator |
-| `test/`                                                     | The fake backend (`fakeApi`), the fake `EventSource`, and `renderApp` for whole-app tests                               |
+| Folder                                                      | What is in it                                                                                                                 |
+| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `api/`                                                      | The typed API client (below)                                                                                                  |
+| `layout/`                                                   | The icon rail, list panel, and content area; which section a path belongs to                                                  |
+| `components/tabs/`                                          | The list panel of each section: agents, chats, knowledge bases                                                                |
+| `components/views/`                                         | One page per route, each loaded when first opened                                                                             |
+| `components/chat/`, `agents/`, `knowledgeBases/`, `modals/` | Their parts; the pure rules (grouping messages, forms, file checks) sit in `.ts` files with their own tests                   |
+| `contexts/`, `hooks/`                                       | The shared agent, knowledge-base, chat, and tool lists; loading data; the SSE stream; delete with Undo; the working indicator |
+| `test/`                                                     | The fake backend (`fakeApi`), the fake `EventSource`, and `renderApp` for whole-app tests                                     |
 
 Colours, radii, and sizes are named once in `index.css` (`@theme`) and `theme.ts` (Ant Design), kept
 equal by a test; components use those names, and lint refuses bracketed Tailwind values.

@@ -6,7 +6,7 @@ COPY pom.xml .
 RUN --mount=type=cache,target=/root/.m2 mvn -B -ntp dependency:go-offline
 COPY src src
 RUN --mount=type=cache,target=/root/.m2 mvn -B -ntp -DskipTests package \
-    && mv target/*-SNAPSHOT.jar app.jar
+    && mv target/backend-*.jar app.jar
 
 FROM eclipse-temurin:21.0.12.1_1-jre
 WORKDIR /app

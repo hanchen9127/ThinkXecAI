@@ -14,7 +14,8 @@ on the frontend, and PostgreSQL + pgvector for storage and retrieval.
 ## Features
 
 - **Configurable agents** — name, description, system prompt, chat model, allowed tools,
-  allowed knowledge bases, and chat options (temperature, top-p, memory window).
+  allowed knowledge bases, and chat options (memory window; temperature and top-p are stored but not
+  yet used at run time).
 - **Think-Execute agent loop** — restores recent chat memory, calls the selected model,
   detects and manually executes tool calls, persists generated messages, and stops on
   completion, `terminate`, a 20-step cap, or when the user stops the chat's runs (between steps).
@@ -22,7 +23,8 @@ on the frontend, and PostgreSQL + pgvector for storage and retrieval.
   always available; optional tools (read-only PostgreSQL query, email through Gmail) are
   selected per agent. Knowledge retrieval only searches the agent's own knowledge bases; SQL
   runs in a read-only transaction with a 5-second limit and a 200-row cap; email goes only to an
-  allowlist of recipients.
+  allowlist of recipients. Every tool result records whether the call succeeded, and if not, why:
+  an unknown tool, wrong arguments, refused by a rule, or a tool error.
 - **Knowledge bases & RAG** — upload Markdown documents, parse them into sections, embed
   section titles with a local Ollama `bge-m3` model, and retrieve the top matching chunks
   via pgvector similarity search.
@@ -32,10 +34,11 @@ on the frontend, and PostgreSQL + pgvector for storage and retrieval.
 - **React frontend** — an icon rail with lists of agents, chats, and knowledge bases; agent
   profiles and dialogs to create, edit, and delete; Markdown upload; a chat view that shows each
   run as a trace of its steps and tool results, live over SSE, with a timer while the agent works,
-  a Stop button, and Try again on a run that did not answer.
+  failed and refused calls marked, a Stop button, and Try again on a run that did not answer.
+  Built for desktop browsers and usable from the keyboard; narrow windows show the list or the item.
 
 Out of scope by design: authentication/authorization, multi-tenancy, WebSocket transport,
-token-by-token streaming, and document formats other than Markdown.
+token-by-token streaming, document formats other than Markdown, and a layout designed for phones.
 
 ## Tech Stack
 
@@ -43,9 +46,9 @@ token-by-token streaming, and document formats other than Markdown.
 |-----------|-----------------------------------------------------------------------------|
 | Backend   | Java 21, Spring Boot 3.5.16, Spring AI 1.1.8, MyBatis, PostgreSQL JDBC      |
 | AI models | Spring AI `ChatClient` over DeepSeek (`deepseek-chat`), Qwen (`qwen3.8-flash`, through its OpenAI-compatible API), and Google Gemini (`gemini-3.8-flash`) |
-| Database  | PostgreSQL (`pgvector/pgvector:pg18`) with the `vector` extension           |
+| Database  | PostgreSQL 18 (`pgvector/pgvector:0.8.6-pg18`) with the `vector` extension  |
 | Embeddings| Local Ollama, model `bge-m3`, 1024-dim vectors                              |
-| Frontend  | React 19, TypeScript, Vite 8, React Router 8, Tailwind CSS, Ant Design + `@ant-design/x-markdown` |
+| Frontend  | React 19, TypeScript, Vite 8, React Router 8, Tailwind CSS 4, Ant Design 6 + `@ant-design/x-markdown` |
 | Realtime  | Server-Sent Events (SSE), one connection per chat session                   |
 
 ## Run Everything in Docker
@@ -71,7 +74,9 @@ keeps the data. A plain `docker compose up` starts only PostgreSQL.
 
 ## Project Status
 
-This project is being built phase by phase. Current status:
+Version 1.0.0: every phase below is done, and the whole system was verified end to end against
+a real model. See [CHANGELOG.md](CHANGELOG.md) for what the release contains and
+[docs/adr/](docs/adr/README.md) for the decisions behind it.
 
 - [x] Phase 1 — Repository baseline (`docker-compose.yml`, `backend/`, `ui/`)
 - [x] Phase 2 — Database schema (`db/init/*.sql`, core tables + sample e-commerce data)
@@ -86,11 +91,8 @@ This project is being built phase by phase. Current status:
 - [x] Phase 11 — Agent runtime (Think-Execute loop)
 - [x] Phase 12 — SSE (one stream per chat, handed over between tabs)
 - [x] Phase 13 — Frontend features (agents, knowledge bases with upload, live chat)
-- [ ] Phase 14 — End-to-end verification
-
-The backend is complete: agents run the Think-Execute loop on the chosen model, use their tools
-and knowledge bases, store every message, and stream them over SSE. The frontend covers every
-screen (agents, knowledge bases with upload, chats); Phase 14 checks the whole system end to end.
+- [x] UI redesign — runs shown as traces, stopping a run, motion, Docker for the whole app
+- [x] Phase 14 — End-to-end verification, and the fixes from the design reviews (failure marks, tool labels, keyboard and focus)
 
 ## Getting Started
 
@@ -259,12 +261,16 @@ The icon rail on the left switches between three lists:
   steps fold into one line ("6 steps in 7.0 s" and the tools used) above the answer; Show steps
   opens them again.
 
-While the agent works and the message box is empty, Send turns into **Stop**. Stopping takes effect
-between steps, so a model call or tool already running finishes first; the button reads
-Stopping… until the run ends with "Stopped.". Stop also ends the messages queued behind it. Typing
-turns the button back into Send, so you can still queue a message. "Stopped." and a run that could
+While the agent works, a **Stop** button sits beside Send, and stays there while you type a
+correction. Stopping takes effect between steps, so a model call or tool already running finishes
+first; the button reads Stopping… until the run ends with "Stopped.". Stop also ends the messages
+queued behind it. Send still queues a message while the agent works. "Stopped." and a run that could
 not finish end with **Try again**, which sends the same question again. It shows only while that
 notice is the last thing in the chat; to repeat an earlier question, send it again yourself.
+
+A tool call that failed is marked on the rail with its reason: "Refused:" (a rule said no, such as a
+query that is not a single SELECT) with a ring, and "Wrong arguments:", "Unknown tool:", or "Failed:"
+with a red cross. A run that ends with a notice stays open, so its steps can be read.
 
 Deleting a chat or a document waits 5 seconds for Undo before it is sent; leaving the page or
 closing the tab sends it at once. Messages keep arriving if you close the tab mid-run: they are
@@ -278,10 +284,12 @@ but cannot continue.
 ## Project Structure
 
 ```
-backend/      Spring Boot application (controllers, services, mappers, agent runtime)
-ui/           React + TypeScript + Vite frontend
-db/init/      PostgreSQL initialization SQL (schema, indexes, sample data)
-docker-compose.yml   PostgreSQL with pgvector
+backend/             Spring Boot application (controllers, services, mappers, agent runtime); Dockerfile
+ui/                  React + TypeScript + Vite frontend; Dockerfile and Nginx config
+db/init/             PostgreSQL initialization SQL (schema, indexes, sample data)
+docs/adr/            Architecture decision records: what was decided, and why
+.impeccable/         Snapshots of the design reviews the UI went through
+docker-compose.yml   PostgreSQL with pgvector; with the profile app, also the backend and frontend
 ```
 
 ## API
@@ -294,7 +302,8 @@ All JSON REST endpoints live under `/api` and return a consistent envelope:
 
 The HTTP status is always 200; errors set `code` and `data: null`, with an English `message`:
 `400` for invalid input (the message names the field), `404` for a missing resource, `409` for a
-conflict (such as a user message to a session whose agent was deleted), and a generic `500` for
+conflict (such as a user message to a session whose agent was deleted), `503` when a service the
+request needs did not answer (such as Ollama while it loads its model), and a generic `500` for
 anything else. The one exception is a request whose `Host` is not `localhost` / `127.0.0.1`: it
 never reaches the API and gets HTTP 403 (with the same envelope, code `403`).
 
@@ -307,16 +316,20 @@ Timestamps (`createdAt`, `updatedAt`) are UTC, written without an offset (`2026-
 | Chat messages   | `GET /chat-messages/session/{sessionId}`, `POST /chat-messages` (user messages only), `DELETE /chat-messages/{chatMessageId}` |
 | Knowledge bases | `GET/POST /knowledge-bases`, `PATCH/DELETE /knowledge-bases/{knowledgeBaseId}` |
 | Documents       | `GET/POST /documents`, `GET /documents/kb/{kbId}`, `POST /documents/upload`, `PATCH/DELETE /documents/{documentId}` |
-| Tools           | `GET /tools` (optional tools only) |
+| Tools           | `GET /tools` |
 
 `POST /documents/upload` takes a `multipart/form-data` form with `kbId` and one `file`: a UTF-8
 Markdown file (`.md` or `.markdown`, at most 1 MB, no NUL characters) with at least one and at most 500
 headings with text. Each heading starts a section; the section titles are embedded and the original
 Markdown below each heading is stored
 as the chunk. The upload either fully succeeds or leaves no document, chunk, or file behind.
-`GET /tools` returns the optional tools an agent can choose, as `{ name, description, type }`;
-fixed tools are given to every agent and are not listed. An agent's `allowedTools` may only name
-optional tools (`dataBaseTool`, `emailTool`); anything else is rejected with `400`. Outside `/api`,
+`GET /tools` returns every tool a person sees, fixed ones first (not `terminate`), as
+`{ name, callName, label, description, type }`: `name` is what an agent's `allowedTools` stores,
+`callName` what the model calls, and `label` what the UI shows. Fixed tools are given to every agent;
+`allowedTools` may only name optional tools (`dataBaseTool`, `emailTool`), and anything else is
+rejected with `400`. A stored tool message's `metadata.toolResponse.failure` is `null` on success, or
+`UNKNOWN_TOOL`, `INVALID_ARGUMENTS`, `REFUSED`, or `TOOL_ERROR`. `POST /chat-sessions/{id}/stop` answers
+`true` when the chat had a run to stop. Outside `/api`,
 `GET /health` and `GET /sse-test` return plain text `ok`.
 
 Live agent output streams from `GET /sse/connect/{chatSessionId}` (`text/event-stream`):
