@@ -14,7 +14,8 @@ on the frontend, and PostgreSQL + pgvector for storage and retrieval.
 ## Features
 
 - **Configurable agents** — name, description, system prompt, chat model, allowed tools,
-  allowed knowledge bases, and chat options (temperature, top-p, memory window).
+  allowed knowledge bases, and chat options (memory window; temperature and top-p are stored but not
+  yet used at run time).
 - **Think-Execute agent loop** — restores recent chat memory, calls the selected model,
   detects and manually executes tool calls, persists generated messages, and stops on
   completion, `terminate`, a 20-step cap, or when the user stops the chat's runs (between steps).
@@ -37,7 +38,7 @@ on the frontend, and PostgreSQL + pgvector for storage and retrieval.
   Built for desktop browsers and usable from the keyboard; narrow windows show the list or the item.
 
 Out of scope by design: authentication/authorization, multi-tenancy, WebSocket transport,
-token-by-token streaming, and document formats other than Markdown.
+token-by-token streaming, document formats other than Markdown, and a layout designed for phones.
 
 ## Tech Stack
 

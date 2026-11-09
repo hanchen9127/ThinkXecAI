@@ -22,8 +22,8 @@ against a real model (DeepSeek) with local `bge-m3` embeddings. The decisions be
 ### Tools and knowledge
 
 - Fixed tools (knowledge search, terminate, city, date, sample weather) and optional ones: a
-  read-only PostgreSQL query (one `SELECT`, its own read-only connection, 5-second limit, 200 rows)
-  and email through the Gmail API to an allowlist of recipients.
+  read-only PostgreSQL query (one `SELECT` in a read-only transaction on its own connection, 5-second
+  limit, 200 rows) and email through the Gmail API to an allowlist of recipients.
 - Every tool result records its outcome: success, `UNKNOWN_TOOL`, `INVALID_ARGUMENTS`, `REFUSED`,
   or `TOOL_ERROR`, so failures can be shown and counted.
 - Markdown upload into knowledge bases: all-or-nothing, split by heading, embedded with a local
@@ -35,22 +35,25 @@ against a real model (DeepSeek) with local `bge-m3` embeddings. The decisions be
   takes the stream over, and a deleted chat closes it.
 - A React frontend for agents, knowledge bases, and chats. Each run is shown as a trace: steps on a
   rail, tool results summarised and opened in place, failed and refused calls marked, a timer while
-  the agent works, Stop beside Send, and Try again on a run that did not answer. Deletes can be
-  undone for 5 seconds. Usable from the keyboard, with a skip link and focus kept in place.
+  the agent works, Stop beside Send, and Try again on a run that did not answer. Deleting a chat
+  or a document can be undone for 5 seconds; deleting an agent or a knowledge base asks first.
+  Usable from the keyboard, with a skip link and focus kept in place.
 - Errors say what failed and what to do next.
 
 ### Running it
 
 - `docker compose up -d` starts PostgreSQL with pgvector; `docker compose --profile app up -d --build`
   also runs the backend and frontend in containers. Ports are published on `127.0.0.1` only, and the
-  backend answers only requests addressed to `localhost`.
+  backend answers only requests addressed to `localhost` or `127.0.0.1`.
 
 ### Quality
 
 - 609 backend tests against a real PostgreSQL and 366 frontend tests, run by CI on every pull
   request, with a check that the frontend's API types match the backend's OpenAPI description.
-- Every pull request was reviewed by two reviewers (correctness and security; specs, tests, and
-  maintainability) before merging, and the UI went through five design reviews.
+- From the tool system on (PR #13), every pull request was reviewed by two reviewers (correctness and
+  security; specs, tests, and maintainability) before merging; the twelve earlier ones were reviewed
+  the same way afterwards and their findings fixed together (PR #14). The UI went through five design
+  reviews.
 
 ### Not included
 
